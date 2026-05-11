@@ -14,7 +14,7 @@ from typing import Any
 from langchain.tools import tool, ToolRuntime
 from langchain_core.messages import SystemMessage
 from langchain_core.tools import tool as lc_tool
-from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 
 from copilotkit import a2ui
 
@@ -49,6 +49,7 @@ def generate_a2ui(runtime: ToolRuntime[Any]) -> str:
     returned as an a2ui_operations container for the middleware to detect.
     """
     import time
+
     t0 = time.time()
     print(f"[A2UI-DEBUG] generate_a2ui STARTED at t=0")
 
@@ -58,25 +59,28 @@ def generate_a2ui(runtime: ToolRuntime[Any]) -> str:
     # Get context entries from copilotkit state (catalog capabilities + component schema)
     context_entries = runtime.state.get("copilotkit", {}).get("context", [])
     context_text = "\n\n".join(
-        entry.get("value", "") for entry in context_entries
+        entry.get("value", "")
+        for entry in context_entries
         if isinstance(entry, dict) and entry.get("value")
     )
-    print(f"[A2UI-DEBUG]   context entries: {len(context_entries)}, context_text_len: {len(context_text)}")
+    print(
+        f"[A2UI-DEBUG]   context entries: {len(context_entries)}, context_text_len: {len(context_text)}"
+    )
 
     prompt = context_text
 
-    model = ChatOpenAI(model="gpt-4.1")
+    model = ChatOllama(model="gemma4:26b")
     model_with_tool = model.bind_tools(
         [render_a2ui],
         tool_choice="render_a2ui",
     )
 
-    print(f"[A2UI-DEBUG]   calling secondary LLM at t={time.time()-t0:.1f}s")
+    print(f"[A2UI-DEBUG]   calling secondary LLM at t={time.time() - t0:.1f}s")
     response = model_with_tool.invoke(
         [SystemMessage(content=prompt), *messages],
     )
     print(f"[A2UI-RESPONSE] {response}")
-    print(f"[A2UI-DEBUG]   secondary LLM responded at t={time.time()-t0:.1f}s")
+    print(f"[A2UI-DEBUG]   secondary LLM responded at t={time.time() - t0:.1f}s")
 
     if not response.tool_calls:
         print(f"[A2UI-DEBUG]   ERROR: no tool calls in response")
@@ -89,7 +93,9 @@ def generate_a2ui(runtime: ToolRuntime[Any]) -> str:
     catalog_id = args.get("catalogId", CUSTOM_CATALOG_ID)
     components = args.get("components", [])
     data = args.get("data", {})
-    print(f"[A2UI-DEBUG]   components={len(components)} data_keys={list(data.keys()) if data else []} surface={surface_id}")
+    print(
+        f"[A2UI-DEBUG]   components={len(components)} data_keys={list(data.keys()) if data else []} surface={surface_id}"
+    )
 
     ops = [
         a2ui.create_surface(surface_id, catalog_id=catalog_id),
@@ -99,5 +105,7 @@ def generate_a2ui(runtime: ToolRuntime[Any]) -> str:
         ops.append(a2ui.update_data_model(surface_id, data))
 
     result = a2ui.render(operations=ops)
-    print(f"[A2UI-DEBUG] generate_a2ui DONE at t={time.time()-t0:.1f}s result_len={len(result)}")
+    print(
+        f"[A2UI-DEBUG] generate_a2ui DONE at t={time.time() - t0:.1f}s result_len={len(result)}"
+    )
     return result

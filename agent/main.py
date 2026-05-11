@@ -14,9 +14,9 @@ from src.todos import AgentState, todo_tools
 from src.a2ui_dynamic_schema import generate_a2ui
 from src.a2ui_fixed_schema import search_flights
 
-from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 
-model = ChatOpenAI(model="gpt-5.4-mini", model_kwargs={"parallel_tool_calls": False})
+model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": False})
 
 agent = create_agent(
     model=model,
