@@ -1,39 +1,40 @@
-"use client";
+import React from "react"
+import type { Metadata } from 'next'
+import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from 'next/font/google'
+import './globals.css'
 
-import "./globals.css";
-import "@copilotkit/react-core/v2/styles.css";
+const instrumentSans = Instrument_Sans({
+  subsets: ["latin"],
+  variable: '--font-instrument'
+});
 
-import { CopilotKit } from "@copilotkit/react-core/v2";
-import { ThemeProvider } from "@/hooks/use-theme";
-// A2UI catalog: definitions + renderers in ./declarative-generative-ui/
-import { demonstrationCatalog } from "./declarative-generative-ui/renderers";
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  variable: '--font-instrument-serif'
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: '--font-jetbrains'
+});
+
+export const metadata: Metadata = {
+  title: 'COMPUTE - AI Agents for Distributed Computing',
+  description: 'Deploy autonomous AI agents on distributed infrastructure. Offload complex tasks to intelligent workers that run 24/7.',
+  generator: 'v0.app',
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
     <html lang="en">
-      <head>
-        <title>CopilotKit</title>
-        <link
-          rel="icon"
-          type="image/svg+xml"
-          href="/copilotkit-logo-mark.svg"
-        />
-      </head>
-      <body className={`antialiased`}>
-        <ThemeProvider>
-          <CopilotKit
-            runtimeUrl="/api/copilotkit"
-            inspectorDefaultAnchor={{ horizontal: "right", vertical: "top" }}
-            a2ui={{ catalog: demonstrationCatalog }}
-            openGenerativeUI={{}}
-            useSingleEndpoint={false}
-          >
-            {children}
-          </CopilotKit>
-        </ThemeProvider>
+      <body className={`${instrumentSans.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+        {children}
       </body>
     </html>
-  );
+  )
 }

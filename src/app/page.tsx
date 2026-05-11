@@ -1,24 +1,33 @@
-"use client";
+import { Navigation } from "@/components/landing/navigation";
+import { HeroSection } from "@/components/landing/hero-section";
+import { FeaturesSection } from "@/components/landing/features-section";
+import { HowItWorksSection } from "@/components/landing/how-it-works-section";
+import { InfrastructureSection } from "@/components/landing/infrastructure-section";
+import { MetricsSection } from "@/components/landing/metrics-section";
+import { IntegrationsSection } from "@/components/landing/integrations-section";
+import { SecuritySection } from "@/components/landing/security-section";
+import { DevelopersSection } from "@/components/landing/developers-section";
+import { TestimonialsSection } from "@/components/landing/testimonials-section";
+import { PricingSection } from "@/components/landing/pricing-section";
+import { CtaSection } from "@/components/landing/cta-section";
+import { FooterSection } from "@/components/landing/footer-section";
 
-import { ExampleLayout } from "@/components/example-layout";
-import { ExampleCanvas } from "@/components/example-canvas";
-import { useGenerativeUIExamples, useExampleSuggestions } from "@/hooks";
-
-import { CopilotChat } from "@copilotkit/react-core/v2";
-
-export default function HomePage() {
-  useGenerativeUIExamples();
-  useExampleSuggestions();
-
+export default function Home() {
   return (
-    <ExampleLayout
-      chatContent={
-        <CopilotChat
-          attachments={{ enabled: true }}
-          input={{ disclaimer: () => null, className: "pb-6" }}
-        />
-      }
-      appContent={<ExampleCanvas />}
-    />
+    <main className="relative min-h-screen overflow-x-hidden">
+      <Navigation />
+      <HeroSection />
+      <FeaturesSection />
+      <HowItWorksSection />
+      <InfrastructureSection />
+      <MetricsSection />
+      <IntegrationsSection />
+      <SecuritySection />
+      <DevelopersSection />
+      <TestimonialsSection />
+      <PricingSection />
+      <CtaSection />
+      <FooterSection />
+    </main>
   );
 }

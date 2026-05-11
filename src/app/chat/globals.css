@@ -1,0 +1,216 @@
+/* CopilotKit brand fonts */
+/* @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300..800&family=Spline+Sans+Mono:wght@400;500;600&display=swap"); */
+
+@import "tailwindcss";
+
+@import "tw-animate-css";
+
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+
+  /* Semantic tokens — CopilotKit brand */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(28.777% 0.11674 28.965);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #ffffff;
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Chart tokens */
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: #dbdbe5;
+  --chart-axis: #57575b;
+
+  --radius: 0.625rem;
+
+  /* Override CopilotKit font */
+  --cpk-default-font-family: var(--font-body);
+
+  /* Fonts */
+  --font-body: "Plus Jakarta Sans", "DM Sans", "Segoe UI", sans-serif;
+  --font-code:
+    "Spline Sans Mono", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+
+  /* Brand accent colors */
+  --cpk-mint-400: #85ecce;
+  --cpk-mint-800: #189370;
+  --cpk-lilac-400: #bec2ff;
+  --cpk-orange-400: #ffac4d;
+  --cpk-yellow-400: #fff388;
+  --cpk-ambient-gradient: linear-gradient(90deg,
+      #bec2ff 0%,
+      #85ecce 45.673%,
+      #ffac4d 100%);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+:root.dark,
+.dark {
+  --background: #010507;
+  --foreground: #ffffff;
+
+  --card: #191a1e;
+  --card-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #010507;
+  --secondary: #242529;
+  --secondary-foreground: #ffffff;
+  --muted: #242529;
+  --muted-foreground: #adadb2;
+  --accent: #303136;
+  --accent-foreground: #ffffff;
+  --destructive: #fa5f67;
+  --destructive-foreground: #ffffff;
+  --border: #303136;
+  --input: #303136;
+  --ring: #bec2ff;
+
+  --chart-tooltip-bg: #191a1e;
+  --chart-tooltip-border: #303136;
+  --chart-axis: #adadb2;
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+body,
+html {
+  height: 100%;
+}
+
+/*
+ * Showcase highlight for suggestion pills.
+ * Applied via className in use-example-suggestions.tsx when showcase.json
+ * is set to a non-default mode (e.g. "a2ui", "opengenui"). Uses CopilotKit
+ * brand colors with a subtle tinted background.
+ * Add new showcase variants here following the same pattern.
+ */
+[data-copilotkit] button[data-slot="suggestion-pill"].a2ui-highlight {
+  border-color: var(--cpk-lilac-400);
+  background: color-mix(in srgb, var(--cpk-lilac-400) 15%, var(--background));
+}
+
+[data-copilotkit] button[data-slot="suggestion-pill"].opengenui-highlight {
+  border-color: var(--cpk-mint-400);
+  background: color-mix(in srgb, var(--cpk-mint-400) 15%, var(--background));
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  html {
+    @apply font-sans;
+  }
+}
