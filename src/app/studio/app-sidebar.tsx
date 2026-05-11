@@ -5,7 +5,7 @@ import * as React from "react"
 import { NavDocuments } from "@/app/studio/nav-documents"
 import { NavMain } from "@/app/studio/nav-main"
 import { NavSecondary } from "@/app/studio/nav-secondary"
-import { NavUser } from "@/app/studio/nav-user"
+import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
   SidebarContent,
