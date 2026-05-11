@@ -17,28 +17,16 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)}>
-      <head>
-        <title>CopilotKit</title>
-        <link
-          rel="icon"
-          type="image/svg+xml"
-          href="/copilotkit-logo-mark.svg"
-        />
-      </head>
-      <body className={`antialiased`}>
-        <ThemeProvider>
-          <CopilotKit
-            runtimeUrl="/api/copilotkit"
-            inspectorDefaultAnchor={{ horizontal: "right", vertical: "top" }}
-            a2ui={{ catalog: demonstrationCatalog }}
-            openGenerativeUI={{}}
-            useSingleEndpoint={false}
-          >
-            {children}
-          </CopilotKit>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider>
+      <CopilotKit
+        runtimeUrl="/api/copilotkit"
+        inspectorDefaultAnchor={{ horizontal: "right", vertical: "top" }}
+        a2ui={{ catalog: demonstrationCatalog }}
+        openGenerativeUI={{}}
+        useSingleEndpoint={false}
+      >
+        {children}
+      </CopilotKit>
+    </ThemeProvider>
   );
 }
