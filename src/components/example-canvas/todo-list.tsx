@@ -25,11 +25,11 @@ export function TodoList({ todos, onUpdate, isAgentRunning }: TodoListProps) {
     const updated = todos.map((t) =>
       t.id === todo.id
         ? {
-            ...t,
-            status: (t.status === "completed" ? "pending" : "completed") as
-              | "pending"
-              | "completed",
-          }
+          ...t,
+          status: (t.status === "completed" ? "pending" : "completed") as
+            | "pending"
+            | "completed",
+        }
         : t,
     );
     onUpdate(updated);
@@ -72,10 +72,10 @@ export function TodoList({ todos, onUpdate, isAgentRunning }: TodoListProps) {
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <div className="text-5xl">✏️</div>
         <p className="text-base font-semibold text-[--foreground]">
-          No todos yet
+          No production tasks yet
         </p>
         <p className="text-sm text-[--muted-foreground]">
-          Create your first task to get started
+          Add a task to start your video project
         </p>
         <Button onClick={addTodo} disabled={isAgentRunning} className="mt-2">
           Add a task
@@ -87,9 +87,9 @@ export function TodoList({ todos, onUpdate, isAgentRunning }: TodoListProps) {
   return (
     <div className="flex gap-8 h-full">
       <TodoColumn
-        title="To Do"
+        title="Production Tasks"
         todos={pendingTodos}
-        emptyMessage="No pending todos"
+        emptyMessage="No pending tasks"
         showAddButton
         onAddTodo={addTodo}
         onToggleStatus={toggleStatus}
@@ -100,9 +100,9 @@ export function TodoList({ todos, onUpdate, isAgentRunning }: TodoListProps) {
         isAgentRunning={isAgentRunning}
       />
       <TodoColumn
-        title="Done"
+        title="Completed"
         todos={completedTodos}
-        emptyMessage="No completed todos yet"
+        emptyMessage="No completed tasks yet"
         onToggleStatus={toggleStatus}
         onDelete={deleteTodo}
         onUpdateTitle={updateTitle}
