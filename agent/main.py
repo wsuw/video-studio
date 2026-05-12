@@ -4,7 +4,7 @@ It defines the workflow graph, state, tools, nodes and edges.
 """
 
 from copilotkit import CopilotKitMiddleware, StateStreamingMiddleware, StateItem
-from langchain.agents import create_agent
+from deepagents import create_deep_agent
 
 # Data & state tools
 from src.query import query_data
@@ -18,16 +18,12 @@ from langchain_ollama import ChatOllama
 
 model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": False})
 
-agent = create_agent(
+agent = create_deep_agent(
     model=model,
     tools=[query_data, *todo_tools, generate_a2ui, search_flights],
     middleware=[
         CopilotKitMiddleware(),
-        StateStreamingMiddleware(
-            StateItem(state_key="todos", tool="manage_todos", tool_argument="todos")
-        ),
     ],
-    state_schema=AgentState,
     system_prompt="""
         You are a polished, professional demo assistant. Keep responses to 1-2 sentences.
 

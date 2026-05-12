@@ -1,7 +1,9 @@
 {
   "python_version": "3.12",
   "dockerfile_lines": [],
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
   "package_manager": "uv",
   "graphs": {
     "sample_agent": "./main.py:graph"

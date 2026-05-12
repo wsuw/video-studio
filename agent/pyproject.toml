@@ -18,5 +18,6 @@ dependencies = [
   "pip>=26.0.1",
   "langchain-anthropic==1.4.1",
   "langchain-ollama==1.1.0",
+  "deepagents>=0.5.3",
 ]
 
