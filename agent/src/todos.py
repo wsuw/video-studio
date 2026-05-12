@@ -5,6 +5,8 @@ from langgraph.types import Command
 from typing import TypedDict, Literal
 import uuid
 
+from copilotkit import CopilotKitState
+
 
 class Todo(TypedDict):
     id: str
@@ -14,7 +16,7 @@ class Todo(TypedDict):
     status: Literal["pending", "completed"]
 
 
-class AgentState(BaseAgentState):
+class AgentState(BaseAgentState, CopilotKitState):
     todos: list[Todo]
 
 

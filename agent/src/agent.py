@@ -1,7 +1,4 @@
-"""
-This is the main entry point for the agent.
-It defines the workflow graph, state, tools, nodes and edges.
-"""
+from langgraph.graph import StateGraph, END, START
 
 from copilotkit import CopilotKitMiddleware, StateStreamingMiddleware, StateItem
 from langchain.agents import create_agent
@@ -27,7 +24,7 @@ agent = create_agent(
             StateItem(state_key="todos", tool="manage_todos", tool_argument="todos")
         ),
     ],
-    state_schema=AgentState,
+    # state_schema=AgentState,
     system_prompt="""
         You are a polished, professional demo assistant. Keep responses to 1-2 sentences.
 
@@ -42,4 +39,15 @@ agent = create_agent(
     """,
 )
 
-graph = agent
+# 2. 定义编排逻辑
+workflow = StateGraph(AgentState)
+
+# 3. 将大脑作为一个处理节点接入
+workflow.add_node("agent", agent)
+
+# 4. 定义工作流转条件
+workflow.add_edge(START, "agent")
+workflow.add_edge("agent", END)
+
+# 5. 编译运行
+graph = workflow.compile()
