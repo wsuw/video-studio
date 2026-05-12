@@ -1,45 +1,19 @@
-"""
-This is the main entry point for the agent.
-It defines the workflow graph, state, tools, nodes and edges.
-"""
+# 1. 导入 LangGraph 基础组件和自定义的状态/节点
+from langgraph.graph import StateGraph, END, START
+from src.utils.state import AgentState
+from src.utils.nodes import agent
 
-from copilotkit import CopilotKitMiddleware, StateStreamingMiddleware, StateItem
-from langchain.agents import create_agent
+# 2. 初始化状态机：传入定义好的 AgentState 作为数据结构
+workflow = StateGraph(AgentState)
 
-# Data & state tools
-from src.query import query_data
-from src.todos import AgentState, todo_tools
+# 3. 注册节点：将定义好的 agent (大脑) 作为一个处理节点加入图中
+workflow.add_node("agent", agent)
 
-# A2UI tools
-from src.a2ui_dynamic_schema import generate_a2ui
-from src.a2ui_fixed_schema import search_flights
+# 4. 设置流转逻辑：
+#    - 从起点 (START) 直接进入 agent 节点
+#    - agent 节点处理完后，直接进入终点 (END)
+workflow.add_edge(START, "agent")
+workflow.add_edge("agent", END)
 
-from langchain_ollama import ChatOllama
-
-model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": False})
-
-agent = create_agent(
-    model=model,
-    tools=[query_data, *todo_tools, generate_a2ui, search_flights],
-    middleware=[
-        CopilotKitMiddleware(),
-        StateStreamingMiddleware(
-            StateItem(state_key="todos", tool="manage_todos", tool_argument="todos")
-        ),
-    ],
-    state_schema=AgentState,
-    system_prompt="""
-        You are a polished, professional demo assistant. Keep responses to 1-2 sentences.
-
-        Tool guidance:
-        - Flights: call search_flights to show flight cards with a pre-built schema.
-        - Dashboards & rich UI: call generate_a2ui to create dashboard UIs with metrics,
-          charts, tables, and cards. It handles rendering automatically.
-        - Charts: call query_data first, then render with the chart component.
-        - Todos: enable app mode first, then manage todos.
-        - A2UI actions: when you see a log_a2ui_event result (e.g. "view_details"),
-          respond with a brief confirmation. The UI already updated on the frontend.
-    """,
-)
-
-graph = agent
+# 5. 编译图：将定义好的逻辑转换为可执行的 graph 对象
+graph = workflow.compile()

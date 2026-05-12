@@ -1,15 +1,19 @@
-from langgraph.graph import StateGraph, END, START
+"""
+This is the main entry point for the agent.
+It defines the workflow graph, state, tools, nodes and edges.
+"""
 
 from copilotkit import CopilotKitMiddleware, StateStreamingMiddleware, StateItem
 from langchain.agents import create_agent
 
 # Data & state tools
-from src.query import query_data
-from src.todos import AgentState, todo_tools
+from src.test.query import query_data
+from src.test.todos import todo_tools
+from src.utils.state import AgentState
 
 # A2UI tools
-from src.a2ui_dynamic_schema import generate_a2ui
-from src.a2ui_fixed_schema import search_flights
+from src.test.a2ui_dynamic_schema import generate_a2ui
+from src.test.a2ui_fixed_schema import search_flights
 
 from langchain_ollama import ChatOllama
 
@@ -24,7 +28,7 @@ agent = create_agent(
             StateItem(state_key="todos", tool="manage_todos", tool_argument="todos")
         ),
     ],
-    # state_schema=AgentState,
+    state_schema=AgentState,
     system_prompt="""
         You are a polished, professional demo assistant. Keep responses to 1-2 sentences.
 
@@ -39,15 +43,4 @@ agent = create_agent(
     """,
 )
 
-# 2. 定义编排逻辑
-workflow = StateGraph(AgentState)
-
-# 3. 将大脑作为一个处理节点接入
-workflow.add_node("agent", agent)
-
-# 4. 定义工作流转条件
-workflow.add_edge(START, "agent")
-workflow.add_edge("agent", END)
-
-# 5. 编译运行
-graph = workflow.compile()
+graph = agent

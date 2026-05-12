@@ -1,23 +1,8 @@
-from langchain.agents import AgentState as BaseAgentState
 from langchain.tools import ToolRuntime, tool
 from langchain.messages import ToolMessage
 from langgraph.types import Command
-from typing import TypedDict, Literal
 import uuid
-
-from copilotkit import CopilotKitState
-
-
-class Todo(TypedDict):
-    id: str
-    title: str
-    description: str
-    emoji: str
-    status: Literal["pending", "completed"]
-
-
-class AgentState(BaseAgentState, CopilotKitState):
-    todos: list[Todo]
+from src.utils.state import Todo
 
 
 @tool
