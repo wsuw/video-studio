@@ -9,5 +9,8 @@
     "sample_agent": "./src/test/main.py:graph",
     "agent": "./main.py:graph"
   },
-  "env": "../.env"
+  "env": "../.env",
+  "checkpointer": {
+    "path": "./src/checkpointer.py:generate_checkpointer"
+  }
 }

@@ -11,7 +11,7 @@ const defaultAgent = new LangGraphAgent({
     process.env.AGENT_URL ||
     process.env.LANGGRAPH_DEPLOYMENT_URL ||
     "http://localhost:8123",
-  graphId: "sample_agent",
+  graphId: "agent",
   langsmithApiKey: process.env.LANGSMITH_API_KEY || "",
 });
 

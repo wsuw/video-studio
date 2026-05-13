@@ -1,19 +1,43 @@
-# 1. 导入 LangGraph 基础组件和自定义的状态/节点
+# agent/main.py
 from langgraph.graph import StateGraph, END, START
 from src.utils.state import AgentState
-from src.utils.nodes import agent
+from src.utils.nodes.design_node import design_node
+from src.utils.nodes.generation_node import generation_node
+from src.utils.nodes.redesign_node import redesign_node
+from src.utils.nodes.supervisor_node import supervisor_node, router_function
+from src.test.main import agent
 
-# 2. 初始化状态机：传入定义好的 AgentState 作为数据结构
+# 1. 定义工作流结构
 workflow = StateGraph(AgentState)
 
-# 3. 注册节点：将定义好的 agent (大脑) 作为一个处理节点加入图中
+# 2. 注册节点
+workflow.add_node("supervisor", supervisor_node)
+workflow.add_node("design", design_node)
+workflow.add_node("generate", generation_node)
+workflow.add_node("redesign", redesign_node)
 workflow.add_node("agent", agent)
 
-# 4. 设置流转逻辑：
-#    - 从起点 (START) 直接进入 agent 节点
-#    - agent 节点处理完后，直接进入终点 (END)
-workflow.add_edge(START, "agent")
-workflow.add_edge("agent", END)
 
-# 5. 编译图：将定义好的逻辑转换为可执行的 graph 对象
-graph = workflow.compile()
+# 3. 设置流转逻辑 (Supervisor 模式)
+workflow.add_edge(START, "agent")
+workflow.add_edge("agent", "supervisor")
+
+# 基于 supervisor 输出的 next_agent 路由到具体节点
+workflow.add_conditional_edges(
+    "supervisor",
+    router_function,
+    {
+        "design": "design",
+        "generate": "generate",
+        "redesign": "redesign",
+        "__end__": END,
+    },
+)
+
+# 各个 agent 节点执行完毕后，返回 supervisor 进行下一轮判断
+workflow.add_edge("design", "supervisor")
+workflow.add_edge("generate", "supervisor")
+workflow.add_edge("redesign", "supervisor")
+
+# 4. 编译工作流 (不在此处配置 checkpointer，由 langgraph dev 托管)
+graph = workflow.compile(interrupt_before=["generate"])
