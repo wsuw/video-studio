@@ -4,6 +4,8 @@ import * as React from "react"
 
 import { NavDesign } from "@/app/workspace/nav-design"
 import { NavGeneration } from "@/app/workspace/nav-generation"
+import { NavRedesign } from "@/app/workspace/nav-redesign"
+import { NavDistribution } from "@/app/workspace/nav-distribution"
 import { NavUser } from "@/components/nav-user"
 import { ProjectSwitcher } from "@/app/workspace/project-switcher"
 import {
@@ -48,9 +50,9 @@ const data = {
       plan: "Free",
     },
   ],
-  navMain: [
+  design: [
     {
-      title: "Playground",
+      title: "Script",
       url: "#",
       icon: (
         <TerminalSquareIcon
@@ -73,7 +75,7 @@ const data = {
       ],
     },
     {
-      title: "Models",
+      title: "Storyboard",
       url: "#",
       icon: (
         <BotIcon
@@ -95,7 +97,7 @@ const data = {
       ],
     },
     {
-      title: "Documentation",
+      title: "Assets",
       url: "#",
       icon: (
         <BookOpenIcon
@@ -120,36 +122,10 @@ const data = {
         },
       ],
     },
-    {
-      title: "Settings",
-      url: "#",
-      icon: (
-        <Settings2Icon
-        />
-      ),
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
   ],
   generation: [
     {
-      name: "Design Engineering",
+      name: "Render Queue",
       url: "#",
       icon: (
         <FrameIcon
@@ -157,21 +133,49 @@ const data = {
       ),
     },
     {
-      name: "Sales & Marketing",
+      name: "Execution",
       url: "#",
       icon: (
         <PieChartIcon
         />
       ),
-    },
+    }
+  ],
+  redesign: [
     {
-      name: "Travel",
+      name: "HITL Review",
       url: "#",
       icon: (
-        <MapIcon
+        <FrameIcon
         />
       ),
     },
+    {
+      name: "Correction",
+      url: "#",
+      icon: (
+        <PieChartIcon
+        />
+      ),
+    }
+  ],
+  distribution: [
+    {
+      name: "Timeline",
+      url: "#",
+      icon: (
+        <FrameIcon
+        />
+      ),
+    },
+    {
+      name: "Export",
+      url: "#",
+      icon: (
+        <PieChartIcon
+        />
+      ),
+    }
   ],
 }
 
@@ -182,8 +186,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <ProjectSwitcher projects={data.projects} />
       </SidebarHeader>
       <SidebarContent>
-        <NavDesign items={data.navMain} />
+        <NavDesign items={data.design} />
         <NavGeneration generation={data.generation} />
+        <NavRedesign redesign={data.redesign} />
+        <NavDistribution distribution={data.distribution} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
