@@ -8,8 +8,10 @@ def supervisor_node(state: AgentState):
     """
     # 获取当前的执行阶段，默认为 INIT
     current_phase = state.get("current_phase", Phase.INIT)
-    is_approved = state.get("is_approved", False)
-    script = state.get("script", "")
+    design = state.get("design", {})
+    is_approved = design.get("is_approved", False)
+    script = design.get("script", "")
+    scenes = design.get("scenes", [])
 
     # 简单的基于规则的路由逻辑
     # 实际应用中，这里也可以通过让 LLM 判断 state["messages"] 来决定跳转
@@ -17,10 +19,11 @@ def supervisor_node(state: AgentState):
     if not current_phase or current_phase == Phase.INIT:
         next_agent = Phase.DESIGN
     elif current_phase == Phase.DESIGN:
-        if is_approved or script:
+        # 经过 Review 节点后，回到 supervisor 判断审核结果
+        if is_approved:
             next_agent = Phase.GENERATE
         else:
-            next_agent = Phase.DESIGN  # 没通过则继续留在此阶段或交给用户
+            next_agent = Phase.DESIGN  # 打回重做，重新进入 design 节点
     elif current_phase == Phase.GENERATE:
         next_agent = Phase.REDESIGN
     elif current_phase == Phase.REDESIGN:

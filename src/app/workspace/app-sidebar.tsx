@@ -2,10 +2,10 @@
 
 import * as React from "react"
 
-import { NavMain } from "@/app/workspace/nav-main"
-import { NavProjects } from "@/app/workspace/nav-projects"
+import { NavDesign } from "@/app/workspace/nav-design"
+import { NavGeneration } from "@/app/workspace/nav-generation"
 import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/app/workspace/team-switcher"
+import { ProjectSwitcher } from "@/app/workspace/project-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -22,9 +22,9 @@ const data = {
     email: "guest@gmail.com",
     avatar: "https://ui.shadcn.com/avatars/shadcn.jpg",
   },
-  teams: [
+  projects: [
     {
-      name: "Acme Inc",
+      name: "Project Name",
       logo: (
         <GalleryVerticalEndIcon
         />
@@ -32,7 +32,7 @@ const data = {
       plan: "Enterprise",
     },
     {
-      name: "Acme Corp.",
+      name: "Project2",
       logo: (
         <AudioLinesIcon
         />
@@ -40,7 +40,7 @@ const data = {
       plan: "Startup",
     },
     {
-      name: "Evil Corp.",
+      name: "Project3",
       logo: (
         <TerminalIcon
         />
@@ -147,7 +147,7 @@ const data = {
       ],
     },
   ],
-  projects: [
+  generation: [
     {
       name: "Design Engineering",
       url: "#",
@@ -179,11 +179,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <ProjectSwitcher projects={data.projects} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        <NavDesign items={data.navMain} />
+        <NavGeneration generation={data.generation} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
