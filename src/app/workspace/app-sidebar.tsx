@@ -15,7 +15,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, TerminalSquareIcon, BotIcon, BookOpenIcon, Settings2Icon, FrameIcon, PieChartIcon, MapIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, PencilIcon, LayoutTemplateIcon, DatabaseIcon, ClapperboardIcon, ActivityIcon, EyeIcon, Wand2Icon, FilmIcon, UploadCloudIcon } from "lucide-react"
 
 // This is sample data.
 const data = {
@@ -53,90 +53,43 @@ const data = {
   design: [
     {
       title: "Script",
-      url: "#",
+      url: "/workspace/design/script",
       icon: (
-        <TerminalSquareIcon
+        <PencilIcon
         />
       ),
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
     },
     {
       title: "Storyboard",
-      url: "#",
+      url: "/workspace/design/storyboard",
       icon: (
-        <BotIcon
+        <LayoutTemplateIcon
         />
       ),
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
     },
     {
       title: "Assets",
-      url: "#",
+      url: "/workspace/design/assets",
       icon: (
-        <BookOpenIcon
+        <DatabaseIcon
         />
       ),
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
     },
   ],
   generation: [
     {
       name: "Render Queue",
-      url: "#",
+      url: "/workspace/generation/queue",
       icon: (
-        <FrameIcon
+        <ClapperboardIcon
         />
       ),
     },
     {
       name: "Execution",
-      url: "#",
+      url: "/workspace/generation/execution",
       icon: (
-        <PieChartIcon
+        <ActivityIcon
         />
       ),
     }
@@ -144,17 +97,17 @@ const data = {
   redesign: [
     {
       name: "HITL Review",
-      url: "#",
+      url: "/workspace/redesign/review",
       icon: (
-        <FrameIcon
+        <EyeIcon
         />
       ),
     },
     {
       name: "Correction",
-      url: "#",
+      url: "/workspace/redesign/correction",
       icon: (
-        <PieChartIcon
+        <Wand2Icon
         />
       ),
     }
@@ -162,17 +115,17 @@ const data = {
   distribution: [
     {
       name: "Timeline",
-      url: "#",
+      url: "/workspace/distribution/timeline",
       icon: (
-        <FrameIcon
+        <FilmIcon
         />
       ),
     },
     {
       name: "Export",
-      url: "#",
+      url: "/workspace/distribution/export",
       icon: (
-        <PieChartIcon
+        <UploadCloudIcon
         />
       ),
     }
