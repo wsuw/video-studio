@@ -5,150 +5,127 @@ import {
 } from "@blocknote/xl-ai/server";
 
 
-const systemPrompt = `You're manipulating a text document using JSON blocks. 
+const systemPrompt = `You're manipulating a text document using HTML blocks. 
 Make sure to follow the json schema provided. When referencing ids they MUST be EXACTLY the same (including the trailing $). 
 
 If the user requests updates to the document, use the "applyDocumentOperations" tool to update the document.
 ---
-IF there is no selection active in the latest state, first, determine what part of the document the user is talking about. You SHOULD probably take cursor info into account if needed.
-  EXAMPLE: if user says "below" (without pointing to a specific part of the document) he / she probably indicates the block(s) after the cursor. 
-  EXAMPLE: If you want to insert content AT the cursor position (UNLESS indicated otherwise by the user), then you need \`referenceId\` to point to the block before the cursor with position \`after\` (or block below and \`before\`
----
- `;
+IF there is no selection active in the latest state, first, determine what part of the document the user is talking about.
+Prefer updating existing blocks over removing and adding.
+The "block" field in update operations MUST be a single HTML element (e.g., <p>Content</p>).
+---`;
 
 
 function injectDocumentStateMessages(
   messages: UIMessage[],
 ): UIMessage[] {
-  return messages.flatMap((message) => {
+  return messages.map((message) => {
     if (message.role === "user" && (message.metadata as any)?.documentState) {
-      const documentState = (message.metadata as any)
-        .documentState as DocumentState<any>;
+      const documentState = (message.metadata as any).documentState as DocumentState<any>;
 
-      return [
-        {
-          role: "assistant",
-          id: "assistant-document-state-" + message.id,
-          parts: [
-            ...(documentState.selection
-              ? [
-                {
-                  type: "text" as const,
-                  text: `This is the latest state of the selection (ignore previous selections, you MUST issue operations against this latest version of the selection):`,
-                },
-                {
-                  type: "text" as const,
-                  text: JSON.stringify(documentState.selectedBlocks),
-                },
-                {
-                  type: "text" as const,
-                  text: `This is the latest state of the entire document (INCLUDING the selected text), 
-you can use this to find the selected text to understand the context (but you MUST NOT issue operations against this document, you MUST issue operations against the selection):`,
-                },
-                {
-                  type: "text" as const,
-                  text: JSON.stringify(documentState.blocks),
-                },
-              ]
-              : [
-                {
-                  type: "text" as const,
-                  text:
-                    `There is no active selection. This is the latest state of the document (ignore previous documents, you MUST issue operations against this latest version of the document). 
-The cursor is BETWEEN two blocks as indicated by cursor: true.
-` +
-                    (documentState.isEmptyDocument
-                      ? `Because the document is empty, YOU MUST first update the empty block before adding new blocks.`
-                      : "Prefer updating existing blocks over removing and adding (but this also depends on the user's question)."),
-                },
-                {
-                  type: "text" as const,
-                  text: JSON.stringify(documentState.blocks),
-                },
-              ]),
-            // Alternatively, we could explore using dynamic tools to fake document state retrieval:
-            // {
-            //   type: "dynamic-tool",
-            //   toolName: "getDocument",
-            //   input: {},
-            //   output: documentState.htmlBlocks,
-            //   state: "output-available",
-            //   toolCallId: "getDocument-" + message.id,
-            // },
-            // {
-            //   type: "dynamic-tool",
-            //   toolName: "getDocumentSelection",
-            //   input: {},
-            //   output: documentState.selection
-            //     ? documentState.htmlSelectedBlocks
-            //     : "no selection active",
-            //   state: "output-available",
-            //   toolCallId: "getDocument-" + message.id,
-            // },
-          ],
-        },
-        message,
-      ];
+      // 获取用户原始文本
+      const userText = message.parts
+        .filter(p => p.type === 'text')
+        .map(p => (p as any).text)
+        .join('\n');
+
+      let combinedContent = "";
+
+      // 1. 全文背景
+      combinedContent += `### BACKGROUND CONTEXT\nBelow is the current state of the document for your reference:\n\`\`\`json\n${JSON.stringify(documentState.blocks, null, 2)}\n\`\`\`\n\n`;
+
+      // 2. 目标操作区
+      if (documentState.selection) {
+        combinedContent += `### TARGET SELECTION\nThe user has selected these specific blocks to replace or improve. You MUST focus your operations on these IDs:\n\`\`\`json\n${JSON.stringify(documentState.selectedBlocks, null, 2)}\n\`\`\`\n\n`;
+      } else {
+        combinedContent += `### CURSOR POSITION\nNo selection. Cursor is ${documentState.cursor ? "AT" : "BETWEEN"} a block.\n\n`;
+      }
+
+      // 3. 最终任务
+      combinedContent += `### TASK\n${userText}\n\nIMPORTANT: Use 'applyDocumentOperations' tool. One HTML element per block. EXACT IDs.`;
+
+      return {
+        ...message,
+        parts: [{ type: "text", text: combinedContent }],
+      };
     }
-    return [message];
+    return message;
   });
 }
-/**
-   * A serializable version of a Tool
-   */
-type ToolDefinition = { description?: string; inputSchema: JSONSchema7; outputSchema: JSONSchema7; };
-type ToolDefinitions = Record<string, ToolDefinition>;
 
+/**
+ * 递归清理 Schema，解决 Ollama 的兼容性问题
+ */
+function cleanSchema(schema: any): any {
+  if (typeof schema !== 'object' || schema === null) return schema;
+  const newSchema = { ...schema };
+  delete newSchema.additionalProperties; // 很多模型不喜欢这个
+
+  if (newSchema.properties) {
+    for (const key in newSchema.properties) {
+      newSchema.properties[key] = cleanSchema(newSchema.properties[key]);
+    }
+  }
+  if (newSchema.items) {
+    newSchema.items = cleanSchema(newSchema.items);
+  }
+  if (newSchema.anyOf) {
+    // 简化 anyOf，只取第一个或展开（此处仅演示简单清理）
+    newSchema.anyOf = newSchema.anyOf.map((s: any) => cleanSchema(s));
+  }
+  return newSchema;
+}
 
 function toolDefinitionsToToolSet(
-  toolDefinitions: ToolDefinitions,
+  toolDefinitions: Record<string, any>,
 ): ToolSet {
   return Object.fromEntries(
     Object.entries(toolDefinitions).map(([name, definition]) => [
       name,
       tool({
         ...definition,
-        inputSchema: jsonSchema(definition.inputSchema),
-        outputSchema: jsonSchema(definition.outputSchema),
+        inputSchema: jsonSchema(cleanSchema(definition.inputSchema)),
+        outputSchema: jsonSchema(cleanSchema(definition.outputSchema)),
       }),
     ]),
   );
 }
 
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30;
+// Allow streaming responses up to 60 seconds
+export const maxDuration = 60;
 
 const ollama = createOllama({
-  // optional settings, e.g.
   baseURL: 'http://localhost:11434',
 });
 
 export async function POST(req: Request) {
   const { messages, toolDefinitions } = await req.json();
-  console.log("Messages received:", JSON.stringify(messages, null, 2));
-  console.log("Tool definitions received:", JSON.stringify(toolDefinitions, null, 2));
-  const modelMessages = await convertToModelMessages(
-    injectDocumentStateMessages(messages),
-  );
-  console.log("Model messages:", JSON.stringify(modelMessages));
+  console.log(">>> [Raw Messages From Frontend]", JSON.stringify(messages, null, 2));
+
+  // 1. 注入上下文（合并到单条 User 消息中）
+  const injectedMessages = injectDocumentStateMessages(messages);
+
+  // 2. 转换为模型消息并平铺
+  const modelMessages = (await convertToModelMessages(injectedMessages)).map(m => ({
+    role: m.role,
+    content: Array.isArray(m.content)
+      ? m.content.map(c => (c.type === 'text' ? (c as any).text : '')).join('')
+      : m.content
+  })) as any;
+
+  console.log(">>> [Model Messages Sent]", JSON.stringify(modelMessages, null, 2));
 
   const result = streamText({
-    model: ollama("gemma4:26b"), // see https://ai-sdk.dev/docs/foundations/providers-and-models
+    model: ollama("gemma4:26b"),
     system: systemPrompt,
-    messages: await convertToModelMessages(
-      injectDocumentStateMessages(messages),
-    ),
+    messages: modelMessages,
     tools: toolDefinitionsToToolSet(toolDefinitions),
-    toolChoice: "required",
-    onFinish: ({ text, toolCalls }) => {
-      console.log("=== Model Response Start ===");
-      if (text) console.log("Text:", text);
-      if (toolCalls && toolCalls.length > 0) {
-        console.log("Tool Calls:", JSON.stringify(toolCalls, null, 2));
-      }
-      console.log("=== Model Response End ===");
-    },
+    toolChoice: "required", // 重新开启
+    // onFinish: ({ text, toolCalls }) => {
+    //   if (text) console.log(">>> [Model Final Text]", text);
+    //   console.log(">>> [Model Tool Calls]", JSON.stringify(toolCalls, null, 2));
+    // }
   });
 
   return result.toUIMessageStreamResponse();
