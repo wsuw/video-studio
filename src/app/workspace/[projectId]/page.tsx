@@ -1,5 +1,6 @@
 "use client"
 
+import { AppSidebar } from "@/app/workspace/[projectId]/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,13 +10,19 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon } from "lucide-react"
-import { WorkspaceContext } from "@/app/workspace/layout"
+import { PanelRightIcon, MessageSquareIcon } from "lucide-react"
+
+import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 
-export default function StoryboardPage() {
+export default function Page() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
 
   return (
@@ -30,19 +37,13 @@ export default function StoryboardPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/workspace">
+                <BreadcrumbLink href="#">
                   Studio
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#">
-                  Design
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Storyboard</BreadcrumbPage>
+                <BreadcrumbPage>Project Name</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -63,27 +64,13 @@ export default function StoryboardPage() {
           </div>
         )}
       </header>
-      
-      <div className="flex flex-1 flex-col gap-4 p-4 pt-4 overflow-y-auto">
-        <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold tracking-tight">Visual Storyboard</h1>
-          <Button variant="default" size="sm">Generate Layouts</Button>
-        </div>
-        
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-4">
         <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-          <div className="aspect-video rounded-xl bg-muted/50 border border-dashed flex items-center justify-center">
-            <span className="text-muted-foreground text-sm">Scene 1 (Pending Bbox)</span>
-          </div>
-          <div className="aspect-video rounded-xl bg-muted/50 border border-dashed flex items-center justify-center">
-            <span className="text-muted-foreground text-sm">Scene 2 (Pending Bbox)</span>
-          </div>
-          <div className="aspect-video rounded-xl bg-muted/50 border border-dashed flex items-center justify-center">
-            <span className="text-muted-foreground text-sm">Scene 3 (Pending Bbox)</span>
-          </div>
+          <div className="aspect-video rounded-xl bg-muted/50" />
+          <div className="aspect-video rounded-xl bg-muted/50" />
+          <div className="aspect-video rounded-xl bg-muted/50" />
         </div>
-        <div className="min-h-screen flex-1 rounded-xl bg-muted/50 md:min-h-min border border-dashed flex items-center justify-center mt-4">
-            <span className="text-muted-foreground text-sm">Select a scene to view detailed layout constraints</span>
-        </div>
+        <div className="min-h-screen flex-1 rounded-xl bg-muted/50 md:min-h-min" />
       </div>
     </>
   )

@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { MessageSquareIcon } from "lucide-react"
-import { WorkspaceContext } from "@/app/workspace/layout"
+import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 
 export default function TimelinePage() {
@@ -58,54 +58,54 @@ export default function TimelinePage() {
           </div>
         )}
       </header>
-      
+
       <div className="flex flex-1 flex-col gap-4 p-4 pt-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold tracking-tight">Timeline & Composition</h1>
           <Button variant="default" size="sm">Render Sequence</Button>
         </div>
-        
+
         <div className="flex-1 flex flex-col gap-4">
           <div className="aspect-video max-w-2xl mx-auto w-full bg-black rounded-lg border border-border flex items-center justify-center relative overflow-hidden">
-             <span className="text-white/50 text-sm">Preview Monitor</span>
-             <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-               <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full opacity-70">{"<"}</Button>
-               <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full opacity-70">{"||"}</Button>
-               <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full opacity-70">{">"}</Button>
-             </div>
+            <span className="text-white/50 text-sm">Preview Monitor</span>
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+              <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full opacity-70">{"<"}</Button>
+              <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full opacity-70">{"||"}</Button>
+              <Button size="icon" variant="secondary" className="w-8 h-8 rounded-full opacity-70">{">"}</Button>
+            </div>
           </div>
-          
+
           <div className="flex-1 bg-muted/30 rounded-xl border border-border p-4 flex flex-col gap-2">
             <div className="flex items-center gap-4 text-xs text-muted-foreground border-b border-border pb-2">
-               <div className="w-24">Tracks</div>
-               <div className="flex-1 flex justify-between px-2">
-                 <span>00:00:00</span>
-                 <span>00:00:15</span>
-                 <span>00:00:30</span>
-                 <span>00:00:45</span>
-               </div>
+              <div className="w-24">Tracks</div>
+              <div className="flex-1 flex justify-between px-2">
+                <span>00:00:00</span>
+                <span>00:00:15</span>
+                <span>00:00:30</span>
+                <span>00:00:45</span>
+              </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
-               <div className="w-24 text-xs font-medium">Video (V1)</div>
-               <div className="flex-1 h-12 bg-background border border-border rounded relative">
-                 <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-blue-500/20 border-r border-blue-500 flex items-center px-2 text-xs text-blue-500">Scene 1</div>
-                 <div className="absolute left-1/3 top-0 bottom-0 w-1/3 bg-blue-500/20 border-r border-blue-500 flex items-center px-2 text-xs text-blue-500">Scene 2</div>
-               </div>
+              <div className="w-24 text-xs font-medium">Video (V1)</div>
+              <div className="flex-1 h-12 bg-background border border-border rounded relative">
+                <div className="absolute left-0 top-0 bottom-0 w-1/3 bg-blue-500/20 border-r border-blue-500 flex items-center px-2 text-xs text-blue-500">Scene 1</div>
+                <div className="absolute left-1/3 top-0 bottom-0 w-1/3 bg-blue-500/20 border-r border-blue-500 flex items-center px-2 text-xs text-blue-500">Scene 2</div>
+              </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
-               <div className="w-24 text-xs font-medium">Dialogue (A1)</div>
-               <div className="flex-1 h-10 bg-background border border-border rounded relative">
-                 <div className="absolute left-[5%] top-0 bottom-0 w-1/4 bg-green-500/20 border-r border-green-500 flex items-center px-2 text-xs text-green-500">TTS Audio 1</div>
-               </div>
+              <div className="w-24 text-xs font-medium">Dialogue (A1)</div>
+              <div className="flex-1 h-10 bg-background border border-border rounded relative">
+                <div className="absolute left-[5%] top-0 bottom-0 w-1/4 bg-green-500/20 border-r border-green-500 flex items-center px-2 text-xs text-green-500">TTS Audio 1</div>
+              </div>
             </div>
-            
+
             <div className="flex items-center gap-4">
-               <div className="w-24 text-xs font-medium">SFX (A2)</div>
-               <div className="flex-1 h-10 bg-background border border-border rounded relative">
-                 <div className="absolute left-[20%] top-0 bottom-0 w-1/6 bg-amber-500/20 border-r border-amber-500 flex items-center px-2 text-xs text-amber-500">Rain SFX</div>
-               </div>
+              <div className="w-24 text-xs font-medium">SFX (A2)</div>
+              <div className="flex-1 h-10 bg-background border border-border rounded relative">
+                <div className="absolute left-[20%] top-0 bottom-0 w-1/6 bg-amber-500/20 border-r border-amber-500 flex items-center px-2 text-xs text-amber-500">Rain SFX</div>
+              </div>
             </div>
           </div>
         </div>

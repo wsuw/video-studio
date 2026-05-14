@@ -11,11 +11,11 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon } from "lucide-react"
-import { WorkspaceContext } from "@/app/workspace/layout"
+import { MessageSquareIcon, CheckCircle2Icon, XCircleIcon } from "lucide-react"
+import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 
-export default function AssetsPage() {
+export default function ReviewPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
 
   return (
@@ -34,11 +34,11 @@ export default function AssetsPage() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#">Design</BreadcrumbLink>
+                <BreadcrumbLink href="#">Redesign</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Assets</BreadcrumbPage>
+                <BreadcrumbPage>HITL Review</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -58,30 +58,41 @@ export default function AssetsPage() {
           </div>
         )}
       </header>
-      
+
       <div className="flex flex-1 flex-col gap-4 p-4 pt-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold tracking-tight">Project Assets</h1>
-          <Button variant="default" size="sm">Upload Asset</Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-orange-500">Pending Director Review</h1>
+            <p className="text-sm text-muted-foreground">Agent execution halted via interrupt(). Waiting for human approval.</p>
+          </div>
         </div>
-        
-        <div className="grid auto-rows-min gap-4 md:grid-cols-4">
-          <div className="aspect-square rounded-xl bg-muted/50 border border-dashed flex flex-col items-center justify-center gap-2 p-4 text-center hover:bg-muted/80 transition-colors cursor-pointer">
-            <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xl font-bold">M</div>
-            <div>
-              <p className="text-sm font-medium">Main Character</p>
-              <p className="text-xs text-muted-foreground">Identity Profile</p>
+
+        <div className="flex-1 rounded-xl bg-background border border-border shadow-sm p-6 flex flex-col items-center">
+          <div className="w-full max-w-4xl space-y-6">
+            <div className="aspect-video bg-muted/50 rounded-lg flex items-center justify-center border border-dashed relative overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm flex-col gap-2">
+                <span>[Generated Clip Preview]</span>
+                <span>Scene: Cyberpunk Dialogue</span>
+              </div>
             </div>
-          </div>
-          <div className="aspect-square rounded-xl bg-muted/50 border border-dashed flex flex-col items-center justify-center gap-2 p-4 text-center hover:bg-muted/80 transition-colors cursor-pointer">
-            <div className="w-12 h-12 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-500 text-xl font-bold">C</div>
-            <div>
-              <p className="text-sm font-medium">Cyber City Base</p>
-              <p className="text-xs text-muted-foreground">Environment Ref</p>
+
+            <div className="bg-muted/30 p-4 rounded-lg border border-border">
+              <h3 className="font-medium text-sm mb-2">VLM QC Report (Automated)</h3>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li className="text-green-500">Character Identity: Match (92%)</li>
+                <li className="text-green-500">Layout/Bbox Constraints: Match (88%)</li>
+                <li className="text-yellow-500">Temporal Consistency: Minor flicker detected on background light.</li>
+              </ul>
             </div>
-          </div>
-          <div className="aspect-square rounded-xl bg-muted/20 border border-dashed flex flex-col items-center justify-center gap-2 p-4 text-center hover:bg-muted/50 transition-colors cursor-pointer opacity-70">
-            <p className="text-sm font-medium text-muted-foreground">+ Add New Asset</p>
+
+            <div className="flex justify-end gap-4 mt-6">
+              <Button variant="outline" className="flex items-center gap-2 text-red-500 hover:text-red-500 hover:bg-red-500/10">
+                <XCircleIcon className="w-4 h-4" /> Reject & Reroute
+              </Button>
+              <Button variant="default" className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
+                <CheckCircle2Icon className="w-4 h-4" /> Approve & Resume
+              </Button>
+            </div>
           </div>
         </div>
       </div>

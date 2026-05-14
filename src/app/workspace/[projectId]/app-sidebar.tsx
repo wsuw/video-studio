@@ -2,12 +2,12 @@
 
 import * as React from "react"
 
-import { NavDesign } from "@/app/workspace/nav-design"
-import { NavGeneration } from "@/app/workspace/nav-generation"
-import { NavRedesign } from "@/app/workspace/nav-redesign"
-import { NavDistribution } from "@/app/workspace/nav-distribution"
+import { NavDesign } from "@/app/workspace/[projectId]/nav-design"
+import { NavGeneration } from "@/app/workspace/[projectId]/nav-generation"
+import { NavRedesign } from "@/app/workspace/[projectId]/nav-redesign"
+import { NavDistribution } from "@/app/workspace/[projectId]/nav-distribution"
 import { NavUser } from "@/components/nav-user"
-import { ProjectSwitcher } from "@/app/workspace/project-switcher"
+import { ProjectSwitcher } from "@/app/workspace/[projectId]/project-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -16,6 +16,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, PencilIcon, LayoutTemplateIcon, DatabaseIcon, ClapperboardIcon, ActivityIcon, EyeIcon, Wand2Icon, FilmIcon, UploadCloudIcon } from "lucide-react"
+import { useParams } from "next/navigation"
 
 // This is sample data.
 const data = {
@@ -26,6 +27,7 @@ const data = {
   },
   projects: [
     {
+      id: "proj_001",
       name: "Project Name",
       logo: (
         <GalleryVerticalEndIcon
@@ -34,6 +36,7 @@ const data = {
       plan: "Enterprise",
     },
     {
+      id: "proj_002",
       name: "Project2",
       logo: (
         <AudioLinesIcon
@@ -42,6 +45,7 @@ const data = {
       plan: "Startup",
     },
     {
+      id: "proj_003",
       name: "Project3",
       logo: (
         <TerminalIcon
@@ -53,7 +57,7 @@ const data = {
   design: [
     {
       title: "Script",
-      url: "/workspace/design/script",
+      url: "/design/script",
       icon: (
         <PencilIcon
         />
@@ -61,7 +65,7 @@ const data = {
     },
     {
       title: "Storyboard",
-      url: "/workspace/design/storyboard",
+      url: "/design/storyboard",
       icon: (
         <LayoutTemplateIcon
         />
@@ -69,7 +73,7 @@ const data = {
     },
     {
       title: "Assets",
-      url: "/workspace/design/assets",
+      url: "/design/assets",
       icon: (
         <DatabaseIcon
         />
@@ -79,7 +83,7 @@ const data = {
   generation: [
     {
       name: "Render Queue",
-      url: "/workspace/generation/queue",
+      url: "/generation/queue",
       icon: (
         <ClapperboardIcon
         />
@@ -87,7 +91,7 @@ const data = {
     },
     {
       name: "Execution",
-      url: "/workspace/generation/execution",
+      url: "/generation/execution",
       icon: (
         <ActivityIcon
         />
@@ -97,7 +101,7 @@ const data = {
   redesign: [
     {
       name: "HITL Review",
-      url: "/workspace/redesign/review",
+      url: "/redesign/review",
       icon: (
         <EyeIcon
         />
@@ -105,7 +109,7 @@ const data = {
     },
     {
       name: "Correction",
-      url: "/workspace/redesign/correction",
+      url: "/redesign/correction",
       icon: (
         <Wand2Icon
         />
@@ -115,7 +119,7 @@ const data = {
   distribution: [
     {
       name: "Timeline",
-      url: "/workspace/distribution/timeline",
+      url: "/distribution/timeline",
       icon: (
         <FilmIcon
         />
@@ -123,7 +127,7 @@ const data = {
     },
     {
       name: "Export",
-      url: "/workspace/distribution/export",
+      url: "/distribution/export",
       icon: (
         <UploadCloudIcon
         />
@@ -133,16 +137,39 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const params = useParams()
+  const projectId = params.projectId as string
+
+  const designItems = data.design.map(item => ({
+    ...item,
+    url: `/workspace/${projectId}${item.url}`
+  }))
+
+  const generationItems = data.generation.map(item => ({
+    ...item,
+    url: `/workspace/${projectId}${item.url}`
+  }))
+
+  const redesignItems = data.redesign.map(item => ({
+    ...item,
+    url: `/workspace/${projectId}${item.url}`
+  }))
+
+  const distributionItems = data.distribution.map(item => ({
+    ...item,
+    url: `/workspace/${projectId}${item.url}`
+  }))
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <ProjectSwitcher projects={data.projects} />
       </SidebarHeader>
       <SidebarContent>
-        <NavDesign items={data.design} />
-        <NavGeneration generation={data.generation} />
-        <NavRedesign redesign={data.redesign} />
-        <NavDistribution distribution={data.distribution} />
+        <NavDesign items={designItems} />
+        <NavGeneration generation={generationItems} />
+        <NavRedesign redesign={redesignItems} />
+        <NavDistribution distribution={distributionItems} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

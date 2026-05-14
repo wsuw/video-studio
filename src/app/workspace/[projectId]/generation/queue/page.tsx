@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { MessageSquareIcon } from "lucide-react"
-import { WorkspaceContext } from "@/app/workspace/layout"
+import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 
 export default function QueuePage() {
@@ -63,29 +63,29 @@ export default function QueuePage() {
           </div>
         )}
       </header>
-      
+
       <div className="flex flex-1 flex-col gap-4 p-4 pt-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold tracking-tight">Render Queue</h1>
           <Button variant="outline" size="sm">Refresh Status</Button>
         </div>
-        
+
         <div className="flex-1 rounded-xl bg-background border border-border shadow-sm p-4 flex flex-col gap-2">
-            <div className="p-4 border border-dashed rounded-lg flex justify-between items-center bg-muted/20">
-                <div>
-                    <h3 className="font-medium">Scene_01_Cyberpunk_City</h3>
-                    <p className="text-xs text-muted-foreground">ComfyUI Cluster 1 - Base Render</p>
-                </div>
-                <div className="text-sm font-medium text-blue-500">Processing (45%)</div>
+          <div className="p-4 border border-dashed rounded-lg flex justify-between items-center bg-muted/20">
+            <div>
+              <h3 className="font-medium">Scene_01_Cyberpunk_City</h3>
+              <p className="text-xs text-muted-foreground">ComfyUI Cluster 1 - Base Render</p>
             </div>
-            
-            <div className="p-4 border border-dashed rounded-lg flex justify-between items-center bg-muted/20">
-                <div>
-                    <h3 className="font-medium">Scene_02_Dialogue_CloseUp</h3>
-                    <p className="text-xs text-muted-foreground">ComfyUI Cluster 2 - Base Render</p>
-                </div>
-                <div className="text-sm font-medium text-muted-foreground">Queued</div>
+            <div className="text-sm font-medium text-blue-500">Processing (45%)</div>
+          </div>
+
+          <div className="p-4 border border-dashed rounded-lg flex justify-between items-center bg-muted/20">
+            <div>
+              <h3 className="font-medium">Scene_02_Dialogue_CloseUp</h3>
+              <p className="text-xs text-muted-foreground">ComfyUI Cluster 2 - Base Render</p>
             </div>
+            <div className="text-sm font-medium text-muted-foreground">Queued</div>
+          </div>
         </div>
       </div>
     </>

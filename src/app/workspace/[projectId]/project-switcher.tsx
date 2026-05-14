@@ -18,18 +18,26 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { useParams, useRouter } from "next/navigation"
 
 export function ProjectSwitcher({
   projects,
 }: {
   projects: {
+    id: string
     name: string
     logo: React.ReactNode
     plan: string
   }[]
 }) {
   const { isMobile } = useSidebar()
-  const [activeProject, setActiveProject] = React.useState(projects[0])
+  const router = useRouter()
+  const params = useParams()
+  const activeProjectId = params.projectId as string
+
+  const [activeProject, setActiveProject] = React.useState(
+    projects.find(p => p.id === activeProjectId) || projects[0]
+  )
 
   if (!activeProject) {
     return null
@@ -66,7 +74,10 @@ export function ProjectSwitcher({
             {projects.map((project, index) => (
               <DropdownMenuItem
                 key={project.name}
-                onClick={() => setActiveProject(project)}
+                onClick={() => {
+                  setActiveProject(project)
+                  router.push(`/workspace/${project.id}/design/script`) // Redirect to default page for project
+                }}
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-md border">

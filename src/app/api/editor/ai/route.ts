@@ -101,7 +101,7 @@ const ollama = createOllama({
 
 export async function POST(req: Request) {
   const { messages, toolDefinitions } = await req.json();
-  console.log(">>> [Raw Messages From Frontend]", JSON.stringify(messages, null, 2));
+  // console.log(">>> [Raw Messages From Frontend]", JSON.stringify(messages, null, 2));
 
   // 1. 注入上下文（合并到单条 User 消息中）
   const injectedMessages = injectDocumentStateMessages(messages);
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
       : m.content
   })) as any;
 
-  console.log(">>> [Model Messages Sent]", JSON.stringify(modelMessages, null, 2));
+  // console.log(">>> [Model Messages Sent]", JSON.stringify(modelMessages, null, 2));
 
   const result = streamText({
     model: ollama("gemma4:26b"),

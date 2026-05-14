@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { MessageSquareIcon } from "lucide-react"
-import { WorkspaceContext } from "@/app/workspace/layout"
+import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 
 export default function CorrectionPage() {
@@ -58,40 +58,40 @@ export default function CorrectionPage() {
           </div>
         )}
       </header>
-      
+
       <div className="flex flex-1 flex-col gap-4 p-4 pt-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold tracking-tight">Atomic Correction</h1>
           <Button variant="default" size="sm">Apply Inpaint</Button>
         </div>
-        
+
         <div className="flex-1 rounded-xl bg-background border border-border shadow-sm p-6 grid grid-cols-3 gap-6">
           <div className="col-span-2 aspect-video bg-muted/50 rounded-lg flex items-center justify-center border border-dashed relative">
             <span className="text-muted-foreground text-sm">Draw Bbox to define re-paint area</span>
             <div className="absolute w-32 h-32 border-2 border-primary bg-primary/10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 border-dashed"></div>
           </div>
-          
+
           <div className="flex flex-col gap-4">
             <div className="p-4 rounded-lg bg-muted/30 border border-border">
-               <h3 className="font-medium text-sm mb-2">Routing Strategy</h3>
-               <p className="text-xs text-muted-foreground mb-4">Select the specific agent/model to fix the localized issue.</p>
-               
-               <div className="space-y-2">
-                  <div className="p-2 text-sm border rounded bg-primary/5 border-primary cursor-pointer">
-                    Identify Agent (Fix Face/IP-Adapter)
-                  </div>
-                  <div className="p-2 text-sm border rounded bg-background cursor-pointer hover:bg-muted/50">
-                    Layout Agent (Fix Composition)
-                  </div>
-                  <div className="p-2 text-sm border rounded bg-background cursor-pointer hover:bg-muted/50">
-                    Lighting/ControlNet Agent
-                  </div>
-               </div>
+              <h3 className="font-medium text-sm mb-2">Routing Strategy</h3>
+              <p className="text-xs text-muted-foreground mb-4">Select the specific agent/model to fix the localized issue.</p>
+
+              <div className="space-y-2">
+                <div className="p-2 text-sm border rounded bg-primary/5 border-primary cursor-pointer">
+                  Identify Agent (Fix Face/IP-Adapter)
+                </div>
+                <div className="p-2 text-sm border rounded bg-background cursor-pointer hover:bg-muted/50">
+                  Layout Agent (Fix Composition)
+                </div>
+                <div className="p-2 text-sm border rounded bg-background cursor-pointer hover:bg-muted/50">
+                  Lighting/ControlNet Agent
+                </div>
+              </div>
             </div>
-            
+
             <div className="p-4 rounded-lg bg-muted/30 border border-border flex-1">
-               <h3 className="font-medium text-sm mb-2">Correction Prompt</h3>
-               <textarea className="w-full h-32 bg-background border border-border rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Describe what needs to change inside the bounding box..."></textarea>
+              <h3 className="font-medium text-sm mb-2">Correction Prompt</h3>
+              <textarea className="w-full h-32 bg-background border border-border rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Describe what needs to change inside the bounding box..."></textarea>
             </div>
           </div>
         </div>

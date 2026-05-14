@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { MessageSquareIcon, DownloadIcon, SmartphoneIcon, MonitorIcon } from "lucide-react"
-import { WorkspaceContext } from "@/app/workspace/layout"
+import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 
 export default function ExportPage() {
@@ -58,37 +58,37 @@ export default function ExportPage() {
           </div>
         )}
       </header>
-      
+
       <div className="flex flex-1 flex-col gap-4 p-4 pt-4 overflow-y-auto">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold tracking-tight">Export & Distribution</h1>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-6 max-w-4xl">
-           <div className="bg-background border border-border shadow-sm rounded-xl p-6">
-              <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><MonitorIcon className="w-5 h-5"/> Cinematic Format (16:9)</h2>
-              <p className="text-sm text-muted-foreground mb-6">Original raw composition perfect for YouTube or internal review.</p>
-              
-              <div className="aspect-video bg-muted/50 rounded-lg border border-dashed mb-6 flex items-center justify-center">
-                 <span className="text-xs text-muted-foreground">Preview 16:9</span>
+          <div className="bg-background border border-border shadow-sm rounded-xl p-6">
+            <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><MonitorIcon className="w-5 h-5" /> Cinematic Format (16:9)</h2>
+            <p className="text-sm text-muted-foreground mb-6">Original raw composition perfect for YouTube or internal review.</p>
+
+            <div className="aspect-video bg-muted/50 rounded-lg border border-dashed mb-6 flex items-center justify-center">
+              <span className="text-xs text-muted-foreground">Preview 16:9</span>
+            </div>
+
+            <Button className="w-full gap-2"><DownloadIcon className="w-4 h-4" /> Export MP4 (4K)</Button>
+          </div>
+
+          <div className="bg-background border border-border shadow-sm rounded-xl p-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1 rounded-bl-lg">AI AUTO CROP</div>
+            <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><SmartphoneIcon className="w-5 h-5" /> Social Format (9:16)</h2>
+            <p className="text-sm text-muted-foreground mb-6">Automatically cropped using visual anchor points for TikTok/Shorts.</p>
+
+            <div className="flex justify-center mb-6">
+              <div className="aspect-[9/16] h-40 bg-muted/50 rounded border border-dashed flex items-center justify-center">
+                <span className="text-xs text-muted-foreground">9:16</span>
               </div>
-              
-              <Button className="w-full gap-2"><DownloadIcon className="w-4 h-4"/> Export MP4 (4K)</Button>
-           </div>
-           
-           <div className="bg-background border border-border shadow-sm rounded-xl p-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1 rounded-bl-lg">AI AUTO CROP</div>
-              <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><SmartphoneIcon className="w-5 h-5"/> Social Format (9:16)</h2>
-              <p className="text-sm text-muted-foreground mb-6">Automatically cropped using visual anchor points for TikTok/Shorts.</p>
-              
-              <div className="flex justify-center mb-6">
-                 <div className="aspect-[9/16] h-40 bg-muted/50 rounded border border-dashed flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">9:16</span>
-                 </div>
-              </div>
-              
-              <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700"><DownloadIcon className="w-4 h-4"/> Export Short (1080p)</Button>
-           </div>
+            </div>
+
+            <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700"><DownloadIcon className="w-4 h-4" /> Export Short (1080p)</Button>
+          </div>
         </div>
       </div>
     </>
