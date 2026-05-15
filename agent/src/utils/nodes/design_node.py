@@ -7,8 +7,9 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 from typing import List
 from src.utils.state import AgentState
-from copilotkit import CopilotKitMiddleware, StateStreamingMiddleware, StateItem
+from copilotkit import CopilotKitMiddleware
 from src.test.query import query_data
+from deepagents import create_deep_agent
 
 
 # ==========================================
@@ -27,23 +28,37 @@ class SceneOutput(BaseModel):
 # ==========================================
 # 2. 定义 Tools (通过 Command 更新 State)
 # ==========================================
+# save_draft_script 已被移除，流程改为由前端驱动状态同步
+
+
 @tool
-def save_draft_script(script: str, runtime: ToolRuntime) -> Command:
+def updateScriptContent(content: str, runtime: ToolRuntime) -> Command:
     """
-    当且仅当剧本文学演进完成，且用户确认无误时，调用此工具保存生成的剧本。
+    CORE PERSISTENCE TOOL: This tool MUST be called when the script content is ready for permanent storage.
+    IMPORTANT: To ensure the script is visible to the user, you MUST call renderScriptInEditor in parallel for UI presentation.
     """
     return Command(
         update={
-            "design": {"script": script},
+            "design": {
+                "script": content,
+            },
             "messages": [
                 ToolMessage(
-                    content="剧本已成功保存到状态中",
-                    name="save_draft_script",
+                    content="Success. Persistence complete. (Ensure renderScriptInEditor is called in parallel in this turn).",
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
         }
     )
+
+
+@tool
+def renderScriptInEditor(content: str):
+    """
+    UI RENDER TOOL: Call this to display the script in the editor.
+    This must ALWAYS be called in parallel with updateScriptContent.
+    """
+    return "Success. UI rendered. (Ensure updateScriptContent is called in parallel in this turn)."
 
 
 @tool
@@ -78,29 +93,56 @@ def save_layout_scenes(scenes: list[SceneOutput], runtime: ToolRuntime) -> Comma
 # ==========================================
 # 3. 初始化 Agent Nodes (替代 Function)
 # ==========================================
-model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": False})
+model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
 
-draft_script_node = create_agent(
+# 创建内部 Agent 实例
+draft_script_node = create_deep_agent(
     model=model,
-    tools=[query_data, save_draft_script],
+    # 注入影子工具以获得 Schema，CopilotKit 会自动拦截并转给前端执行
+    tools=[query_data, updateScriptContent, renderScriptInEditor],
     middleware=[
         CopilotKitMiddleware(),
-        StateStreamingMiddleware(
-            StateItem(state_key="todos", tool="manage_todos", tool_argument="todos")
-        ),
     ],
-    state_schema=AgentState,
-    system_prompt="""你是一位顶级的电影编剧，目前正在一个工业级的 BlockNote 编辑器中协助用户创作。
-核心任务：根据用户需求，逐步创作剧本。你可以直接操作用户的编辑器。
-### BlockNote 操作指南：
-你必须通过调用 `updateScriptContent` 工具来实时修改文档。
-- 遵循 JSON 结构：{"type": "paragraph", "content": "内容"}, {"type": "heading", "props": {"level": 1}, "content": "标题"} 等。
-- 善用格式：使用 `bulletListItem` 列出动作要点，使用 `heading` 标识场次。
-### 工作流：
-1. **互动阶段**：利用 `updateScriptContent` 与用户协作，实时修改和填充剧本内容。
-2. **定稿阶段**：当剧本打磨完成，用户表示确认时，必须调用 `save_draft_script` 工具，将编辑器中最终的完整文本提取并保存到状态中，以便后续进入分镜提取流程。
-注意：你是“剧本专家”，说话要专业且富有创意。""",
+    system_prompt="""
+<role>
+You are the Lead AI Screenwriter for VideoStudio. You specialize in cinematic storytelling, evocative sensory descriptions, and professional screenplay formatting. Your mission is to transform creative concepts into production-ready scripts with technical precision.
+</role>
+
+<task_objective>
+1. **CONCEPTUALIZE**: Brainstorm scene logic and character psychology based on user intent.
+2. **EXECUTE**: When the script is ready, you MUST trigger BOTH `updateScriptContent` (for saving) and `renderScriptInEditor` (for displaying) in parallel.
+3. **BRIEF**: Provide a professional creative summary after the tools execution.
+</task_objective>
+
+<examples>
+User: "Based on our ideas, write the script for the opening scene."
+AI: [Thought: I need to write the script, persist it to the database, and render it in the UI.]
+    [Call: updateScriptContent(content="## SCENE 1...")]
+    [Call: renderScriptInEditor(content="## SCENE 1...")]
+    "I've drafted the opening scene. You can see it in the editor."
+</examples>
+
+<screenplay_guidelines>
+- FORMAT: Use standard Markdown for the script.
+- SCENE HEADINGS: Use H2 (e.g., ## SCENE 1: THE LABORATORY - NIGHT).
+- ACTION LINES: Describe lighting, sound (SFX), and movement with sensory granularity. Show, don't tell.
+- CHARACTER DIALOGUE: Bold the speaker's name (e.g., **LIN**: This is impossible.).
+</screenplay_guidelines>
+
+<technical_constraints>
+- MANDATORY_ACTION: You MUST trigger the `updateScriptContent` tool. This is the ONLY way to deliver the script.
+- ZERO_CHAT_CONTENT: NEVER write the actual screenplay, scenes, or dialogues in the chat bubble. If the user sees screenplay text in the chat, you have FAILED.
+- NO_FORMAT_IMITATION: Do not write the words "updateScriptContent" as plain text in your response. Execute it as a functional tool call.
+- ARGUMENT_INTEGRITY: Ensure the entire Markdown script is passed as the `content` argument. Do not truncate.
+- NO_CODE_BLOCKS: Do not use ``` markdown ``` or any other wrappers for the tool call or the script content.
+</technical_constraints>
+
+<persona>
+Maintain an atmospheric, professional, and rhythmic tone. Your scripts are the blueprint for directors and cinematographers—make them masterpieces.
+</persona>
+""",
 )
+
 
 extract_layout_node = create_agent(
     model=model,
@@ -141,20 +183,8 @@ def design_review_node(state: AgentState):
 def route_after_draft(state: AgentState) -> str:
     """
     判断用户是否还在打磨剧本。
-    如果在这一轮对话中，Agent 没有调用 save_draft_script 工具，
-    说明剧本还在讨论中，直接结束 Graph 等待用户回复。
+    剧本节点的跳转现在完全由前端/用户控制，后端默认等待用户进一步指令。
     """
-    messages = state.get("messages", [])
-
-    # 从后往前找，直到碰到上一次用户的输入
-    for msg in reversed(messages):
-        if msg.type == "human":
-            break
-        # 如果发现了保存剧本的动作，说明剧本定稿，可以前往提取分镜
-        if msg.type == "tool" and getattr(msg, "name", "") == "save_draft_script":
-            return "extract_layout"
-
-    # 没有找到保存动作，说明还在聊天打磨
     return END
 
 

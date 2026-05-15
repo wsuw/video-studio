@@ -1,6 +1,5 @@
 from typing import TypedDict, Literal, Annotated
 from enum import Enum
-import operator
 from langchain.agents import AgentState as BaseAgentState
 from copilotkit import CopilotKitState
 
@@ -46,10 +45,10 @@ class DesignState(TypedDict, total=False):
 
 class AgentState(BaseAgentState, CopilotKitState):
     todos: list[Todo]
-    
+
     # 按照模块聚拢的设计阶段状态 (带有合并策略，防止部分更新时丢失数据)
     design: Annotated[DesignState, merge_dict]
-    
+
     current_scene_index: int
     qc_report: str  # 质检结果
     current_phase: Phase  # 当前阶段标识

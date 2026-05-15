@@ -23,7 +23,12 @@ import {
 import { en as aiEn } from "@blocknote/xl-ai/locales";
 import "@blocknote/xl-ai/style.css";
 
+import { useEffect, useCallback } from "react";
+import { z } from "zod";
 import { DefaultChatTransport } from "ai";
+import { useFrontendTool } from "@copilotkit/react-core/v2";
+import { useParams } from "next/navigation";
+import { updateThreadState, getThreadState } from "@/lib/langgraph";
 
 // Formatting toolbar with the `AIToolbarButton` added
 const FormattingToolbarWithAI = () => (
@@ -42,71 +47,116 @@ const getSlashMenuItemsWithAI = (editor: BlockNoteEditor<any, any, any>) => [
 ];
 
 export default function EditorContent() {
-  // Creates a new editor instance.
+  const { projectId } = useParams();
+
+  // 1. 初始化编辑器 (完整配置)
   const editor = useCreateBlockNote({
     dictionary: {
       ...en,
-      ai: aiEn, // add default translations for the AI extension
+      ai: aiEn,
     },
-    // Register the AI extension
     extensions: [
       AIExtension({
         transport: new DefaultChatTransport({
-          // URL to your backend API, see example source in `packages/xl-ai-server/src/routes/regular.ts`
           api: `/api/editor/ai`,
         }),
       }),
     ],
-    // We set some initial content for demo purposes
     initialContent: [
       {
         type: "heading",
         props: {
-          level: 1,
+          level: 2,
         },
-        content: "Open source software",
+        content: "🎬 VideoStudio Screenplay Editor Guide",
       },
       {
         type: "paragraph",
-        content:
-          "Open source software refers to computer programs whose source code is made available to the public, allowing anyone to view, modify, and distribute the code. This model stands in contrast to proprietary software, where the source code is kept secret and only the original creators have the right to make changes. Open projects are developed collaboratively, often by communities of developers from around the world, and are typically distributed under licenses that promote sharing and openness.",
+        content: "Welcome to your professional-grade screenplay editor. Collaborate with AI using the following methods:",
       },
       {
-        type: "paragraph",
-        content:
-          "One of the primary benefits of open source is the promotion of digital autonomy. By providing access to the source code, these programs empower users to control their own technology, customize software to fit their needs, and avoid vendor lock-in. This level of transparency also allows for greater security, as anyone can inspect the code for vulnerabilities or malicious elements. As a result, users are not solely dependent on a single company for updates, bug fixes, or continued support.",
+        type: "bulletListItem",
+        content: "Send instructions in the chat (e.g., 'Write a sci-fi opening') and the AI will update the script here in real-time.",
       },
       {
-        type: "paragraph",
-        content:
-          "Additionally, open development fosters innovation and collaboration. Developers can build upon existing projects, share improvements, and learn from each other, accelerating the pace of technological advancement. The open nature of these projects often leads to higher quality software, as bugs are identified and fixed more quickly by a diverse group of contributors. Furthermore, using open source can reduce costs for individuals, businesses, and governments, as it is often available for free and can be tailored to specific requirements without expensive licensing fees.",
+        type: "bulletListItem",
+        content: "Type '/' to open the quick insert menu for scene headings, action lines, and other standard formats.",
+      },
+      {
+        type: "bulletListItem",
+        content: "Utilize standard Markdown shortcuts for a faster and more efficient creative workflow.",
       },
     ],
   });
 
-  // Renders the editor instance using a React component.
+  // 2. 封装手动保存函数
+  const handleManualSave = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const markdown = await editor.blocksToMarkdownLossy();
+      console.log("正在手动同步剧本到后端 (路径: design.script)...");
+      await updateThreadState(projectId as string, { design: { script: markdown } });
+      console.log("✅ 剧本保存成功！");
+    } catch (error) {
+      console.error("❌ 手动保存失败:", error);
+    }
+  }, [projectId, editor]);
+
+  // 3. 自动恢复状态 (仅在挂载时)
+  useEffect(() => {
+    async function loadSavedScript() {
+      if (!projectId) return;
+      try {
+        const state = await getThreadState(projectId as string);
+        const savedMarkdown = state?.values?.design?.script;
+        if (savedMarkdown) {
+          console.log("从后端恢复剧本内容...");
+          const blocks = await editor.tryParseMarkdownToBlocks(savedMarkdown);
+          editor.replaceBlocks(editor.document, blocks);
+        }
+      } catch (error) {
+        console.warn("未发现历史剧本或拉取失败:", error);
+      }
+    }
+    loadSavedScript();
+  }, [projectId, editor]);
+
+  // 4. 监听全局保存按钮事件
+  useEffect(() => {
+    const handleSaveEvent = () => handleManualSave();
+    window.addEventListener("save-script-event", handleSaveEvent);
+    return () => window.removeEventListener("save-script-event", handleSaveEvent);
+  }, [handleManualSave]);
+
+  // 5. 注册全能同步工具 (与后端 MASTER SYNC TOOL 保持一致)
+  useFrontendTool({
+    name: "renderScriptInEditor",
+    description: "[SYSTEM CALL] Sync screenplay content and render it in the editor UI.",
+    parameters: z.object({
+      content: z.string().describe("The Markdown text of the screenplay."),
+    }),
+    handler: async ({ content }) => {
+      console.log("正在原子化渲染并保存剧本...");
+      try {
+        const blocks = await editor.tryParseMarkdownToBlocks(content);
+        editor.replaceBlocks(editor.document, blocks);
+      } catch (e) {
+        console.error("渲染剧本失败:", e);
+      }
+      return "Success. UI rendered. (Ensure updateScriptContent is called in parallel in this turn).";
+    },
+  }, [editor]);
+
   return (
-    <div>
+    <div className="p-4 min-h-screen">
       <BlockNoteView
         editor={editor}
-        // We're disabling some default UI elements
         formattingToolbar={false}
         slashMenu={false}
         style={{ paddingBottom: "300px" }}
       >
-        {/* Add the AI Command menu to the editor */}
         <AIMenuController />
-
-        {/* We disabled the default formatting toolbar with `formattingToolbar=false`
-        and replace it for one with an "AI button" (defined below).
-        (See "Formatting Toolbar" in docs)
-        */}
         <FormattingToolbarController formattingToolbar={FormattingToolbarWithAI} />
-
-        {/* We disabled the default SlashMenu with `slashMenu=false`
-        and replace it for one with an AI option (defined below).
-        (See "Suggestion Menus" in docs)
-        */}
         <SuggestionMenuController
           triggerCharacter="/"
           getItems={async (query) =>

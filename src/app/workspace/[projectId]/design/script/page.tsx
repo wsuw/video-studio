@@ -59,6 +59,7 @@ export default function Page() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => window.dispatchEvent(new CustomEvent("save-script-event"))}
             className="flex items-center gap-2 h-9 px-3 text-muted-foreground hover:text-foreground transition-all group"
           >
             <SaveIcon className="h-4 w-4 group-hover:scale-110 transition-transform" />
