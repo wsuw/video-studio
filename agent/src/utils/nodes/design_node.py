@@ -4,12 +4,15 @@ from langchain.agents import create_agent
 from langchain.tools import ToolRuntime, tool
 from langchain.messages import ToolMessage
 from langgraph.types import Command
+from langgraph.runtime import Runtime
+from typing import Any
 from pydantic import BaseModel, Field
 from typing import List
 from src.utils.state import AgentState
 from copilotkit import CopilotKitMiddleware
 from src.test.query import query_data
 from deepagents import create_deep_agent
+from langchain.agents.middleware import after_model
 
 
 # ==========================================
@@ -32,24 +35,12 @@ class SceneOutput(BaseModel):
 
 
 @tool
-def updateScriptContent(content: str, runtime: ToolRuntime) -> Command:
+def updateScriptContent(content: str, runtime: ToolRuntime) -> str:
     """
     CORE PERSISTENCE TOOL: This tool MUST be called when the script content is ready for permanent storage.
     IMPORTANT: To ensure the script is visible to the user, you MUST call renderScriptInEditor in parallel for UI presentation.
     """
-    return Command(
-        update={
-            "design": {
-                "script": content,
-            },
-            "messages": [
-                ToolMessage(
-                    content="Success. Persistence complete. (Ensure renderScriptInEditor is called in parallel in this turn).",
-                    tool_call_id=runtime.tool_call_id,
-                )
-            ],
-        }
-    )
+    return "Success. Persistence complete. (Ensure renderScriptInEditor is called in parallel in this turn)."
 
 
 @tool
@@ -90,19 +81,39 @@ def save_layout_scenes(scenes: list[SceneOutput], runtime: ToolRuntime) -> Comma
     )
 
 
+@after_model
+def sync_script_interceptor(
+    state: AgentState, runtime: Runtime
+) -> dict[str, Any] | None:
+    """
+    【剧本同步哨兵】使用装饰器模式，在 AI 响应后第一时间拦截指令。
+    """
+    last_msg = state["messages"][-1]
+    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+        for tc in last_msg.tool_calls:
+            if tc["name"] == "updateScriptContent":
+                content = tc["args"].get("content", "")
+                if content:
+                    print(f"[Sentinel] 拦截到存盘指令，正在同步状态...")
+                    return {"design": {"script": content}}
+    return None
+
+
 # ==========================================
 # 3. 初始化 Agent Nodes (替代 Function)
 # ==========================================
 model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
 
 # 创建内部 Agent 实例
-draft_script_node = create_deep_agent(
+draft_script_node = create_agent(
     model=model,
     # 注入影子工具以获得 Schema，CopilotKit 会自动拦截并转给前端执行
     tools=[query_data, updateScriptContent, renderScriptInEditor],
     middleware=[
         CopilotKitMiddleware(),
+        sync_script_interceptor,  # 注入同步哨兵
     ],
+    state_schema=AgentState,
     system_prompt="""
 <role>
 You are the Lead AI Screenwriter for VideoStudio. You specialize in cinematic storytelling, evocative sensory descriptions, and professional screenplay formatting. Your mission is to transform creative concepts into production-ready scripts with technical precision.

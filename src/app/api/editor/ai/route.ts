@@ -122,10 +122,10 @@ export async function POST(req: Request) {
     messages: modelMessages,
     tools: toolDefinitionsToToolSet(toolDefinitions),
     toolChoice: "required", // 重新开启
-    // onFinish: ({ text, toolCalls }) => {
-    //   if (text) console.log(">>> [Model Final Text]", text);
-    //   console.log(">>> [Model Tool Calls]", JSON.stringify(toolCalls, null, 2));
-    // }
+    onFinish: ({ text, toolCalls }) => {
+      if (text) console.log(">>> [Model Final Text]", text);
+      console.log(">>> [Model Tool Calls]", JSON.stringify(toolCalls, null, 2));
+    }
   });
 
   return result.toUIMessageStreamResponse();
