@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from src.utils.state import AgentState
 from copilotkit import CopilotKitMiddleware, StateStreamingMiddleware, StateItem
+from src.test.query import query_data
 
 
 # ==========================================
@@ -81,7 +82,7 @@ model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": Fals
 
 draft_script_node = create_agent(
     model=model,
-    tools=[save_draft_script],
+    tools=[query_data, save_draft_script],
     middleware=[
         CopilotKitMiddleware(),
         StateStreamingMiddleware(

@@ -18,6 +18,8 @@ import { useGenerativeUIExamples, useExampleSuggestions } from "@/hooks";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
+import { useParams } from "next/navigation";
+
 
 function CopilotHooks() {
   useGenerativeUIExamples();
@@ -37,15 +39,19 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const [isChatOpen, setIsChatOpen] = React.useState(true);
+  const params = useParams();
+  const projectId = params?.projectId as string;
 
   return (
     <ThemeProvider>
       <CopilotKit
         runtimeUrl="/api/copilotkit"
+        threadId={projectId}
         inspectorDefaultAnchor={{ horizontal: "right", vertical: "top" }}
         a2ui={{ catalog: demonstrationCatalog }}
         openGenerativeUI={{}}
         useSingleEndpoint={false}
+        showDevConsole={true}
       >
         <WorkspaceContext.Provider value={{ isChatOpen, setIsChatOpen }}>
           <SidebarProvider className="h-screen overflow-hidden">

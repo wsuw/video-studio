@@ -27,7 +27,7 @@ const data = {
   },
   projects: [
     {
-      id: "proj_001",
+      id: "318b76e2-2a5b-4b13-911b-26514e2d307b",
       name: "Project Name",
       logo: (
         <GalleryVerticalEndIcon
@@ -36,7 +36,7 @@ const data = {
       plan: "Enterprise",
     },
     {
-      id: "proj_002",
+      id: "83f0980c-c6f1-4328-986c-486940d93f7c",
       name: "Project2",
       logo: (
         <AudioLinesIcon
@@ -45,7 +45,7 @@ const data = {
       plan: "Startup",
     },
     {
-      id: "proj_003",
+      id: "d9b4b1e2-2a5b-4b13-911b-26514e2d307d",
       name: "Project3",
       logo: (
         <TerminalIcon
