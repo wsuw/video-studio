@@ -14,9 +14,11 @@ import { Button } from "@/components/ui/button"
 import { MessageSquareIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
+import { usePhaseSync } from "@/hooks/use-phase-sync"
 
 export default function StoryboardPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  usePhaseSync("storyboard");
 
   return (
     <>

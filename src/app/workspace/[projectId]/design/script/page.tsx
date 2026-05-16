@@ -16,6 +16,7 @@ import { MessageSquareIcon, SaveIcon, ArrowRightIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
 import { useRouter, useParams } from "next/navigation";
+import { usePhaseSync } from "@/hooks/use-phase-sync";
 
 // 使用动态导入，禁用 SSR，防止 "window is not defined" 错误
 const EditorContent = dynamic(() => import("./EditorContent"), {
@@ -32,6 +33,8 @@ export default function Page() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId;
+
+  usePhaseSync("design");
 
   const handleNextStep = () => {
     router.push(`/workspace/${projectId}/design/storyboard`);

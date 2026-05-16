@@ -1,13 +1,13 @@
-from langgraph.graph import END
 from langchain_ollama import ChatOllama
-from langchain.agents import tool
+from langchain.tools import tool
 from langchain.messages import ToolMessage
 from langgraph.types import Command
 from langgraph.runtime import Runtime
 from pydantic import BaseModel, Field
 from typing import List
 from src.utils.state import AgentState, Phase
-from deepagents import create_deep_agent
+from langchain.agents import create_agent
+from copilotkit import CopilotKitMiddleware
 
 
 # ==========================================
@@ -60,11 +60,14 @@ def save_layout_scenes(scenes: list[SceneOutput], runtime: Runtime) -> Command:
 # ==========================================
 # 3. Define Storyboard Agent
 # ==========================================
-model = ChatOllama(model="qwen2.5:14b", temperature=0)
+model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
 
-storyboard_agent = create_deep_agent(
+storyboard_node = create_agent(
     model=model,
     tools=[save_layout_scenes],
+    middleware=[
+        CopilotKitMiddleware(),
+    ],
     state_schema=AgentState,
     system_prompt="""You are a Visual Composition Engineer (Layout Engineer) in the film industry.
 Your sole mission is: Read the script content in the current state and precisely decompose it into multiple visual storyboards.
@@ -73,8 +76,3 @@ Requirements:
 2. You must plan the Bbox coordinates [x, y, w, h] for the main subject in each storyboard.
 3. Upon completion, you MUST call the save_layout_scenes tool to save the results.""",
 )
-
-
-def storyboard_node(state: AgentState):
-    """Storyboard node entry point"""
-    return storyboard_agent.invoke(state)

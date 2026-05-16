@@ -5,7 +5,6 @@ from langgraph.runtime import Runtime
 from typing import Any
 from src.utils.state import AgentState
 from copilotkit import CopilotKitMiddleware
-from src.test.query import query_data
 from langchain.agents.middleware import after_model
 
 
@@ -50,7 +49,7 @@ model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True
 design_node = create_agent(
     model=model,
     # 注入影子工具以获得 Schema，CopilotKit 会自动拦截并转给前端执行
-    tools=[query_data, updateScriptContent, renderScriptInEditor],
+    tools=[updateScriptContent, renderScriptInEditor],
     middleware=[
         CopilotKitMiddleware(),
         sync_script_interceptor,  # Inject sync sentinel

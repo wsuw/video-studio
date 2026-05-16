@@ -14,9 +14,11 @@ import { Button } from "@/components/ui/button"
 import { MessageSquareIcon, CheckCircle2Icon, XCircleIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
+import { usePhaseSync } from "@/hooks/use-phase-sync"
 
 export default function ReviewPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  usePhaseSync("redesign");
 
   return (
     <>

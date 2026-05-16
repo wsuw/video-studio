@@ -22,6 +22,24 @@ import { ToolReasoning } from "@/components/tool-rendering";
 export const useGenerativeUIExamples = () => {
   const { theme, setTheme } = useTheme();
 
+  useHumanInTheLoop({
+    name: "humanApprovedCommand",
+    description: "Ask human for approval to run a command.",
+    parameters: z.object({
+      command: z.string().describe("The command to run"),
+    }),
+    render: ({ args, respond, status }) => {
+      if (status !== "executing") return <></>;
+      return (
+        <div>
+          <pre>{args.command}</pre>
+          <button onClick={() => respond?.(`Command is APPROVED`)}>Approve</button>
+          <button onClick={() => respond?.(`Command is DENIED`)}>Deny</button>
+        </div>
+      );
+    },
+  });
+
   // Human-in-the-Loop (frontend tool requiring user decision)
   useHumanInTheLoop({
     name: "scheduleTime",
