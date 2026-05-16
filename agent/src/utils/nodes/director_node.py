@@ -4,7 +4,6 @@ from langchain.messages import ToolMessage
 from langgraph.types import Command
 from langgraph.runtime import Runtime
 from pydantic import BaseModel, Field
-from typing import List
 from src.utils.state import AgentState, Phase
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
@@ -13,30 +12,24 @@ from copilotkit import CopilotKitMiddleware
 # ==========================================
 # 1. Define Pydantic Models
 # ==========================================
-class SceneOutput(BaseModel):
-    id: str = Field(..., description="Unique identifier for the scene, e.g., s1, s2")
-    description: str = Field(
-        ...,
-        description="Detailed visual description of the scene, covering character actions and environmental lighting/shadows",
-    )
-    layout_bbox: List[float] = Field(
-        ...,
-        description="Bbox coordinates [x, y, w, h] of the main subject, using 0.0-1.0 scale",
-    )
-
+class BreakdownScene(BaseModel):
+    id: str = Field(..., description="Unique ID, e.g., s1, s2")
+    description: str = Field(..., description="Narrative description of what happens in this scene/shot.")
 
 # ==========================================
 # 2. Define Tools
 # ==========================================
 @tool
-def save_layout_scenes(scenes: list[SceneOutput], runtime: Runtime) -> Command:
+def save_script_breakdown(scenes: list[BreakdownScene], runtime: Runtime) -> Command:
     """
-    Call this tool to save the list of scenes after storyboard decomposition is complete.
+    Call this tool to save the textual breakdown of the script into scenes. 
+    This is the first step before visual storyboarding.
     """
     parsed_scenes = []
     for s in scenes:
         scene_dict = s if isinstance(s, dict) else s.dict()
         scene_dict["status"] = "pending"
+        scene_dict["layout_bbox"] = [0.25, 0.25, 0.5, 0.5] # Default center crop
         parsed_scenes.append(scene_dict)
 
     return Command(
@@ -45,33 +38,32 @@ def save_layout_scenes(scenes: list[SceneOutput], runtime: Runtime) -> Command:
                 "scenes": parsed_scenes,
                 "is_approved": False,
             },
-            "current_scene_index": 0,
-            "next_agent": Phase.END,  # Hand back control upon completion
+            "next_agent": Phase.END,
             "messages": [
                 ToolMessage(
-                    content="Storyboard successfully decomposed and saved",
+                    content="Script breakdown successfully saved. Waiting for director approval.",
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
         }
     )
 
-
 # ==========================================
-# 3. Define Storyboard Agent
+# 3. Define Director Agent
 # ==========================================
 model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
 
-storyboard_node = create_agent(
+director_node = create_agent(
     model=model,
-    tools=[save_layout_scenes],
+    tools=[save_script_breakdown],
     middleware=[
         CopilotKitMiddleware(),
     ],
     state_schema=AgentState,
-    system_prompt="""You are a Visual Composition Engineer (Layout Engineer) in the film industry.
-Your mission is:
-1. Read the list of scenes already broken down by the Director.
-2. For each scene, precisely plan the Bbox coordinates [x, y, w, h] for the main subject based on its description.
-3. Upon completion, you MUST call the save_layout_scenes tool to update the results with the visual coordinates.""",
+    system_prompt="""You are the Film Director (Director Node). 
+Your mission is to read the script and perform a 'Scene Breakdown'.
+1. Identify the key visual beats and shots required to tell the story.
+2. For each shot, provide a vivid narrative description.
+3. Use the save_script_breakdown tool to deliver the result.
+Do NOT worry about camera coordinates or Bboxes yet; focus on the storytelling and shot selection.""",
 )

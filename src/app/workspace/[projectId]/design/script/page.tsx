@@ -37,7 +37,7 @@ export default function Page() {
   usePhaseSync("design");
 
   const handleNextStep = () => {
-    router.push(`/workspace/${projectId}/design/storyboard`);
+    router.push(`/workspace/${projectId}/design/breakdown`);
   };
 
   return (

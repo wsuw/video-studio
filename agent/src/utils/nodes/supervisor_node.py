@@ -1,5 +1,4 @@
 from src.utils.state import AgentState, Phase
-from langgraph.graph import END
 
 
 def supervisor_node(state: AgentState):
@@ -19,11 +18,17 @@ def supervisor_node(state: AgentState):
     if not current_phase or current_phase == Phase.INIT:
         next_agent = Phase.DESIGN
     elif current_phase == Phase.DESIGN:
-        # If the script exists, proceed to the storyboard phase
+        # If the script exists, proceed to the breakdown phase
         if script:
-            next_agent = Phase.STORYBOARD
+            next_agent = Phase.BREAKDOWN
         else:
             next_agent = Phase.DESIGN
+    elif current_phase == Phase.BREAKDOWN:
+        # If scenes exist and are approved, proceed to storyboard
+        if scenes and is_approved:
+            next_agent = Phase.STORYBOARD
+        else:
+            next_agent = Phase.BREAKDOWN
     elif current_phase == Phase.STORYBOARD:
         # If storyboards are complete, proceed to the generation phase
         if scenes:

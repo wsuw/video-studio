@@ -64,6 +64,14 @@ const data = {
       ),
     },
     {
+      title: "Breakdown",
+      url: "/design/breakdown",
+      icon: (
+        <ClapperboardIcon
+        />
+      ),
+    },
+    {
       title: "Storyboard",
       url: "/design/storyboard",
       icon: (
