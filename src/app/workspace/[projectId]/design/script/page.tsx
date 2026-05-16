@@ -84,7 +84,7 @@ export default function Page() {
               onClick={handleNextStep}
               className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
             >
-              <span className="text-xs font-semibold">Design Storyboard</span>
+              <span className="text-xs font-semibold">Director Breakdown</span>
               <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </div>

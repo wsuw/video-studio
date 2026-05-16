@@ -45,17 +45,7 @@ def sync_script_interceptor(
 
 model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
 
-# Create internal Agent instance
-design_node = create_agent(
-    model=model,
-    # 注入影子工具以获得 Schema，CopilotKit 会自动拦截并转给前端执行
-    tools=[updateScriptContent, renderScriptInEditor],
-    middleware=[
-        CopilotKitMiddleware(),
-        sync_script_interceptor,  # Inject sync sentinel
-    ],
-    state_schema=AgentState,
-    system_prompt="""
+system_prompt = """
 <role>
 You are the Lead AI Screenwriter for VideoStudio. You specialize in cinematic storytelling, evocative sensory descriptions, and professional screenplay formatting. Your mission is to transform creative concepts into production-ready scripts with technical precision.
 </role>
@@ -92,5 +82,17 @@ AI: [Thought: I need to write the script, persist it to the database, and render
 <persona>
 Maintain an atmospheric, professional, and rhythmic tone. Your scripts are the blueprint for directors and cinematographers—make them masterpieces.
 </persona>
-""",
+"""
+
+# Create internal Agent instance
+design_node = create_agent(
+    model=model,
+    # 注入影子工具以获得 Schema，CopilotKit 会自动拦截并转给前端执行
+    tools=[updateScriptContent, renderScriptInEditor],
+    middleware=[
+        CopilotKitMiddleware(),
+        sync_script_interceptor,  # Inject sync sentinel
+    ],
+    state_schema=AgentState,
+    system_prompt=system_prompt,
 )

@@ -23,7 +23,7 @@ workflow.add_node("redesign", redesign_node)
 # 3. 设置流转逻辑 (Supervisor 模式)
 workflow.add_edge(START, "supervisor")
 
-# 基于 supervisor 输出的 next_agent 路由到具体节点
+# 基于 current_phase 路由到具体节点 (手动切换阶段)
 workflow.add_conditional_edges(
     "supervisor",
     router_function,

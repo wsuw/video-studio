@@ -1,60 +1,59 @@
-from langchain_ollama import ChatOllama
-from langchain.tools import tool
-from langchain.messages import ToolMessage
-from langgraph.types import Command
+import json
+from typing import Any
+from langchain.tools import tool, ToolRuntime
 from langgraph.runtime import Runtime
-from pydantic import BaseModel, Field
-from typing import List
 from src.utils.state import AgentState, Phase
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
+from langchain.agents.middleware import after_model
+from langchain_ollama import ChatOllama
 
 
 # ==========================================
-# 1. Define Pydantic Models
-# ==========================================
-class SceneOutput(BaseModel):
-    id: str = Field(..., description="Unique identifier for the scene, e.g., s1, s2")
-    description: str = Field(
-        ...,
-        description="Detailed visual description of the scene, covering character actions and environmental lighting/shadows",
-    )
-    layout_bbox: List[float] = Field(
-        ...,
-        description="Bbox coordinates [x, y, w, h] of the main subject, using 0.0-1.0 scale",
-    )
-
-
-# ==========================================
-# 2. Define Tools
+# 1. Define Tools
 # ==========================================
 @tool
-def save_layout_scenes(scenes: list[SceneOutput], runtime: Runtime) -> Command:
+def submit_storyboard(storyboard_json: str, runtime: ToolRuntime):
+    """Submit the fully planned storyboard.
+    Expected JSON structure:
+    {
+        "scenes": [
+            {
+                "id": "s1",
+                "description": "…",
+                "entities": ["c1", "p3"],
+                "layout_bbox": [0.1, 0.2, 0.6, 0.8],
+                "status": "pending"
+            }
+        ]
+    }
     """
-    Call this tool to save the list of scenes after storyboard decomposition is complete.
-    """
-    parsed_scenes = []
-    for s in scenes:
-        scene_dict = s if isinstance(s, dict) else s.dict()
-        scene_dict["status"] = "pending"
-        parsed_scenes.append(scene_dict)
+    return "Storyboard submitted. Ready for generation."
 
-    return Command(
-        update={
-            "design": {
-                "scenes": parsed_scenes,
-                "is_approved": False,
-            },
-            "current_scene_index": 0,
-            "next_agent": Phase.END,  # Hand back control upon completion
-            "messages": [
-                ToolMessage(
-                    content="Storyboard successfully decomposed and saved",
-                    tool_call_id=runtime.tool_call_id,
-                )
-            ],
-        }
-    )
+
+# ==========================================
+# 2. Sync Interceptor (Middleware)
+# ==========================================
+@after_model
+def sync_storyboard_interceptor(
+    state: AgentState, runtime: Runtime
+) -> dict[str, Any] | None:
+    """Intercept submit_storyboard calls and write full scenes into design state."""
+    last_msg = state["messages"][-1]
+    if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+        for tc in last_msg.tool_calls:
+            if tc["name"] == "submit_storyboard":
+                try:
+                    data = json.loads(tc["args"].get("storyboard_json", "{}"))
+                    return {
+                        "design": {
+                            "scenes": data.get("scenes", []),
+                            "is_approved": False,
+                        },
+                    }
+                except Exception as e:
+                    print(f"Error parsing storyboard JSON: {e}")
+    return None
 
 
 # ==========================================
@@ -64,15 +63,26 @@ model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True
 
 storyboard_node = create_agent(
     model=model,
-    tools=[save_layout_scenes],
+    tools=[submit_storyboard],
     middleware=[
         CopilotKitMiddleware(),
+        sync_storyboard_interceptor,
     ],
     state_schema=AgentState,
-    system_prompt="""You are a Visual Composition Engineer (Layout Engineer) in the film industry.
-Your sole mission is: Read the script content in the current state and precisely decompose it into multiple visual storyboards.
-Requirements:
-1. Each storyboard must have a detailed visual description.
-2. You must plan the Bbox coordinates [x, y, w, h] for the main subject in each storyboard.
-3. Upon completion, you MUST call the save_layout_scenes tool to save the results.""",
+    system_prompt="""
+<role>
+You are the Storyboard Artist. Your job is to take the raw scene descriptions (provided by the Breakdown stage) and turn them into fully planned storyboard entries.
+</role>
+
+<workflow>
+1. For each raw scene, decide which entities appear (character, prop, location).
+2. Generate a bounding‑box `[x, y, w, h]` (normalized 0‑1) that indicates where the main subject should be placed.
+3. Assemble a JSON payload matching the `submit_storyboard` tool schema and call the tool.
+</workflow>
+
+<technical_requirements>
+- You MUST call `submit_storyboard` exactly once with a JSON string containing a `scenes` array.
+- Do NOT output raw JSON in the chat; use the tool.
+</technical_requirements>
+""",
 )
