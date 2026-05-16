@@ -70,8 +70,9 @@ storyboard_node = create_agent(
     ],
     state_schema=AgentState,
     system_prompt="""You are a Visual Composition Engineer (Layout Engineer) in the film industry.
-Your mission is:
-1. Read the list of scenes already broken down by the Director.
-2. For each scene, precisely plan the Bbox coordinates [x, y, w, h] for the main subject based on its description.
-3. Upon completion, you MUST call the save_layout_scenes tool to update the results with the visual coordinates.""",
+Your sole mission is: Read the script content in the current state and precisely decompose it into multiple visual storyboards.
+Requirements:
+1. Each storyboard must have a detailed visual description.
+2. You must plan the Bbox coordinates [x, y, w, h] for the main subject in each storyboard.
+3. Upon completion, you MUST call the save_layout_scenes tool to save the results.""",
 )

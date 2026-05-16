@@ -9,6 +9,7 @@ export function usePhaseSync(phase: string) {
   const { agent } = useAgent({ agentId: "default" });
 
   useEffect(() => {
+    console.log(agent)
     if (agent && agent.state?.current_phase !== phase) {
       agent.setState({
         ...agent.state,

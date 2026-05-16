@@ -2,7 +2,7 @@
 from langgraph.graph import StateGraph, END, START
 from src.utils.state import AgentState
 from src.utils.nodes.design_node import design_node
-from src.utils.nodes.director_node import director_node
+from src.utils.nodes.breakdown_node import breakdown_node
 from src.utils.nodes.storyboard_node import storyboard_node
 from src.utils.nodes.generation_node import generation_node
 from src.utils.nodes.redesign_node import redesign_node
@@ -14,7 +14,7 @@ workflow = StateGraph(AgentState)
 # 2. 注册节点
 workflow.add_node("supervisor", supervisor_node)
 workflow.add_node("design", design_node)
-workflow.add_node("breakdown", director_node)
+workflow.add_node("breakdown", breakdown_node)
 workflow.add_node("storyboard", storyboard_node)
 workflow.add_node("generate", generation_node)
 workflow.add_node("redesign", redesign_node)
