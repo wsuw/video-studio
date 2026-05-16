@@ -27,7 +27,7 @@ const data = {
   },
   projects: [
     {
-      id: "318b76e2-2a5b-4b13-911b-26514e2d307b",
+      id: "318b76e2-2a5b-4b13-011b-26514e2d307b",
       name: "Project Name",
       logo: (
         <GalleryVerticalEndIcon

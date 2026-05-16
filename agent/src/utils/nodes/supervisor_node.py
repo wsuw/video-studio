@@ -4,26 +4,32 @@ from langgraph.graph import END
 
 def supervisor_node(state: AgentState):
     """
-    主管/调度节点：根据当前状态和进度，决定下一步调用哪个 Agent。
+    Supervisor/Dispatcher Node: Decides which Agent to call next based on the current state and progress.
     """
-    # 获取当前的执行阶段，默认为 INIT
+    # Get the current execution phase, default is INIT
     current_phase = state.get("current_phase", Phase.INIT)
     design = state.get("design", {})
     is_approved = design.get("is_approved", False)
     script = design.get("script", "")
     scenes = design.get("scenes", [])
 
-    # 简单的基于规则的路由逻辑
-    # 实际应用中，这里也可以通过让 LLM 判断 state["messages"] 来决定跳转
+    # Simple rule-based routing logic.
+    # In practice, this could also let the LLM judge state["messages"] to decide the transition.
 
     if not current_phase or current_phase == Phase.INIT:
         next_agent = Phase.DESIGN
     elif current_phase == Phase.DESIGN:
-        # 经过 Review 节点后，回到 supervisor 判断审核结果
-        if is_approved:
+        # If the script exists, proceed to the storyboard phase
+        if script:
+            next_agent = Phase.STORYBOARD
+        else:
+            next_agent = Phase.DESIGN
+    elif current_phase == Phase.STORYBOARD:
+        # If storyboards are complete, proceed to the generation phase
+        if scenes:
             next_agent = Phase.GENERATE
         else:
-            next_agent = Phase.DESIGN  # 打回重做，重新进入 design 节点
+            next_agent = Phase.STORYBOARD
     elif current_phase == Phase.GENERATE:
         next_agent = Phase.REDESIGN
     elif current_phase == Phase.REDESIGN:
@@ -38,6 +44,6 @@ def supervisor_node(state: AgentState):
 
 
 def router_function(state: AgentState) -> str:
-    """条件边路由函数：读取 supervisor 的决定并进行路由"""
+    """Conditional edge routing function: Reads the supervisor's decision and routes accordingly"""
     next_agent = state.get("next_agent", Phase.DESIGN)
     return next_agent.value if isinstance(next_agent, Phase) else next_agent

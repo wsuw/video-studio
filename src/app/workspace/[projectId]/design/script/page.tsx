@@ -12,9 +12,10 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon, SaveIcon } from "lucide-react"
+import { MessageSquareIcon, SaveIcon, ArrowRightIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
+import { useRouter, useParams } from "next/navigation";
 
 // 使用动态导入，禁用 SSR，防止 "window is not defined" 错误
 const EditorContent = dynamic(() => import("./EditorContent"), {
@@ -28,6 +29,13 @@ const EditorContent = dynamic(() => import("./EditorContent"), {
 
 export default function Page() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  const router = useRouter();
+  const params = useParams();
+  const projectId = params.projectId;
+
+  const handleNextStep = () => {
+    router.push(`/workspace/${projectId}/design/storyboard`);
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -55,16 +63,30 @@ export default function Page() {
           </Breadcrumb>
         </div>
 
-        <div className="flex items-center gap-2 pr-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => window.dispatchEvent(new CustomEvent("save-script-event"))}
-            className="flex items-center gap-2 h-9 px-3 text-muted-foreground hover:text-foreground transition-all group"
-          >
-            <SaveIcon className="h-4 w-4 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-medium">Save</span>
-          </Button>
+        <div className="flex items-center gap-4 pr-2">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.dispatchEvent(new CustomEvent("save-script-event"))}
+              className="flex items-center gap-2 h-9 px-3 text-muted-foreground hover:text-foreground transition-all group"
+            >
+              <SaveIcon className="h-4 w-4 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-medium">Save</span>
+            </Button>
+
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleNextStep}
+              className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
+            >
+              <span className="text-xs font-semibold">Design Storyboard</span>
+              <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </div>
+
+          <Separator orientation="vertical" className="h-6" />
 
           {!isChatOpen && (
             <Button

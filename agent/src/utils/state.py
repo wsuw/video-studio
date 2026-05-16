@@ -7,6 +7,7 @@ from copilotkit import CopilotKitState
 class Phase(str, Enum):
     INIT = ""
     DESIGN = "design"
+    STORYBOARD = "storyboard"
     GENERATE = "generate"
     REDESIGN = "redesign"
     END = "__end__"
