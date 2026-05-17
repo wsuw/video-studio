@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, PlusIcon } from "lucide-react"
+import { ChevronsUpDownIcon, PlusIcon, VideoIcon } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 
 export function ProjectSwitcher({
@@ -35,9 +35,40 @@ export function ProjectSwitcher({
   const params = useParams()
   const activeProjectId = params.projectId as string
 
-  const [activeProject, setActiveProject] = React.useState(
-    projects.find(p => p.id === activeProjectId) || projects[0]
-  )
+  const [customProjects, setCustomProjects] = React.useState<any[]>([])
+
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem("video-agent:projects")
+      if (stored) {
+        setCustomProjects(JSON.parse(stored))
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }, [])
+
+  const allProjects = React.useMemo(() => {
+    const list = [...projects]
+    customProjects.forEach((cp: any) => {
+      if (!list.some(p => p.id === cp.id)) {
+        list.push({
+          id: cp.id,
+          name: cp.name,
+          logo: <VideoIcon className="size-4 text-primary" />,
+          plan: "Pro Project"
+        })
+      }
+    })
+    return list
+  }, [customProjects, projects])
+
+  const [activeProject, setActiveProject] = React.useState<any>(null)
+
+  React.useEffect(() => {
+    const found = allProjects.find(p => p.id === activeProjectId) || allProjects[0]
+    setActiveProject(found)
+  }, [allProjects, activeProjectId])
 
   if (!activeProject) {
     return null
@@ -71,9 +102,9 @@ export function ProjectSwitcher({
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Projects
             </DropdownMenuLabel>
-            {projects.map((project, index) => (
+            {allProjects.map((project, index) => (
               <DropdownMenuItem
-                key={project.name}
+                key={project.id || project.name}
                 onClick={() => {
                   setActiveProject(project)
                   router.push(`/workspace/${project.id}/design/script`) // Redirect to default page for project
@@ -88,11 +119,14 @@ export function ProjectSwitcher({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2">
+            <DropdownMenuItem
+              className="gap-2 p-2"
+              onClick={() => router.push("/studio")}
+            >
               <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                 <PlusIcon className="size-4" />
               </div>
-              <div className="font-medium text-muted-foreground">Add Project</div>
+              <div className="font-medium text-muted-foreground">Create New Project</div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

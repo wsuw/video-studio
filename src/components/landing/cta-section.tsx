@@ -58,17 +58,19 @@ export function CtaSection() {
 
                 <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-xl">
                   Join teams automating complex workflows with COMPUTE agents. 
-                  Deploy your first agent in minutes.
+                  Launch your studio in minutes.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4">
-                  <Button
-                    size="lg"
-                    className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group"
-                  >
-                    Deploy your first agent
-                    <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-                  </Button>
+                  <a href="/studio">
+                    <Button
+                      size="lg"
+                      className="bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group animate-none"
+                    >
+                      Launch Studio
+                      <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </a>
                   <Button
                     size="lg"
                     variant="outline"

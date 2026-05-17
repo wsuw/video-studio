@@ -34,6 +34,23 @@ export default function Page() {
   const params = useParams();
   const projectId = params.projectId;
 
+  const [projectName, setProjectName] = React.useState("Project Name");
+
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem("video-agent:projects");
+      if (stored) {
+        const storedProjects = JSON.parse(stored);
+        const current = storedProjects.find((p: any) => p.id === projectId);
+        if (current) {
+          setProjectName(current.name);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [projectId]);
+
   usePhaseSync("design");
 
   const handleNextStep = () => {
@@ -56,7 +73,7 @@ export default function Page() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbLink>Project Name</BreadcrumbLink>
+                <BreadcrumbLink>{projectName}</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>

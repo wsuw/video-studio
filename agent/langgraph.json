@@ -7,7 +7,8 @@
   "package_manager": "uv",
   "graphs": {
     "sample_agent": "./src/test/main.py:graph",
-    "agent": "./main.py:graph"
+    "agent": "./main.py:graph",
+    "breakdown": "./src/breakdown.py:breakdown_node"
   },
   "env": "../.env",
   "checkpointer": {

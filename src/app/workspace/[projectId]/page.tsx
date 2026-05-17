@@ -21,9 +21,29 @@ import { PanelRightIcon, MessageSquareIcon } from "lucide-react"
 
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React from "react"
+import { useParams } from "next/navigation";
 
 export default function Page() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  const params = useParams();
+  const projectId = params?.projectId;
+
+  const [projectName, setProjectName] = React.useState("Project Name");
+
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem("video-agent:projects");
+      if (stored) {
+        const storedProjects = JSON.parse(stored);
+        const current = storedProjects.find((p: any) => p.id === projectId);
+        if (current) {
+          setProjectName(current.name);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [projectId]);
 
   return (
     <>
@@ -37,13 +57,13 @@ export default function Page() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#">
+                <BreadcrumbLink href="/studio">
                   Studio
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Project Name</BreadcrumbPage>
+                <BreadcrumbPage>{projectName}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

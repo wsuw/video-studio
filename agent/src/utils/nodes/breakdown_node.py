@@ -33,27 +33,51 @@ def sync_breakdown_interceptor(
     Intercepts the submit_breakdown tool call to update the global design state.
     """
     last_msg = state["messages"][-1]
+    print(
+        f"[Breakdown Interceptor] ✅ Triggered. Last message type: {type(last_msg).__name__}"
+    )
+    print(
+        f"[Breakdown Interceptor] Has tool_calls: {hasattr(last_msg, 'tool_calls') and bool(last_msg.tool_calls)}"
+    )
+
     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
+        print(
+            f"[Breakdown Interceptor] Tool calls found: {[tc['name'] for tc in last_msg.tool_calls]}"
+        )
         for tc in last_msg.tool_calls:
             if tc["name"] == "submit_breakdown":
                 try:
-                    data = json.loads(tc["args"].get("breakdown_json", "{}"))
-                    # Keep raw scene descriptions (id & description) for later spatial planning
+                    raw_json = tc["args"].get("breakdown_json", "{}")
+                    print(
+                        f"[Breakdown Interceptor] Raw JSON (first 200 chars): {raw_json[:200]}"
+                    )
+                    data = json.loads(raw_json)
+                    entities = data.get("entities", [])
+                    scenes = data.get("scenes", [])
+                    print(
+                        f"[Breakdown Interceptor] Parsed: {len(entities)} entities, {len(scenes)} scenes"
+                    )
+
                     raw_scenes = [
                         {"id": s.get("id"), "description": s.get("description")}
-                        for s in data.get("scenes", [])
+                        for s in scenes
                     ]
-                    return {
+
+                    result = {
                         "design": {
-                            "entities": data.get("entities", []),
+                            "entities": entities,
                             "raw_scenes": raw_scenes,
                             "is_approved": False,
                         },
                     }
+                    print(
+                        f"[Breakdown Interceptor] ✅ Returning state update with {len(entities)} entities, {len(raw_scenes)} raw_scenes"
+                    )
+                    return result
                 except Exception as e:
-                    print(f"Error parsing breakdown JSON: {e}")
-                except Exception as e:
-                    print(f"Error parsing breakdown JSON: {e}")
+                    print(
+                        f"[Breakdown Interceptor] ❌ Error parsing breakdown JSON: {e}"
+                    )
     return None
 
 
