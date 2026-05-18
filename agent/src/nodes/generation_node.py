@@ -1,4 +1,5 @@
-from src.utils.state import AgentState
+from src.state import AgentState
+
 
 def generation_node(state: AgentState):
     """
@@ -15,8 +16,10 @@ def generation_node(state: AgentState):
         new_scene = scene.copy()
         new_scene["status"] = "rendered"
         rendered_scenes.append(new_scene)
-    
+
     return {
         "scenes": rendered_scenes,
-        "messages": [("ai", f"已完成 {len(rendered_scenes)} 个分镜的渲染。进入质检阶段。")]
+        "messages": [
+            ("ai", f"已完成 {len(rendered_scenes)} 个分镜的渲染。进入质检阶段。")
+        ],
     }

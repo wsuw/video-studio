@@ -9,7 +9,7 @@ from langchain.agents import create_agent
 # Data & state tools
 from src.test.query import query_data
 from src.test.todos import todo_tools
-from src.utils.state import AgentState
+from src.state import AgentState
 
 # A2UI tools
 from src.test.a2ui_dynamic_schema import generate_a2ui

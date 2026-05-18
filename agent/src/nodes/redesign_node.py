@@ -1,4 +1,5 @@
-from src.utils.state import AgentState
+from src.state import AgentState
+
 
 def redesign_node(state: AgentState):
     """
@@ -7,10 +8,7 @@ def redesign_node(state: AgentState):
     """
     # 模拟质检逻辑
     # 在真实场景中，这里会调用一个视觉大模型 (VLM) 传入图片/视频进行比对
-    qc_passed = True 
+    qc_passed = True
     report = "所有分镜通过 AI 质检，角色一致性良好，物理位移符合剧本。"
-    
-    return {
-        "qc_report": report,
-        "messages": [("ai", f"🎬 质检完成：{report}")]
-    }
+
+    return {"qc_report": report, "messages": [("ai", f"🎬 质检完成：{report}")]}

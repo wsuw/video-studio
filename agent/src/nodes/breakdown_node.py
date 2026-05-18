@@ -3,7 +3,7 @@ from typing import Any, Annotated
 from langchain.tools import tool, ToolRuntime
 from langgraph.prebuilt import InjectedState
 from langgraph.runtime import Runtime
-from src.utils.state import AgentState
+from src.state import AgentState
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
 from langchain.agents.middleware import after_model

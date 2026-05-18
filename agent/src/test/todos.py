@@ -2,7 +2,7 @@ from langchain.tools import ToolRuntime, tool
 from langchain.messages import ToolMessage
 from langgraph.types import Command
 import uuid
-from src.utils.state import Todo
+from src.state import Todo
 
 
 @tool

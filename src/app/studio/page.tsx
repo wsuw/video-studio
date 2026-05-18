@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { updateThreadState } from "@/lib/langgraph"
+import { updateThreadState, createThread } from "@/lib/langgraph"
 import {
   Sparkles,
   Video,
@@ -172,18 +172,15 @@ export default function Page() {
       try {
         const LANGGRAPH_API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL || "http://localhost:8123"
 
-        // A. First, create the thread letting the server auto-generate a valid UUID!
-        const createRes = await fetch(`${LANGGRAPH_API_URL}/threads`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            metadata: {
-              graph_id: "agent"
-            }
-          })
+        // A. First, create the thread with custom metadata (user_id, name, prompt, ratio, style, voice)
+        const threadData = await createThread({
+          name: finalProjectName,
+          prompt: finalPrompt,
+          style: selectedStyle,
+          ratio: selectedRatio,
+          voice: selectedVoice,
+          createdAt: new Date().toISOString()
         })
-        if (!createRes.ok) throw new Error("Failed to create thread on LangGraph server")
-        const threadData = await createRes.json()
         const newProjectId = threadData.thread_id // This is the server-generated valid UUID!
 
         // B. Second, populate the initial screenplay state

@@ -1,12 +1,12 @@
 # agent/main.py
 from langgraph.graph import StateGraph, END, START
-from src.utils.state import AgentState
-from src.utils.nodes.design_node import design_node
-from src.utils.nodes.breakdown_node import breakdown_node
-from src.utils.nodes.storyboard_node import storyboard_node
-from src.utils.nodes.generation_node import generation_node
-from src.utils.nodes.redesign_node import redesign_node
-from src.utils.nodes.supervisor_node import supervisor_node, router_function
+from src.state import AgentState
+from src.nodes.design_node import design_node
+from src.nodes.breakdown_node import breakdown_node
+from src.nodes.storyboard_node import storyboard_node
+from src.nodes.generation_node import generation_node
+from src.nodes.redesign_node import redesign_node
+from src.nodes.supervisor_node import supervisor_node, router_function
 
 # 1. 定义工作流结构
 workflow = StateGraph(AgentState)

@@ -26,7 +26,7 @@ const data = {
   navMain: [
     {
       title: "Projects",
-      url: "#",
+      url: "/studio/projects",
       icon: (
         <FolderIcon
         />

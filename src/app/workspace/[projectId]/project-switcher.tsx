@@ -17,8 +17,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { ChevronsUpDownIcon, PlusIcon, VideoIcon } from "lucide-react"
+import { ChevronsUpDownIcon, PlusIcon, VideoIcon, FolderIcon } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
+import { searchThreads } from "@/lib/langgraph"
 
 export function ProjectSwitcher({
   projects,
@@ -38,14 +39,39 @@ export function ProjectSwitcher({
   const [customProjects, setCustomProjects] = React.useState<any[]>([])
 
   React.useEffect(() => {
-    try {
-      const stored = localStorage.getItem("video-agent:projects")
-      if (stored) {
-        setCustomProjects(JSON.parse(stored))
+    async function syncCustomProjects() {
+      // Fast load from localStorage first
+      try {
+        const stored = localStorage.getItem("video-agent:projects")
+        if (stored) {
+          setCustomProjects(JSON.parse(stored))
+        }
+      } catch (e) {
+        console.error(e)
       }
-    } catch (e) {
-      console.error(e)
+
+      // Then sync from server in background
+      try {
+        const threads = await searchThreads()
+        if (Array.isArray(threads)) {
+          const syncedList = threads.map((t: any) => ({
+            id: t.thread_id,
+            name: t.metadata?.name || "Untitled Project",
+            prompt: t.metadata?.prompt || "Created via VideoStudio.",
+            style: t.metadata?.style || "cinematic",
+            ratio: t.metadata?.ratio || "16:9",
+            voice: t.metadata?.voice || "deep",
+            createdAt: t.metadata?.createdAt || t.created_at || new Date().toISOString(),
+          }))
+          setCustomProjects(syncedList)
+          localStorage.setItem("video-agent:projects", JSON.stringify(syncedList))
+        }
+      } catch (err) {
+        console.warn("[Project Switcher] Failed to sync custom projects from server.", err)
+      }
     }
+
+    syncCustomProjects()
   }, [])
 
   const allProjects = React.useMemo(() => {
@@ -119,6 +145,15 @@ export function ProjectSwitcher({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="gap-2 p-2"
+              onClick={() => router.push("/studio/projects")}
+            >
+              <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                <FolderIcon className="size-4" />
+              </div>
+              <div className="font-medium text-muted-foreground">View All Projects</div>
+            </DropdownMenuItem>
             <DropdownMenuItem
               className="gap-2 p-2"
               onClick={() => router.push("/studio")}
