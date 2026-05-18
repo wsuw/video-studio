@@ -15,7 +15,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, PencilIcon, LayoutTemplateIcon, DatabaseIcon, ClapperboardIcon, ActivityIcon, EyeIcon, Wand2Icon, FilmIcon, UploadCloudIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, AudioLinesIcon, TerminalIcon, PencilIcon, LayoutTemplateIcon, DatabaseIcon, ClapperboardIcon, ActivityIcon, EyeIcon, Wand2Icon, FilmIcon, UploadCloudIcon, PaletteIcon } from "lucide-react"
 import { useParams } from "next/navigation"
 
 // This is sample data.
@@ -72,6 +72,14 @@ const data = {
       ),
     },
     {
+      title: "Style",
+      url: "/design/style",
+      icon: (
+        <PaletteIcon
+        />
+      ),
+    },
+    {
       title: "Storyboard",
       url: "/design/storyboard",
       icon: (
@@ -79,27 +87,19 @@ const data = {
         />
       ),
     },
-    {
-      title: "Assets",
-      url: "/design/assets",
-      icon: (
-        <DatabaseIcon
-        />
-      ),
-    },
   ],
   generation: [
     {
-      name: "Render Queue",
-      url: "/generation/queue",
+      name: "Keyframe Gen",
+      url: "/generation/keyframes",
       icon: (
         <ClapperboardIcon
         />
       ),
     },
     {
-      name: "Execution",
-      url: "/generation/execution",
+      name: "Video Gen",
+      url: "/generation/video",
       icon: (
         <ActivityIcon
         />
