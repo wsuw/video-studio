@@ -17,10 +17,10 @@ import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useAgent } from "@copilotkit/react-core/v2"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useRouter, useParams } from "next/navigation"
 import { getThreadState } from "@/lib/langgraph"
+
 
 interface LayoutElement {
   entity_id: string;
@@ -461,7 +461,7 @@ export default function StoryboardPage() {
             <p className="text-[10px] text-muted-foreground/60">Sequential scene breakdown</p>
           </div>
 
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto pr-1 scroll-smooth">
             <div className="p-4 space-y-3">
               {scenes.map((scene) => {
                 const layout = getActiveLayout(scene);
@@ -477,6 +477,14 @@ export default function StoryboardPage() {
                         : "bg-card border-border hover:border-primary/30 hover:bg-muted/50"
                     )}
                   >
+                    {/* Floating Selection Indicator Dot */}
+                    <div className={cn(
+                      "absolute top-3 right-3 w-1.5 h-1.5 rounded-full transition-colors shrink-0",
+                      isSelected
+                        ? "bg-primary"
+                        : "bg-primary/20 group-hover:bg-primary/50"
+                    )} />
+
                     <div className="flex gap-3 items-center">
                       {/* Left: Beautiful Square Visual Preview Thumbnail */}
                       <div className="aspect-square w-20 shrink-0 bg-black/5 dark:bg-black/40 rounded-lg relative overflow-hidden border border-border/50 transition-all duration-300 group-hover:bg-black/10 dark:group-hover:bg-black/60">
@@ -510,7 +518,7 @@ export default function StoryboardPage() {
                       </div>
 
                       {/* Right: Detailed Metadata Stack */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch">
+                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch pr-3">
                         <div>
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <div className="flex items-center gap-1.5">
@@ -527,7 +535,6 @@ export default function StoryboardPage() {
                                 {scene.motion || "static"}
                               </span>
                             </div>
-                            <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors shrink-0"></div>
                           </div>
                           <p className="text-[11px] leading-relaxed text-muted-foreground group-hover:text-foreground transition-colors line-clamp-3 italic font-serif">
                             "{scene.description}"
@@ -536,6 +543,7 @@ export default function StoryboardPage() {
                       </div>
                     </div>
                   </div>
+
                 );
               })}
 
@@ -546,7 +554,8 @@ export default function StoryboardPage() {
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
+
         </div>
       </div>
     </div>

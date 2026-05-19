@@ -8,7 +8,9 @@ from src.state import AgentState, Entity
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
 from langchain.agents.middleware import after_model
-from src.llm import get_model
+from src.models import get_model, generate_image_via_openrouter
+
+
 
 
 # ==========================================
@@ -49,27 +51,6 @@ def generate_entity_portrait(
     CONCEPT ART TOOL: Generate a canonical visual reference image (Master Portrait) for the specified entity
     to maintain absolute visual consistency across different storyboard scenes.
     """
-    PORTRAITS = {
-        "character": [
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-        "prop": [
-            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-        "location": [
-            "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-    }
-
-    val = sum(ord(c) for c in entity_id + style_prompt)
-
     entity_type = "character"
     if "prop" in entity_id.lower() or "prop" in style_prompt.lower():
         entity_type = "prop"
@@ -81,9 +62,7 @@ def generate_entity_portrait(
     ):
         entity_type = "location"
 
-    options = PORTRAITS[entity_type]
-    selected_url = options[val % len(options)]
-
+    selected_url = generate_image_via_openrouter(style_prompt, entity_type)
     return f"Success: Portrait generated for {entity_id}. Master portrait reference URL: {selected_url}"
 
 
@@ -155,26 +134,6 @@ def sync_breakdown_interceptor(
                         f"[Breakdown Interceptor] Intercepted portrait generation for entity: {entity_id}"
                     )
 
-                    PORTRAITS = {
-                        "character": [
-                            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400&h=400",
-                        ],
-                        "prop": [
-                            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=400&h=400",
-                        ],
-                        "location": [
-                            "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&q=80&w=400&h=400",
-                            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=400&h=400",
-                        ],
-                    }
-                    val = sum(ord(c) for c in entity_id + style_prompt)
-
                     entity_type = "character"
                     if "prop" in entity_id.lower() or "prop" in style_prompt.lower():
                         entity_type = "prop"
@@ -186,9 +145,7 @@ def sync_breakdown_interceptor(
                     ):
                         entity_type = "location"
 
-                    selected_url = PORTRAITS[entity_type][
-                        val % len(PORTRAITS[entity_type])
-                    ]
+                    selected_url = generate_image_via_openrouter(style_prompt, entity_type)
 
                     design = state.get("design", {})
                     entities = design.get("entities", [])

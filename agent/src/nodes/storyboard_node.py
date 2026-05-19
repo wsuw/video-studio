@@ -7,7 +7,8 @@ from src.state import AgentState, Scene
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
 from langchain.agents.middleware import after_model
-from src.llm import get_model
+from src.models import get_model
+
 
 
 # ==========================================

@@ -1,4 +1,5 @@
-from src.llm import get_model
+from src.models import get_model
+
 from langchain.agents import create_agent
 from langchain.tools import ToolRuntime, tool
 from langgraph.runtime import Runtime
@@ -88,7 +89,7 @@ Maintain an atmospheric, professional, and rhythmic tone. Your scripts are the b
 design_node = create_agent(
     model=model,
     # 注入影子工具以获得 Schema，CopilotKit 会自动拦截并转给前端执行
-    tools=[updateScriptContent, renderScriptInEditor],
+    tools=[updateScriptContent],
     middleware=[
         CopilotKitMiddleware(),
         sync_script_interceptor,  # Inject sync sentinel
