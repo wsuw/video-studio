@@ -149,6 +149,16 @@ export default function BreakdownPage() {
     agent.runAgent();
   };
 
+  const handleAutoPortrait = (entity: Entity) => {
+    if (!agent) return;
+    agent.addMessage({
+      role: "user",
+      id: crypto.randomUUID(),
+      content: `Please generate a canonical visual reference image (Master Portrait) using the generate_entity_portrait tool for the entity "${entity.name}" (ID: ${entity.id}) with the style prompt: "${entity.description}"`,
+    });
+    agent.runAgent();
+  };
+
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
       {/* Header */}
@@ -281,12 +291,16 @@ export default function BreakdownPage() {
 
                       <div className="flex items-start gap-3 relative z-10">
                         <div className={cn(
-                          "p-2 rounded-lg border transition-colors shrink-0",
+                          "w-10 h-10 rounded-lg overflow-hidden shrink-0 border flex items-center justify-center bg-muted/20 relative transition-all duration-300",
                           isSelected
                             ? cn("border-transparent", entity.type === "character" && "bg-blue-500 text-white", entity.type === "prop" && "bg-amber-500 text-white", entity.type === "location" && "bg-emerald-500 text-white")
                             : config.color
                         )}>
-                          <Icon className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                          {entity.visual_reference ? (
+                            <img src={entity.visual_reference} className="w-full h-full object-cover" />
+                          ) : (
+                            <Icon className="w-4 h-4 transition-transform duration-300 group-hover:scale-110" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
@@ -393,6 +407,77 @@ export default function BreakdownPage() {
                         onChange={(e) => handleEntityUpdate(activeEntity.id, { name: e.target.value })}
                         className="bg-background border-border/80 text-sm focus-visible:ring-primary/20 h-10"
                       />
+                    </div>
+
+                    {/* Master Portrait / Visual Reference */}
+                    <div className="space-y-1.5 shrink-0">
+                      <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground">
+                        Master Portrait (主视觉人设档案)
+                      </label>
+                      {activeEntity.visual_reference ? (
+                        <div className="relative group rounded-xl overflow-hidden border border-border/60 aspect-[16/10] bg-muted/20 shadow-inner flex items-center justify-center">
+                          <img
+                            src={activeEntity.visual_reference}
+                            alt={activeEntity.name}
+                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-all duration-300 backdrop-blur-[2px]">
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              onClick={() => handleAutoPortrait(activeEntity)}
+                              className="text-[10px] font-semibold h-7 px-3 bg-white text-black hover:bg-zinc-100"
+                            >
+                              <Wand2Icon className="w-3 h-3 mr-1" />
+                              Regenerate
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="text-[10px] font-semibold h-7 px-3 text-white border-white/20 hover:bg-white/10"
+                              onClick={() => {
+                                const newRef = prompt("Enter Custom Image URL:", activeEntity.visual_reference);
+                                if (newRef !== null) {
+                                  handleEntityUpdate(activeEntity.id, { visual_reference: newRef });
+                                }
+                              }}
+                            >
+                              Edit URL
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-border/80 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-muted/5 min-h-[140px] transition-all duration-300 hover:border-primary/30">
+                          <SparklesIcon className="w-6 h-6 text-indigo-500/40 mb-2 animate-pulse" />
+                          <h4 className="text-[11px] font-bold text-slate-800 dark:text-zinc-200">No Character Reference Image</h4>
+                          <p className="text-[10px] text-muted-foreground mt-1 max-w-[240px] leading-normal">
+                            Lack of visual reference causes character drift. Generate a canonical visual reference portrait now!
+                          </p>
+                          <div className="flex gap-2 mt-3.5">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleAutoPortrait(activeEntity)}
+                              className="text-[10px] font-semibold h-7 px-3"
+                            >
+                              <Wand2Icon className="w-3 h-3 mr-1" />
+                              AI Auto-Draw
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="text-[10px] font-semibold h-7 px-3 border-dashed hover:border-primary/30 text-slate-700 dark:text-zinc-300"
+                              onClick={() => {
+                                const newRef = prompt("Enter Reference Image URL:");
+                                if (newRef) {
+                                  handleEntityUpdate(activeEntity.id, { visual_reference: newRef });
+                                }
+                              }}
+                            >
+                              Upload URL
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Visual Styling Prompt Description */}

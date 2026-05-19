@@ -1,4 +1,3 @@
-import json
 from typing import Any, Annotated, List
 from pydantic import BaseModel, Field
 from langchain.tools import tool, ToolRuntime
@@ -8,7 +7,7 @@ from src.state import AgentState, Scene
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
 from langchain.agents.middleware import after_model
-from langchain_ollama import ChatOllama
+from src.llm import get_model
 
 
 # ==========================================
@@ -41,27 +40,36 @@ def get_design_context(state: Annotated[dict, InjectedState] = None) -> dict:
     print(f"[get_design_context] 🟢 Tool execution started. State type: {type(state)}")
     try:
         if state is None:
-            print("[get_design_context] ⚠️ Warning: injected state is None. Returning empty design context.")
+            print(
+                "[get_design_context] ⚠️ Warning: injected state is None. Returning empty design context."
+            )
             return {"script": "", "entities": []}
-            
-        print(f"[get_design_context] State keys: {list(state.keys()) if hasattr(state, 'keys') else 'No keys method'}")
-        
+
+        print(
+            f"[get_design_context] State keys: {list(state.keys()) if hasattr(state, 'keys') else 'No keys method'}"
+        )
+
         design = {}
         if isinstance(state, dict):
             design = state.get("design", {})
         elif hasattr(state, "get"):
             design = state.get("design", {})
         else:
-            print(f"[get_design_context] ⚠️ Warning: state is not a dict or dict-like. state={state}")
-            
+            print(
+                f"[get_design_context] ⚠️ Warning: state is not a dict or dict-like. state={state}"
+            )
+
         script = design.get("script", "") if isinstance(design, dict) else ""
         entities = design.get("entities", []) if isinstance(design, dict) else []
-        
-        print(f"[get_design_context] ✅ Success. Script length: {len(script)}, Entities count: {len(entities)}")
+
+        print(
+            f"[get_design_context] ✅ Success. Script length: {len(script)}, Entities count: {len(entities)}"
+        )
         return {"script": script, "entities": entities}
     except Exception as e:
         print(f"[get_design_context] ❌ Exception occurred in get_design_context: {e}")
         import traceback
+
         traceback.print_exc()
         return {"script": "", "entities": [], "error": str(e)}
 
@@ -93,7 +101,7 @@ def sync_storyboard_interceptor(
                 try:
                     args = tc["args"]
                     print(
-                        f"[Storyboard Interceptor] Received structured args directly (no string parsing needed!)"
+                        "[Storyboard Interceptor] Received structured args directly (no string parsing needed!)"
                     )
 
                     scenes = args.get("scenes", [])
@@ -129,7 +137,7 @@ def sync_storyboard_interceptor(
 # ==========================================
 # 3. Define Storyboard Agent
 # ==========================================
-model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
+model = get_model(parallel_tool_calls=True)
 
 storyboard_node = create_agent(
     model=model,

@@ -1,4 +1,4 @@
-from langchain_ollama import ChatOllama
+from src.llm import get_model
 from langchain.agents import create_agent
 from langchain.tools import ToolRuntime, tool
 from langgraph.runtime import Runtime
@@ -43,7 +43,7 @@ def sync_script_interceptor(
     return None
 
 
-model = ChatOllama(model="gemma4:26b", model_kwargs={"parallel_tool_calls": True})
+model = get_model(parallel_tool_calls=True)
 
 system_prompt = """
 <role>
