@@ -107,25 +107,32 @@ def get_script(state: Annotated[dict, InjectedState] = None) -> str:
     print(f"[get_script] 🟢 Tool execution started. State type: {type(state)}")
     try:
         if state is None:
-            print("[get_script] ⚠️ Warning: injected state is None. Returning empty script.")
+            print(
+                "[get_script] ⚠️ Warning: injected state is None. Returning empty script."
+            )
             return ""
-            
-        print(f"[get_script] State keys: {list(state.keys()) if hasattr(state, 'keys') else 'No keys method'}")
-        
+
+        print(
+            f"[get_script] State keys: {list(state.keys()) if hasattr(state, 'keys') else 'No keys method'}"
+        )
+
         design = {}
         if isinstance(state, dict):
             design = state.get("design", {})
         elif hasattr(state, "get"):
             design = state.get("design", {})
         else:
-            print(f"[get_script] ⚠️ Warning: state is not a dict or dict-like. state={state}")
-            
+            print(
+                f"[get_script] ⚠️ Warning: state is not a dict or dict-like. state={state}"
+            )
+
         script = design.get("script", "") if isinstance(design, dict) else ""
         print(f"[get_script] ✅ Success. Script length: {len(script)}")
         return script
     except Exception as e:
         print(f"[get_script] ❌ Exception occurred in get_script: {e}")
         import traceback
+
         traceback.print_exc()
         return ""
 
