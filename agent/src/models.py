@@ -36,10 +36,24 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
             api_base=api_base,
         )
 
+    elif provider == "openrouter":
+        model_name = os.getenv("OPENROUTER_LLM_MODEL")
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        print(f"[LLM Factory] 🤖 Loading ChatOpenRouter model='{model_name}'")
+
+        return ChatOpenRouter(
+            model=model_name,
+            api_key=api_key,
+            temperature=0,
+            max_tokens=1024,
+            max_retries=2,
+        )
+
     else:
         from langchain_ollama import ChatOllama
 
         model_name = os.getenv("OLLAMA_MODEL", "gemma4:26b")
+
         print(
             f"[LLM Factory] 🤖 Loading ChatOllama model='{model_name}' (parallel_tool_calls={parallel_tool_calls})"
         )
@@ -57,7 +71,7 @@ def generate_image_via_openrouter(prompt: str, entity_type: str = "character") -
     If the API key is not configured or fails, it falls back to high-quality curated illustrations.
     """
     api_key = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("OPENROUTER_IMAGE_MODEL", "black-forest-labs/flux-schnell")
+    model = os.getenv("OPENROUTER_IMAGE_MODEL", "x-ai/grok-imagine-image-quality")
 
     # Deterministic beautiful fallback image dataset if API key is missing
     FALLBACK_PORTRAITS = {
@@ -89,33 +103,30 @@ def generate_image_via_openrouter(prompt: str, entity_type: str = "character") -
         return options[val % len(options)]
 
     print(
-        f"[OpenRouter API] 🎨 Calling OpenRouter Image model='{model}' via ChatOpenRouter for prompt: '{prompt[:50]}'"
+        f"[OpenRouter API] 🎨 Generating image via OpenRouter SDK (model='{model}') for prompt: '{prompt[:50]}'"
     )
     try:
-        llm = ChatOpenRouter(
+        from openrouter import OpenRouter
+
+        openrouter_client = OpenRouter(api_key=api_key)
+
+        result = openrouter_client.chat.send(
             model=model,
-            api_key=api_key,
-            temperature=1.0,
+            messages=[{"role": "user", "content": prompt}],
+            modalities=["image"],
         )
 
-        response = llm.invoke([HumanMessage(content=prompt)])
-        content = response.content
-        print(
-            f"[OpenRouter API] 📥 Received ChatOpenRouter image response content: {content}"
-        )
-
-        # Regex to extract the first HTTP/HTTPS URL from response (plain URL or markdown ![img](url))
-        urls = re.findall(r"https?://[^\s\)\]]+", content)
-        if urls:
-            image_url = urls[0]
-            print(f"[OpenRouter API] ✅ Extracted generated image URL: {image_url}")
+        message = result.choices[0].message
+        if message.images:
+            image_url = message.images[0].image_url.url
+            print(f"[OpenRouter API] ✅ Generated image URL: {image_url}")
             return image_url
 
         print(
-            f"[OpenRouter API] ❌ No valid image URL found in ChatOpenRouter response."
+            f"[OpenRouter API] ❌ No valid image found in OpenRouter SDK response. Message: {message}"
         )
     except Exception as e:
-        print(f"[OpenRouter API] ❌ Exception occurred while using ChatOpenRouter: {e}")
+        print(f"[OpenRouter API] ❌ Exception occurred while using OpenRouter SDK: {e}")
 
     # Ultimate backup
     val = sum(ord(c) for c in prompt)
@@ -127,6 +138,7 @@ def generate_video_via_openrouter(prompt: str) -> str:
     """
     Generate video cinematic sequences using OpenRouter's video generation models (e.g. runway/gen3 or luma/ray-v2) via ChatOpenRouter.
     """
+
     api_key = os.getenv("OPENROUTER_API_KEY")
     model = os.getenv("OPENROUTER_VIDEO_MODEL", "luma/ray-v2")
 
