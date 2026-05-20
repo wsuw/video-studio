@@ -15,8 +15,8 @@ dtype = torch.bfloat16
 
 class GenerationRequest(BaseModel):
     prompt: str
-    height: int = 1024
-    width: int = 1024
+    height: int = 256
+    width: int = 256
     guidance_scale: float = 1.0
     num_inference_steps: int = 4
     seed: int = 0
