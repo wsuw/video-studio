@@ -40,6 +40,7 @@ class VideoGenerationRequest(BaseModel):
     guidance_scale_stage2: float = 1.0
     seed: int = 0
     output_path: str = "video.mp4"
+    stage1_only: bool = False  # Set to True to skip latent upsampling and Stage 2 refinement
 
 
 @app.on_event("startup")
@@ -59,7 +60,8 @@ def load_model():
         print(f"[{time.strftime('%H:%M:%S')}] Loading base LTX-2 distilled pipeline from Hugging Face / Cache...")
         pipe = LTX2Pipeline.from_pretrained(
             model_path, 
-            torch_dtype=dtype
+            torch_dtype=dtype,
+            local_files_only=True,
         )
         print(f"[{time.strftime('%H:%M:%S')}] Base pipeline loaded in {time.time() - start_time:.2f} seconds.")
 
@@ -82,6 +84,7 @@ def load_model():
             model_path,
             subfolder="latent_upsampler",
             torch_dtype=dtype,
+            local_files_only=True,
         )
         if hasattr(latent_upsampler, "enable_layerwise_casting"):
             print(f"[{time.strftime('%H:%M:%S')}] Enabling FP8 layerwise casting on latent upsampler...")
@@ -111,13 +114,14 @@ def load_model():
 @app.post("/generate")
 async def generate_video(request: VideoGenerationRequest):
     global pipe, upsample_pipe
-    if pipe is None or upsample_pipe is None:
+    if pipe is None or (upsample_pipe is None and not request.stage1_only):
         raise HTTPException(
             status_code=503,
             detail="LTX-2 pipeline components are not fully loaded",
         )
 
-    print(f"[{time.strftime('%H:%M:%S')}] Generating video via 2-stage distilled pipeline for prompt: '{request.prompt}'...")
+    mode_str = "Stage 1 only (draft preview)" if request.stage1_only else "2-stage distilled pipeline"
+    print(f"[{time.strftime('%H:%M:%S')}] Generating video via {mode_str} for prompt: '{request.prompt}'...")
     start_time = time.time()
     try:
         # Create output directory if it doesn't exist
@@ -134,7 +138,9 @@ async def generate_video(request: VideoGenerationRequest):
 
         print(f"[{time.strftime('%H:%M:%S')}] [Stage 1] Generating base latents ({request.num_inference_steps_stage1} steps)...")
         stage1_start = time.time()
-        video_latent, audio_latent = pipe(
+        output_type = "np" if request.stage1_only else "latent"
+        
+        stage1_res = pipe(
             prompt=request.prompt,
             negative_prompt=request.negative_prompt,
             width=request.width,
@@ -144,79 +150,91 @@ async def generate_video(request: VideoGenerationRequest):
             num_inference_steps=request.num_inference_steps_stage1,
             sigmas=DISTILLED_SIGMA_VALUES,
             guidance_scale=request.guidance_scale_stage1,
-            output_type="latent",
+            output_type=output_type,
             generator=generator,
             return_dict=False,
             callback_on_step_end=stage1_callback,
         )
-        print(f"[{time.strftime('%H:%M:%S')}] [Stage 1] Completed base latent generation in {time.time() - stage1_start:.2f} seconds.")
 
-        # Force offload Stage 1 models to CPU to free VRAM for the next stages
-        print("Offloading Stage 1 transformer and text_encoder to CPU...")
-        pipe.transformer.to("cpu")
-        if hasattr(pipe, "text_encoder"):
-            pipe.text_encoder.to("cpu")
-        import gc
-        gc.collect()
-        torch.cuda.empty_cache()
+        if request.stage1_only:
+            video, audio = stage1_res
+            print(f"[{time.strftime('%H:%M:%S')}] [Stage 1 Only] Completed base generation and decoding in {time.time() - stage1_start:.2f} seconds.")
+            
+            # Force offload Stage 1 models to CPU and clear VRAM
+            print("Offloading Stage 1 models and VAE to CPU...")
+            pipe.vae.to("cpu")
+            pipe.transformer.to("cpu")
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
+        else:
+            video_latent, audio_latent = stage1_res
+            print(f"[{time.strftime('%H:%M:%S')}] [Stage 1] Completed base latent generation in {time.time() - stage1_start:.2f} seconds.")
 
-        # --- LATENT UPSAMPLING ---
-        print(f"[{time.strftime('%H:%M:%S')}] [Upsampler] Upscaling video latents...")
-        upscale_start = time.time()
-        upscaled_video_latent = upsample_pipe(
-            latents=video_latent,
-            output_type="latent",
-            return_dict=False,
-        )[0]
-        print(f"[{time.strftime('%H:%M:%S')}] [Upsampler] Completed upsampling in {time.time() - upscale_start:.2f} seconds.")
+            # Force offload Stage 1 models to CPU to free VRAM for the next stages
+            print("Offloading Stage 1 transformer to CPU...")
+            pipe.transformer.to("cpu")
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
 
-        # Force offload upsampler to CPU to free VRAM for Stage 2 VAE decoding
-        print("Offloading latent upsampler to CPU...")
-        upsample_pipe.latent_upsampler.to("cpu")
-        import gc
-        gc.collect()
-        torch.cuda.empty_cache()
+            # --- LATENT UPSAMPLING ---
+            print(f"[{time.strftime('%H:%M:%S')}] [Upsampler] Upscaling video latents...")
+            upscale_start = time.time()
+            upscaled_video_latent = upsample_pipe(
+                latents=video_latent,
+                output_type="latent",
+                return_dict=False,
+            )[0]
+            print(f"[{time.strftime('%H:%M:%S')}] [Upsampler] Completed upsampling in {time.time() - upscale_start:.2f} seconds.")
 
-        # --- STAGE 2: Distilled Refinement & Decode ---
-        # Change scheduler to use Stage 2 distilled sigmas
-        original_scheduler = pipe.scheduler
-        new_scheduler = FlowMatchEulerDiscreteScheduler.from_config(
-            pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None
-        )
-        pipe.scheduler = new_scheduler
+            # Force offload upsampler to CPU to free VRAM for Stage 2 VAE decoding
+            print("Offloading latent upsampler to CPU...")
+            upsample_pipe.latent_upsampler.to("cpu")
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
 
-        def stage2_callback(pipe_obj, step_index, timestep, callback_kwargs):
-            print(f"[{time.strftime('%H:%M:%S')}] [Stage 2] Step {step_index}/{request.num_inference_steps_stage2} completed. Timestep: {timestep.item() if hasattr(timestep, 'item') else timestep}")
-            return callback_kwargs
+            # --- STAGE 2: Distilled Refinement & Decode ---
+            # Change scheduler to use Stage 2 distilled sigmas
+            original_scheduler = pipe.scheduler
+            new_scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+                pipe.scheduler.config, use_dynamic_shifting=False, shift_terminal=None
+            )
+            pipe.scheduler = new_scheduler
 
-        print(f"[{time.strftime('%H:%M:%S')}] [Stage 2] Refining and decoding upscaled latents ({request.num_inference_steps_stage2} steps)...")
-        stage2_start = time.time()
-        video, audio = pipe(
-            latents=upscaled_video_latent,
-            audio_latents=audio_latent,
-            prompt=request.prompt,
-            negative_prompt=request.negative_prompt,
-            num_inference_steps=request.num_inference_steps_stage2,
-            noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
-            sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
-            guidance_scale=request.guidance_scale_stage2,
-            output_type="np",
-            generator=generator,
-            return_dict=False,
-            callback_on_step_end=stage2_callback,
-        )
-        print(f"[{time.strftime('%H:%M:%S')}] [Stage 2] Completed refinement and decoding in {time.time() - stage2_start:.2f} seconds.")
+            def stage2_callback(pipe_obj, step_index, timestep, callback_kwargs):
+                print(f"[{time.strftime('%H:%M:%S')}] [Stage 2] Step {step_index}/{request.num_inference_steps_stage2} completed. Timestep: {timestep.item() if hasattr(timestep, 'item') else timestep}")
+                return callback_kwargs
 
-        # Force offload Stage 2 components to CPU and clear VRAM
-        print("Offloading Stage 2 components and clearing CUDA cache...")
-        pipe.vae.to("cpu")
-        pipe.transformer.to("cpu")
-        import gc
-        gc.collect()
-        torch.cuda.empty_cache()
+            print(f"[{time.strftime('%H:%M:%S')}] [Stage 2] Refining and decoding upscaled latents ({request.num_inference_steps_stage2} steps)...")
+            stage2_start = time.time()
+            video, audio = pipe(
+                latents=upscaled_video_latent,
+                audio_latents=audio_latent,
+                prompt=request.prompt,
+                negative_prompt=request.negative_prompt,
+                num_inference_steps=request.num_inference_steps_stage2,
+                noise_scale=STAGE_2_DISTILLED_SIGMA_VALUES[0],
+                sigmas=STAGE_2_DISTILLED_SIGMA_VALUES,
+                guidance_scale=request.guidance_scale_stage2,
+                output_type="np",
+                generator=generator,
+                return_dict=False,
+                callback_on_step_end=stage2_callback,
+            )
+            print(f"[{time.strftime('%H:%M:%S')}] [Stage 2] Completed refinement and decoding in {time.time() - stage2_start:.2f} seconds.")
 
-        # Restore original scheduler
-        pipe.scheduler = original_scheduler
+            # Force offload Stage 2 components to CPU and clear VRAM
+            print("Offloading Stage 2 components and clearing CUDA cache...")
+            pipe.vae.to("cpu")
+            pipe.transformer.to("cpu")
+            import gc
+            gc.collect()
+            torch.cuda.empty_cache()
+
+            # Restore original scheduler
+            pipe.scheduler = original_scheduler
 
         # Export video with audio (if vocoder/audio exists)
         audio_tensor = None
