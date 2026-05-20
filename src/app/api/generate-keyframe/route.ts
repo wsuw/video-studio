@@ -30,8 +30,9 @@ export async function POST(req: Request) {
     const absoluteOutputPath = path.join(outputsDir, filename);
 
     // Call the local Python Flux.2 Klein server on port 8124
-    console.log(`[API Proxy] Sending request to Flux.2 Klein Server... Path: ${absoluteOutputPath}`);
-    const response = await fetch("http://localhost:8124/generate", {
+    const fluxServerUrl = process.env.FLUX_SERVER_URL || "http://localhost:8124/generate";
+    console.log(`[API Proxy] Sending request to Flux.2 Klein Server... Path: ${absoluteOutputPath} (URL: ${fluxServerUrl})`);
+    const response = await fetch(fluxServerUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

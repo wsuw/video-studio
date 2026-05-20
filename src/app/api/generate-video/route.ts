@@ -33,8 +33,9 @@ export async function POST(req: Request) {
     const absoluteOutputPath = path.join(outputsDir, filename);
 
     // Call the local Python LTX-2 server on port 8125
-    console.log(`[API Proxy] Sending request to LTX-2 Server... Path: ${absoluteOutputPath}`);
-    const response = await fetch("http://localhost:8125/generate", {
+    const ltxServerUrl = process.env.LTX_SERVER_URL || "http://localhost:8125/generate";
+    console.log(`[API Proxy] Sending request to LTX-2 Server... Path: ${absoluteOutputPath} (URL: ${ltxServerUrl})`);
+    const response = await fetch(ltxServerUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

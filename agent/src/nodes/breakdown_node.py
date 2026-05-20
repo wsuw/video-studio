@@ -98,14 +98,55 @@ def sync_breakdown_interceptor(
                     print(
                         f"[Breakdown Interceptor] Parsed: {len(entities)} entities. scenes will be processed in Storyboard node."
                     )  # Serialize entities safely to list of dicts for global state
-                    serialized_entities = []
+                    
+                    # Load existing entities from state to prevent partial updates from wiping out other assets
+                    existing_entities = []
+                    design_state = state.get("design", {})
+                    if isinstance(design_state, dict):
+                        existing_entities = design_state.get("entities", [])
+
+                    # Construct lookup by ID for existing entities
+                    existing_entities_dict = {}
+                    for e in existing_entities:
+                        e_dict = e if isinstance(e, dict) else (e.dict() if hasattr(e, "dict") else dict(e))
+                        eid = e_dict.get("id")
+                        if eid:
+                            existing_entities_dict[eid] = e_dict
+
+                    # Map and merge incoming entities
+                    incoming_entities = []
                     for e in entities:
-                        if isinstance(e, dict):
-                            serialized_entities.append(e)
-                        elif hasattr(e, "dict"):
-                            serialized_entities.append(e.dict())
-                        else:
-                            serialized_entities.append(dict(e))
+                        e_dict = e if isinstance(e, dict) else (e.dict() if hasattr(e, "dict") else dict(e))
+                        eid = e_dict.get("id")
+                        if eid:
+                            if eid in existing_entities_dict:
+                                merged = existing_entities_dict[eid].copy()
+                                merged.update(e_dict)
+                                existing_entities_dict[eid] = merged
+                                incoming_entities.append(merged)
+                            else:
+                                existing_entities_dict[eid] = e_dict
+                                incoming_entities.append(e_dict)
+
+                    # Determine final entities list
+                    if len(entities) < len(existing_entities) and len(existing_entities) > 0:
+                        print(f"[Breakdown Interceptor] Detected partial update ({len(entities)} incoming vs {len(existing_entities)} existing). Merging and preserving other entities.")
+                        final_entities_to_process = []
+                        seen_ids = set()
+                        # Maintain original list order
+                        for e in existing_entities:
+                            e_dict = e if isinstance(e, dict) else (e.dict() if hasattr(e, "dict") else dict(e))
+                            eid = e_dict.get("id")
+                            if eid in existing_entities_dict:
+                                final_entities_to_process.append(existing_entities_dict[eid])
+                                seen_ids.add(eid)
+                        # Add any new ones that weren't in existing_entities
+                        for eid, e_dict in existing_entities_dict.items():
+                            if eid not in seen_ids:
+                                final_entities_to_process.append(e_dict)
+                    else:
+                        print(f"[Breakdown Interceptor] Detected full update or fresh extraction. Replacing list with incoming entities.")
+                        final_entities_to_process = incoming_entities
 
                     # Automatically generate visual reference portraits in parallel for all extracted entities
                     import concurrent.futures
@@ -137,13 +178,13 @@ def sync_breakdown_interceptor(
                         return e_dict
 
                     print(
-                        f"[Breakdown Interceptor] ⚡ Starting parallel portrait generation for {len(serialized_entities)} entities..."
+                        f"[Breakdown Interceptor] ⚡ Starting parallel portrait generation for {len(final_entities_to_process)} entities..."
                     )
                     with concurrent.futures.ThreadPoolExecutor(
                         max_workers=5
                     ) as executor:
                         final_entities = list(
-                            executor.map(process_entity_visual, serialized_entities)
+                            executor.map(process_entity_visual, final_entities_to_process)
                         )
 
                     result = {
@@ -257,7 +298,38 @@ def get_script(state: Annotated[dict, InjectedState] = None) -> str:
         return ""
 
 
-# Updated system prompt: instruct AI to first obtain the script via get_script and extract entities, and support generating visual portraits
+@tool
+def get_entities(state: Annotated[dict, InjectedState] = None) -> List[dict]:
+    """Return the list of currently extracted entities from design.entities."""
+    print(f"[get_entities] 🟢 Tool execution started. State type: {type(state)}")
+    try:
+        if state is None:
+            print("[get_entities] ⚠️ Warning: injected state is None. Returning empty list.")
+            return []
+
+        design = {}
+        if isinstance(state, dict):
+            design = state.get("design", {})
+        elif hasattr(state, "get"):
+            design = state.get("design", {})
+
+        entities = design.get("entities", []) if isinstance(design, dict) else []
+        serialized_entities = []
+        for e in entities:
+            if isinstance(e, dict):
+                serialized_entities.append(e)
+            elif hasattr(e, "dict"):
+                serialized_entities.append(e.dict())
+            else:
+                serialized_entities.append(dict(e))
+        print(f"[get_entities] ✅ Success. Found {len(serialized_entities)} entities.")
+        return serialized_entities
+    except Exception as e:
+        print(f"[get_entities] ❌ Exception occurred in get_entities: {e}")
+        return []
+
+
+# Updated system prompt: instruct AI to first obtain the script via get_script and extract entities, and support generating visual portraits and auto-styling
 system_prompt = """
 <role>
 You are the 1st Assistant Director (1st AD) and Visual Planner.
@@ -272,7 +344,12 @@ Step 4: The Storyboard (分镜) node will handle the scene-by-scene planning lat
 
 <technical_requirements>
 - TOOL_USAGE: First call `get_script` to obtain script text.
-- Call `submit_breakdown` to save initial entity decomposition.
+- Call `submit_breakdown` to save initial entity decomposition or update existing entities.
+- If the user asks to "Auto-Style" or refine/generate a visual profile for a specific entity, follow these steps:
+  1. Call `get_entities` to retrieve the current list of entities.
+  2. Locate the target entity, generate a rich visual description (style parameters, appearance, textures) based on the user's request.
+  3. Call `submit_breakdown` with the updated list of entities containing the new description.
+  4. Call `generate_entity_portrait` to regenerate/update the portrait image for that entity so it matches the new style perfectly.
 - All concept art portraits for the entities will be automatically generated and linked by the backend upon submission.
 - Do NOT attempt to extract or plan scenes; scene breakdown and storyboard generation is completely delegated to the next stage.
 - Do NOT output raw markdown JSON in chat; always call the tool directly.
@@ -281,7 +358,7 @@ Step 4: The Storyboard (分镜) node will handle the scene-by-scene planning lat
 
 breakdown_node = create_agent(
     model=model,
-    tools=[get_script, submit_breakdown, generate_entity_portrait],
+    tools=[get_script, get_entities, submit_breakdown, generate_entity_portrait],
     middleware=[
         CopilotKitMiddleware(),
         sync_breakdown_interceptor,

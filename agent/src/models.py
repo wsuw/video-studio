@@ -53,13 +53,20 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
         from langchain_ollama import ChatOllama
 
         model_name = os.getenv("OLLAMA_MODEL", "gemma4:26b")
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL")
 
         print(
-            f"[LLM Factory] 🤖 Loading ChatOllama model='{model_name}' (parallel_tool_calls={parallel_tool_calls})"
+            f"[LLM Factory] 🤖 Loading ChatOllama model='{model_name}' (base_url='{ollama_base_url}', parallel_tool_calls={parallel_tool_calls})"
         )
-        return ChatOllama(
-            model=model_name, model_kwargs={"parallel_tool_calls": parallel_tool_calls}
-        )
+        
+        kwargs = {
+            "model": model_name,
+            "model_kwargs": {"parallel_tool_calls": parallel_tool_calls}
+        }
+        if ollama_base_url:
+            kwargs["base_url"] = ollama_base_url
+            
+        return ChatOllama(**kwargs)
 
 
 # ==========================================
@@ -103,7 +110,7 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
     absolute_output_path = os.path.join(outputs_dir, filename)
     web_url = f"/images/outputs/{filename}"
 
-    flux_server_url = "http://localhost:8124/generate"
+    flux_server_url = os.getenv("FLUX_SERVER_URL", "http://localhost:8124/generate")
     print(f"[Image Factory] 🎨 Contacting local Flux.2 Klein server at {flux_server_url} for prompt: '{prompt[:50]}'...")
 
     try:

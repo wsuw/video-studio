@@ -144,7 +144,8 @@ export default function BreakdownPage() {
     agent.addMessage({
       role: "user",
       id: crypto.randomUUID(),
-      content: `Please generate a highly detailed, professional visual prompt profile (style parameters, appearance, and textures) for the extracted asset "${entity.name}" (ID: ${entity.id}, Type: ${entity.type}). Align it with our current global style description: "${customStylePrompt || 'cinematic'}"`,
+      content: `Please generate a highly detailed, professional visual prompt profile (style parameters, appearance, and textures) for the extracted asset "${entity.name}" (ID: ${entity.id}, Type: ${entity.type}). Align it with our current global style description: "${customStylePrompt || 'cinematic'}".
+After generating the visual profile, please ALSO call the generate_entity_portrait tool to regenerate/update the portrait image for this entity.`,
     });
     agent.runAgent();
   };
@@ -162,7 +163,7 @@ export default function BreakdownPage() {
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
       {/* Header */}
-      <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -179,58 +180,61 @@ export default function BreakdownPage() {
           </Breadcrumb>
         </div>
 
-        {!isChatOpen && (
+        <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
-            onClick={() => setIsChatOpen?.(true)}
-            className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            onClick={() => router.push(`/workspace/${projectId}/design/style`)}
+            className="h-9 px-4 font-semibold shadow-sm"
           >
-            <MessageSquareIcon className="h-4 w-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
-            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Open Assistant</span>
+            Next: Style Setup
           </Button>
-        )}
+
+          {!isChatOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsChatOpen?.(true)}
+              className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            >
+              <MessageSquareIcon className="h-4 w-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Open Assistant</span>
+            </Button>
+          )}
+        </div>
       </header>
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {hasData ? (
           <>
-            {/* Left Pane: Entity Extraction & Selection (58% width) */}
-            <div className="w-[58%] flex flex-col p-6 overflow-y-auto border-r border-border/40">
-              <div className="flex items-center justify-between mb-6">
+            {/* Left Pane: Entity Extraction & Selection (60% width) */}
+            <div className="w-[60%] min-w-[340px] flex flex-col p-6 overflow-y-auto border-r border-border/40">
+              {/* Premium spacious layout for left pane header */}
+              <div className="flex flex-col gap-4 mb-6 shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                  <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0">
                     <ListChecksIcon className="w-5 h-5 text-primary" />
                   </div>
-                  <div>
-                    <h1 className="text-lg font-bold tracking-tight">Script Decomposition</h1>
-                    <p className="text-xs text-muted-foreground">Molecular-level entity extraction (Characters, Props & Locations)</p>
+                  <div className="min-w-0">
+                    <h1 className="text-md font-bold tracking-tight truncate">Script Decomposition</h1>
+                    <p className="text-[10px] text-muted-foreground truncate">Molecular-level entity extraction</p>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-dashed"
-                    onClick={handleAutoBreakdown}
-                  >
-                    <Wand2Icon className="w-4 h-4 mr-2" />
-                    Auto-Breakdown
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => router.push(`/workspace/${projectId}/design/style`)}
-                  >
-                    Next: Style Setup
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-dashed h-9 font-semibold text-xs text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm"
+                  onClick={handleAutoBreakdown}
+                >
+                  <Wand2Icon className="w-3.5 h-3.5 mr-2" />
+                  Auto-Breakdown Script
+                </Button>
               </div>
 
               {/* Premium Tabs Selector */}
-              <div className="flex border-b border-border/40 mb-5 gap-1.5 bg-background/50 p-1 rounded-lg">
+              <div className="flex border-b border-border/40 mb-5 gap-1 bg-background/50 p-1 rounded-lg shrink-0">
                 {[
                   { id: "character", label: "Characters", count: characters.length, icon: UserIcon, activeColor: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
                   { id: "prop", label: "Props", count: props.length, icon: PackageIcon, activeColor: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
@@ -249,13 +253,13 @@ export default function BreakdownPage() {
                         }
                       }}
                       className={cn(
-                        "flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md font-semibold text-xs transition-all focus:outline-none text-muted-foreground hover:text-foreground",
+                        "flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-md font-bold text-[10px] transition-all focus:outline-none text-muted-foreground hover:text-foreground truncate",
                         isActive ? tab.activeColor : "bg-transparent border-transparent"
                       )}
                     >
-                      <TabIcon className="w-3.5 h-3.5" />
-                      <span>{tab.label}</span>
-                      <Badge variant={isActive ? "default" : "secondary"} className="text-[9px] px-1.5 py-0 font-bold shrink-0">
+                      <TabIcon className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                      <Badge variant={isActive ? "default" : "secondary"} className="text-[8px] px-1 py-0 font-bold shrink-0">
                         {tab.count}
                       </Badge>
                     </button>
@@ -264,7 +268,7 @@ export default function BreakdownPage() {
               </div>
 
               {/* Tab Grid Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {(activeTab === "character" ? characters : activeTab === "prop" ? props : locations).map((entity: any) => {
                   const isSelected = selectedEntityId === entity.id;
                   const config = ENTITY_CONFIG[entity.type] || ENTITY_CONFIG.prop;
@@ -304,7 +308,7 @@ export default function BreakdownPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-bold text-xs tracking-tight text-slate-800 dark:text-zinc-100 truncate">
+                            <span className="font-bold text-xs tracking-tight text-foreground truncate">
                               {entity.name}
                             </span>
                             <Badge variant="outline" className="text-[8px] font-mono shrink-0 px-1.5 py-0 font-bold">
@@ -341,8 +345,8 @@ export default function BreakdownPage() {
               )}
             </div>
 
-            {/* Right Pane: Casting & Visual Profile Editor (42% width) */}
-            <div className="w-[42%] flex flex-col bg-muted/10 overflow-y-auto">
+            {/* Right Pane: Casting & Visual Profile Editor (40% width, max-w-xl safety limit) */}
+            <div className="w-[40%] min-w-[380px] max-w-[500px] flex flex-col bg-muted/10 overflow-y-auto border-l border-border/20">
               <div className="p-6 border-b border-border/40 bg-background/50 flex items-center gap-2.5">
                 <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
                   <FolderSyncIcon className="w-4 h-4 text-indigo-500" />
@@ -355,7 +359,8 @@ export default function BreakdownPage() {
 
               <div className="p-6 flex-1 flex flex-col">
                 {activeEntity ? (
-                  <div className="space-y-5 flex-1 flex flex-col">
+                  <div className="space-y-6 flex-1 flex flex-col">
+                    {/* Header Card */}
                     <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border/60 bg-background/60 shadow-sm relative overflow-hidden shrink-0">
                       <div className="flex items-center gap-3">
                         <div className={cn(
@@ -367,7 +372,7 @@ export default function BreakdownPage() {
                           {activeEntity.type === "character" ? <UserIcon className="w-5 h-5" /> : activeEntity.type === "prop" ? <PackageIcon className="w-5 h-5" /> : <MapPinIcon className="w-5 h-5" />}
                         </div>
                         <div>
-                          <div className="flex items-center gap-1 mb-0.5">
+                          <div className="flex items-center gap-1.5 mb-0.5">
                             <span className="text-[10px] font-mono font-bold text-muted-foreground">
                               #{activeEntity.id.toUpperCase()}
                             </span>
@@ -390,107 +395,98 @@ export default function BreakdownPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleAutoStyleProfile(activeEntity)}
-                        className="text-xs h-8 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all"
+                        className="text-xs h-8 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all shrink-0"
                       >
                         <SparklesIcon className="w-3.5 h-3.5 mr-1.5" />
                         Auto-Style
                       </Button>
                     </div>
 
-                    {/* Edit Name */}
-                    <div className="space-y-1.5 shrink-0">
-                      <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground">
-                        Asset Name
-                      </label>
-                      <Input
-                        value={activeEntity.name}
-                        onChange={(e) => handleEntityUpdate(activeEntity.id, { name: e.target.value })}
-                        className="bg-background border-border/80 text-sm focus-visible:ring-primary/20 h-10"
-                      />
-                    </div>
-
-                    {/* Master Portrait / Visual Reference */}
-                    <div className="space-y-1.5 shrink-0">
-                      <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground">
-                        Master Portrait (主视觉人设档案)
-                      </label>
-                      {activeEntity.visual_reference ? (
-                        <div className="relative group rounded-xl overflow-hidden border border-border/60 aspect-[16/10] bg-muted/20 shadow-inner flex items-center justify-center">
-                          <img
-                            src={activeEntity.visual_reference}
-                            alt={activeEntity.name}
-                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
-                          />
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-all duration-300 backdrop-blur-[2px]">
-                            <Button 
-                              size="sm" 
-                              variant="secondary" 
-                              onClick={() => handleAutoPortrait(activeEntity)}
-                              className="text-[10px] font-semibold h-7 px-3 bg-white text-black hover:bg-zinc-100"
-                            >
-                              <Wand2Icon className="w-3 h-3 mr-1" />
-                              Regenerate
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="text-[10px] font-semibold h-7 px-3 text-white border-white/20 hover:bg-white/10"
-                              onClick={() => {
-                                const newRef = prompt("Enter Custom Image URL:", activeEntity.visual_reference);
-                                if (newRef !== null) {
-                                  handleEntityUpdate(activeEntity.id, { visual_reference: newRef });
-                                }
-                              }}
-                            >
-                              Edit URL
-                            </Button>
-                          </div>
+                    {/* Vertical Form Fields */}
+                    <div className="flex-1 flex flex-col gap-5 overflow-y-auto pr-1">
+                      {/* Master Portrait Section */}
+                      <div className="space-y-2 shrink-0">
+                        <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                          Master Portrait (主视觉人设档案)
+                        </label>
+                        <div className="w-40 h-40 relative group rounded-xl overflow-hidden border border-border/60 bg-muted/20 shadow-inner flex items-center justify-center">
+                          {activeEntity.visual_reference ? (
+                            <>
+                              <img
+                                src={activeEntity.visual_reference}
+                                alt={activeEntity.name}
+                                className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 backdrop-blur-[1px] p-2 text-center">
+                                <Button 
+                                  size="sm" 
+                                  variant="secondary" 
+                                  onClick={() => handleAutoPortrait(activeEntity)}
+                                  className="text-[10px] font-bold h-6 px-2 w-full"
+                                >
+                                  <Wand2Icon className="w-2.5 h-2.5 mr-1" />
+                                  Regenerate
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="text-[10px] font-bold h-6 px-2 w-full text-white border-white/25 hover:bg-white/10"
+                                  onClick={() => {
+                                    const newRef = prompt("Enter Custom Image URL:", activeEntity.visual_reference);
+                                    if (newRef !== null) {
+                                      handleEntityUpdate(activeEntity.id, { visual_reference: newRef });
+                                    }
+                                  }}
+                                >
+                                  Edit URL
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
+                              <SparklesIcon className="w-5 h-5 text-indigo-500/40 mb-1.5 animate-pulse" />
+                              <p className="text-[9px] text-muted-foreground leading-snug">No reference image</p>
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleAutoPortrait(activeEntity)}
+                                className="text-[9px] font-bold h-5 px-1.5 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                              >
+                                Auto-Draw
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="border border-dashed border-border/80 rounded-xl p-6 flex flex-col items-center justify-center text-center bg-muted/5 min-h-[140px] transition-all duration-300 hover:border-primary/30">
-                          <SparklesIcon className="w-6 h-6 text-indigo-500/40 mb-2 animate-pulse" />
-                          <h4 className="text-[11px] font-bold text-slate-800 dark:text-zinc-200">No Character Reference Image</h4>
-                          <p className="text-[10px] text-muted-foreground mt-1 max-w-[240px] leading-normal">
-                            Lack of visual reference causes character drift. Generate a canonical visual reference portrait now!
-                          </p>
-                          <div className="flex gap-2 mt-3.5">
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleAutoPortrait(activeEntity)}
-                              className="text-[10px] font-semibold h-7 px-3"
-                            >
-                              <Wand2Icon className="w-3 h-3 mr-1" />
-                              AI Auto-Draw
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="text-[10px] font-semibold h-7 px-3 border-dashed hover:border-primary/30 text-slate-700 dark:text-zinc-300"
-                              onClick={() => {
-                                const newRef = prompt("Enter Reference Image URL:");
-                                if (newRef) {
-                                  handleEntityUpdate(activeEntity.id, { visual_reference: newRef });
-                                }
-                              }}
-                            >
-                              Upload URL
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
 
-                    {/* Visual Styling Prompt Description */}
-                    <div className="space-y-1.5 flex-1 flex flex-col min-h-[220px]">
-                      <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground">
-                        Visual Identity Profile (Casting Visual Styling)
-                      </label>
-                      <Textarea
-                        value={activeEntity.description}
-                        onChange={(e) => handleEntityUpdate(activeEntity.id, { description: e.target.value })}
-                        placeholder="Outfit style, material textures, camera features, face/design elements..."
-                        className="flex-1 bg-background border-border/80 text-sm focus-visible:ring-primary/20 leading-relaxed min-h-[200px]"
-                      />
+                      {/* Asset Name Input */}
+                      <div className="space-y-2 shrink-0">
+                        <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                          Asset Name
+                        </label>
+                        <Input
+                          value={activeEntity.name}
+                          onChange={(e) => handleEntityUpdate(activeEntity.id, { name: e.target.value })}
+                          className="bg-background border-border/80 text-sm focus-visible:ring-primary/20 h-10 max-w-md"
+                        />
+                      </div>
+
+                      {/* Visual Identity Profile Textarea */}
+                      <div className="space-y-2 flex flex-col flex-1 min-h-[200px]">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground">
+                            Visual Identity Profile (Casting Visual Styling)
+                          </label>
+                          <span className="text-[8px] font-medium text-muted-foreground/60">
+                            Aligns with global: {customStylePrompt || "cinematic"}
+                          </span>
+                        </div>
+                        <Textarea
+                          value={activeEntity.description}
+                          onChange={(e) => handleEntityUpdate(activeEntity.id, { description: e.target.value })}
+                          placeholder="Outfit style, material textures, camera features, face/design elements..."
+                          className="bg-background border-border/80 text-sm focus-visible:ring-primary/20 leading-relaxed p-3.5 flex-1 min-h-[160px] resize-none focus-visible:border-primary/30 shadow-inner rounded-xl"
+                        />
+                      </div>
                     </div>
                   </div>
                 ) : (
