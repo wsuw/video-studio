@@ -8,9 +8,7 @@ from src.state import AgentState, Entity
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
 from langchain.agents.middleware import after_model
-from src.models import get_model, generate_image_via_openrouter
-
-
+from src.models import get_model, generate_image
 
 
 # ==========================================
@@ -62,7 +60,7 @@ def generate_entity_portrait(
     ):
         entity_type = "location"
 
-    selected_url = generate_image_via_openrouter(style_prompt, entity_type)
+    selected_url = generate_image(style_prompt, entity_type)
     return f"Success: Portrait generated for {entity_id}. Master portrait reference URL: {selected_url}"
 
 
@@ -99,9 +97,7 @@ def sync_breakdown_interceptor(
                     entities = args.get("entities", [])
                     print(
                         f"[Breakdown Interceptor] Parsed: {len(entities)} entities. scenes will be processed in Storyboard node."
-                    )
-
-                    # Serialize entities safely to list of dicts for global state
+                    )  # Serialize entities safely to list of dicts for global state
                     serialized_entities = []
                     for e in entities:
                         if isinstance(e, dict):
@@ -111,14 +107,53 @@ def sync_breakdown_interceptor(
                         else:
                             serialized_entities.append(dict(e))
 
+                    # Automatically generate visual reference portraits in parallel for all extracted entities
+                    import concurrent.futures
+
+                    def process_entity_visual(e_dict):
+                        ref = e_dict.get("visual_reference")
+                        # Generate if ref is missing, empty, or a simple placeholder
+                        if not ref or not ref.startswith("http"):
+                            name = e_dict.get("name", "Asset")
+                            desc = e_dict.get("description", "")
+                            e_type = e_dict.get("type", "character")
+
+                            style_prompt = f"Concept art of {name}: {desc}. Beautiful detailed cinematic style."
+                            print(
+                                f"[Auto Portrait] 🎨 Generating background portrait for {name} ({e_type})..."
+                            )
+                            try:
+                                url = generate_image(
+                                    style_prompt, e_type
+                                )
+                                e_dict["visual_reference"] = url
+                                print(
+                                    f"[Auto Portrait] ✅ Success: Linked background portrait {url} to {name}"
+                                )
+                            except Exception as ex:
+                                print(
+                                    f"[Auto Portrait] ❌ Failed to generate portrait for {name}: {ex}"
+                                )
+                        return e_dict
+
+                    print(
+                        f"[Breakdown Interceptor] ⚡ Starting parallel portrait generation for {len(serialized_entities)} entities..."
+                    )
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=5
+                    ) as executor:
+                        final_entities = list(
+                            executor.map(process_entity_visual, serialized_entities)
+                        )
+
                     result = {
                         "design": {
-                            "entities": serialized_entities,
+                            "entities": final_entities,
                             "is_approved": False,
                         },
                     }
                     print(
-                        f"[Breakdown Interceptor] ✅ Returning state update with {len(serialized_entities)} entities"
+                        f"[Breakdown Interceptor] ✅ Returning state update with {len(final_entities)} entities populated with portraits"
                     )
                     return result
                 except Exception as e:
@@ -131,7 +166,7 @@ def sync_breakdown_interceptor(
                     entity_id = args.get("entity_id")
                     style_prompt = args.get("style_prompt")
                     print(
-                        f"[Breakdown Interceptor] Intercepted portrait generation for entity: {entity_id}"
+                        f"[Breakdown Interceptor] Intercepted manual portrait generation for entity: {entity_id}"
                     )
 
                     entity_type = "character"
@@ -145,7 +180,9 @@ def sync_breakdown_interceptor(
                     ):
                         entity_type = "location"
 
-                    selected_url = generate_image_via_openrouter(style_prompt, entity_type)
+                    selected_url = generate_image(
+                        style_prompt, entity_type
+                    )
 
                     design = state.get("design", {})
                     entities = design.get("entities", [])
@@ -230,14 +267,13 @@ You are the 1st Assistant Director (1st AD) and Visual Planner.
 Step 1: Retrieve the full script using the `get_script` tool.
 Step 2: Perform Entity Extraction (Characters, Props, Locations).
 Step 3: Call `submit_breakdown` directly with your extracted `entities` arguments.
-Step 4: Once entities are extracted, if the director requests generating standard visual references or concept art portraits to maintain consistency, call `generate_entity_portrait` to create the master portraits.
-Step 5: The Storyboard (分镜) node will handle the scene-by-scene planning later. Do NOT attempt to break down or submit scenes here.
+Step 4: The Storyboard (分镜) node will handle the scene-by-scene planning later. Do NOT attempt to break down or submit scenes here.
 </workflow>
 
 <technical_requirements>
 - TOOL_USAGE: First call `get_script` to obtain script text.
 - Call `submit_breakdown` to save initial entity decomposition.
-- Call `generate_entity_portrait` when the director asks to create/generate concept art reference portraits for specific entities.
+- All concept art portraits for the entities will be automatically generated and linked by the backend upon submission.
 - Do NOT attempt to extract or plan scenes; scene breakdown and storyboard generation is completely delegated to the next stage.
 - Do NOT output raw markdown JSON in chat; always call the tool directly.
 </technical_requirements>

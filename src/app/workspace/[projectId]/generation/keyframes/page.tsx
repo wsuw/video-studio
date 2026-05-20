@@ -13,6 +13,10 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/components/ui/use-toast"
+import { Slider } from "@/components/ui/slider"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   MessageSquareIcon,
   PlayIcon,
@@ -123,6 +127,7 @@ export default function QueuePage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
   const params = useParams();
   const projectId = params.projectId as string;
+  const { toast } = useToast();
 
   // Sync to LangGraph thread
   usePhaseSync("generate");
@@ -132,12 +137,22 @@ export default function QueuePage() {
   // States
   const [loadedDesign, setLoadedDesign] = useState<any>(null);
   const [renderingStates, setRenderingStates] = useState<Record<string, { progress: number; log: string }>>({});
-  
+
   // Custom Gacha Choice state: sceneId -> chosenMasterImageUrl
   const [masterOutputs, setMasterOutputs] = useState<Record<string, string>>({});
-  
+
   // Controls variant selection drawer: sceneId -> boolean (active selection mode)
   const [gachaMode, setGachaMode] = useState<Record<string, boolean>>({});
+
+  // Real generated Gacha variants: sceneId -> array of string URLs
+  const [realGachaVariants, setRealGachaVariants] = useState<Record<string, string[]>>({});
+
+  // Advanced inference engine controls
+  const [renderMode, setRenderMode] = useState<'mock' | 'real_single' | 'real_gacha'>('real_single');
+  const [guidanceScale, setGuidanceScale] = useState<number>(1.0);
+  const [numInferenceSteps, setNumInferenceSteps] = useState<number>(4);
+  const [baseSeed, setBaseSeed] = useState<number>(0);
+  const [stylePrompt, setStylePrompt] = useState<string>("");
 
   // Load state on mount
   useEffect(() => {
@@ -147,6 +162,9 @@ export default function QueuePage() {
         const design = data?.values?.design;
         if (design) {
           setLoadedDesign(design);
+          if (design.style_prompt) {
+            setStylePrompt(design.style_prompt);
+          }
           if (agent && (!agent.state?.design?.scenes?.length)) {
             agent.setState({
               ...agent.state,
@@ -195,49 +213,232 @@ export default function QueuePage() {
     return [];
   };
 
-  // Get all 4 gacha options for this specific scene
+  // Get all 4 gacha options for this specific scene (with real fallback)
   const getGachaOptions = (sceneId: string): string[] => {
+    if (realGachaVariants[sceneId] && realGachaVariants[sceneId].length > 0) {
+      return realGachaVariants[sceneId];
+    }
     const styleVariants = GACHA_VARIANTS[globalArtStyle] || GACHA_VARIANTS.cyberpunk;
     const key = styleVariants[sceneId] ? sceneId : Object.keys(styleVariants)[0];
     return styleVariants[key] || GACHA_VARIANTS.cyberpunk.s1;
   };
 
-  // Dispatch Render Gacha (Simulate High-End SDXL/Kling GPU synthesis)
-  const handleStartRender = (sceneId: string) => {
-    setRenderingStates(prev => ({
-      ...prev,
-      [sceneId]: { progress: 5, log: "Allocating cluster cluster GPU nodes..." }
-    }));
+  // Dispatch Render Gacha (Simulate or run real Flux-Klein GPU inference)
+  const handleStartRender = async (sceneId: string) => {
+    const scene = scenes.find(s => s.id === sceneId);
+    if (!scene) return;
 
-    const stages = [
-      { progress: 25, log: "Parsing structural layout boundary nodes..." },
-      { progress: 50, log: "Synthesizing 4 aesthetic variants from design styles..." },
-      { progress: 75, log: "Compiling optical lens focal depth fields..." },
-      { progress: 95, log: "Applying cinematic film grade LUT palettes..." },
-      { progress: 100, log: "Completed variants generation." }
-    ];
+    // Build compound prompt for high-fidelity diffusion synthesis
+    const fullPrompt = `${scene.description}.${stylePrompt ? ` Style: ${stylePrompt}.` : ""} ${globalArtStyle} aesthetic, ${scene.shot_type || "medium"} shot, ${scene.lens || "50mm"} lens, ${scene.motion || "static"} camera.`;
 
-    let currentStage = 0;
-    const interval = setInterval(() => {
-      if (currentStage >= stages.length) {
-        clearInterval(interval);
-        
-        // Render completed: open Gacha selection mode immediately!
-        setGachaMode(prev => ({ ...prev, [sceneId]: true }));
+    if (renderMode === "mock") {
+      // Original mock render
+      setRenderingStates(prev => ({
+        ...prev,
+        [sceneId]: { progress: 5, log: "Allocating cluster cluster GPU nodes..." }
+      }));
+
+      const stages = [
+        { progress: 25, log: "Parsing structural layout boundary nodes..." },
+        { progress: 50, log: "Synthesizing 4 aesthetic variants from design styles..." },
+        { progress: 75, log: "Compiling optical lens focal depth fields..." },
+        { progress: 95, log: "Applying cinematic film grade LUT palettes..." },
+        { progress: 100, log: "Completed variants generation." }
+      ];
+
+      let currentStage = 0;
+      const interval = setInterval(() => {
+        if (currentStage >= stages.length) {
+          clearInterval(interval);
+
+          // Render completed: open Gacha selection mode immediately!
+          setGachaMode(prev => ({ ...prev, [sceneId]: true }));
+          setRenderingStates(prev => {
+            const next = { ...prev };
+            delete next[sceneId];
+            return next;
+          });
+        } else {
+          const stage = stages[currentStage];
+          setRenderingStates(prev => ({
+            ...prev,
+            [sceneId]: { progress: stage.progress, log: stage.log }
+          }));
+          currentStage++;
+        }
+      }, 850);
+      return;
+    }
+
+    // Real GPU single frame generation
+    if (renderMode === "real_single") {
+      setRenderingStates(prev => ({
+        ...prev,
+        [sceneId]: { progress: 10, log: "Contacting GPU Server..." }
+      }));
+
+      toast({
+        title: "⚡ Generation Initiated",
+        description: "Executing real-time Flux.2 Klein diffusion on CUDA.",
+      });
+
+      // Periodic progress ticker during long HTTP request
+      let currentProgress = 15;
+      const progressInterval = setInterval(() => {
+        currentProgress = Math.min(95, currentProgress + Math.floor(Math.random() * 8) + 2);
+        let logText = "Running Flux.2 Klein diffusion steps...";
+        if (currentProgress > 45) logText = "Synthesizing optical composition boundary nodes...";
+        if (currentProgress > 75) logText = "Offloading model pipeline to system CPU...";
+        if (currentProgress > 90) logText = "Writing finished static image frame...";
+
+        setRenderingStates(prev => {
+          if (!prev[sceneId]) return prev;
+          return {
+            ...prev,
+            [sceneId]: { progress: currentProgress, log: logText }
+          };
+        });
+      }, 650);
+
+      try {
+        const response = await fetch("/api/generate-keyframe", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: fullPrompt,
+            guidance_scale: guidanceScale,
+            num_inference_steps: numInferenceSteps,
+            seed: baseSeed || Math.floor(Math.random() * 1000000),
+            sceneId: scene.id,
+          }),
+        });
+
+        clearInterval(progressInterval);
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to render keyframe");
+        }
+
+        const data = await response.json();
+
+        // Single frame generated successfully! Save directly to master frame
+        setMasterOutputs(prev => ({ ...prev, [sceneId]: data.url }));
+        handleUpdateSceneStatus(sceneId, "rendered");
+
         setRenderingStates(prev => {
           const next = { ...prev };
           delete next[sceneId];
           return next;
         });
-      } else {
-        const stage = stages[currentStage];
-        setRenderingStates(prev => ({
-          ...prev,
-          [sceneId]: { progress: stage.progress, log: stage.log }
-        }));
-        currentStage++;
+
+        toast({
+          title: "🎉 Generation Completed",
+          description: `Successfully synthesized scene ${sceneId} in ${data.elapsed_seconds}s!`,
+        });
+
+      } catch (error: any) {
+        clearInterval(progressInterval);
+        console.error("[Render] Single render error:", error);
+        setRenderingStates(prev => {
+          const next = { ...prev };
+          delete next[sceneId];
+          return next;
+        });
+        toast({
+          variant: "destructive",
+          title: "❌ Render Failed",
+          description: error.message || "Could not connect to model server.",
+        });
       }
-    }, 850);
+    }
+
+    // Real GPU multi-variant Gacha generation (sequential to protect VRAM)
+    if (renderMode === "real_gacha") {
+      setRenderingStates(prev => ({
+        ...prev,
+        [sceneId]: { progress: 5, log: "Starting 4-Variant Gacha Synthesis..." }
+      }));
+
+      toast({
+        title: "🎲 Gacha Batch Started",
+        description: "Generating 4 variants sequentially for safe VRAM execution.",
+      });
+
+      const generatedUrls: string[] = [];
+      const totalVariants = 4;
+
+      try {
+        for (let i = 0; i < totalVariants; i++) {
+          const currentSeed = (baseSeed || Math.floor(Math.random() * 1000000)) + i * 17;
+
+          setRenderingStates(prev => ({
+            ...prev,
+            [sceneId]: {
+              progress: Math.round((i / totalVariants) * 100) + 5,
+              log: `Variant ${i + 1}/${totalVariants} - Seed: ${currentSeed}...`
+            }
+          }));
+
+          const response = await fetch("/api/generate-keyframe", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              prompt: fullPrompt,
+              guidance_scale: guidanceScale,
+              num_inference_steps: numInferenceSteps,
+              seed: currentSeed,
+              sceneId: `${scene.id}_v${i}`,
+            }),
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(`Variant ${i + 1} failed: ${errData.error}`);
+          }
+
+          const data = await response.json();
+          generatedUrls.push(data.url);
+        }
+
+        // Store real gacha variants
+        setRealGachaVariants(prev => ({
+          ...prev,
+          [sceneId]: generatedUrls
+        }));
+
+        // Render completed: open Gacha selection mode immediately!
+        setGachaMode(prev => ({ ...prev, [sceneId]: true }));
+
+        setRenderingStates(prev => {
+          const next = { ...prev };
+          delete next[sceneId];
+          return next;
+        });
+
+        toast({
+          title: "🎉 Gacha Complete",
+          description: "All 4 variants rendered successfully. Choose your master frame!",
+        });
+
+      } catch (error: any) {
+        console.error("[Render] Gacha render error:", error);
+        setRenderingStates(prev => {
+          const next = { ...prev };
+          delete next[sceneId];
+          return next;
+        });
+        toast({
+          variant: "destructive",
+          title: "❌ Gacha Failed",
+          description: error.message || "Failed to complete multi-variant run.",
+        });
+      }
+    }
   };
 
   // Lock selected variant as the master frame
@@ -332,7 +533,7 @@ export default function QueuePage() {
               const layout = getActiveLayout(scene);
               const isRendering = !!renderingStates[scene.id];
               const renderState = renderingStates[scene.id];
-              
+
               const variants = getGachaOptions(scene.id);
               const masterUrl = masterOutputs[scene.id] || variants[0];
               const isGachaSelecting = !!gachaMode[scene.id];
@@ -384,7 +585,7 @@ export default function QueuePage() {
                       ) : isRendering ? (
                         <span className="text-[10px] font-bold text-primary animate-pulse flex items-center gap-1">
                           <CpuIcon className="w-3.5 h-3.5 animate-spin" />
-                          Generating 4 Variants...
+                          {renderMode === 'real_single' ? 'Generating Frame...' : 'Generating 4 Variants...'}
                         </span>
                       ) : isGachaSelecting ? (
                         <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
@@ -399,7 +600,7 @@ export default function QueuePage() {
                           className="h-8 text-xs font-bold hover:bg-primary hover:text-primary-foreground border-primary/30 hover:border-primary transition-all duration-300"
                         >
                           <PlayIcon className="w-3.5 h-3.5 mr-1" />
-                          Generate Variants (4x Gacha)
+                          {renderMode === 'real_single' ? 'Generate Frame (Flux)' : 'Generate Variants (4x Gacha)'}
                         </Button>
                       )}
                     </div>
@@ -438,7 +639,7 @@ export default function QueuePage() {
                           </div>
                         );
                       })}
-                      
+
                       <span className="text-[8px] font-mono tracking-widest text-muted-foreground/30 uppercase absolute bottom-2 right-2">
                         Composition Viewfinder
                       </span>
@@ -565,9 +766,12 @@ export default function QueuePage() {
             </div>
             <div className="space-y-2">
               <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider block">Atmosphere Styling Prompt:</span>
-              <span className="text-[11px] text-muted-foreground/80 leading-relaxed block bg-muted/30 p-3 rounded-xl border border-border/50 italic">
-                "{globalStylePrompt || "None defined"}"
-              </span>
+              <Textarea
+                value={stylePrompt}
+                onChange={(e) => setStylePrompt(e.target.value)}
+                placeholder="Describe cinematic lighting, mood, tone, style modifiers..."
+                className="text-[11px] bg-muted/30 border-border/50 text-muted-foreground leading-relaxed rounded-xl placeholder:text-muted-foreground/30 min-h-[70px] resize-none focus-visible:ring-primary/20"
+              />
             </div>
           </div>
 
@@ -581,33 +785,111 @@ export default function QueuePage() {
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-sm space-y-4">
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span className="uppercase font-bold tracking-wider">CFG Scale (Guidance)</span>
-                  <span className="font-mono font-semibold text-foreground">7.5</span>
+              {/* Render Mode Segmented Control */}
+              <div className="space-y-2">
+                <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider block">Inference Engine Mode</span>
+                <div className="grid grid-cols-3 gap-1 p-1 bg-muted/50 rounded-lg border border-border/60">
+                  <button
+                    onClick={() => setRenderMode('mock')}
+                    className={cn(
+                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                      renderMode === 'mock'
+                        ? "bg-background text-foreground shadow-sm border border-border/40"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Mock Gacha
+                  </button>
+                  <button
+                    onClick={() => setRenderMode('real_single')}
+                    className={cn(
+                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                      renderMode === 'real_single'
+                        ? "bg-background text-primary shadow-sm border border-primary/20"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Flux Single
+                  </button>
+                  <button
+                    onClick={() => setRenderMode('real_gacha')}
+                    className={cn(
+                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                      renderMode === 'real_gacha'
+                        ? "bg-background text-amber-500 shadow-sm border border-amber-500/20"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Flux Gacha
+                  </button>
                 </div>
-                <Progress value={75} className="h-1 bg-muted" />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-2 pt-2 border-t border-border/40">
                 <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span className="uppercase font-bold tracking-wider">Sampling Steps</span>
-                  <span className="font-mono font-semibold text-foreground">30 Steps</span>
+                  <span className="uppercase font-bold tracking-wider">CFG Guidance Scale</span>
+                  <span className="font-mono font-bold text-primary">{guidanceScale.toFixed(1)}</span>
                 </div>
-                <Progress value={60} className="h-1 bg-muted" />
+                <Slider
+                  min={1.0}
+                  max={10.0}
+                  step={0.1}
+                  value={[guidanceScale]}
+                  onValueChange={(val) => setGuidanceScale(val[0])}
+                  className="py-1 cursor-pointer"
+                />
               </div>
 
-              <div className="flex justify-between items-center text-xs pt-1">
-                <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Dynamic Seed:</span>
-                <span className="font-mono text-muted-foreground bg-muted/40 px-2 py-0.5 rounded text-[10px]">
-                  🎲 Randomize Seed
-                </span>
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span className="uppercase font-bold tracking-wider">Inference Steps</span>
+                  <span className="font-mono font-bold text-primary">{numInferenceSteps} Steps</span>
+                </div>
+                <Slider
+                  min={1}
+                  max={50}
+                  step={1}
+                  value={[numInferenceSteps]}
+                  onValueChange={(val) => setNumInferenceSteps(val[0])}
+                  className="py-1 cursor-pointer"
+                />
               </div>
-              
-              <div className="flex justify-between items-center text-xs pt-1">
+
+              <div className="space-y-2 pt-2 border-t border-border/40">
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span className="uppercase font-bold tracking-wider">Generation Seed</span>
+                  <span className="font-mono font-semibold text-muted-foreground">
+                    {baseSeed === 0 ? "🎲 Auto-Randomize" : `Manual: ${baseSeed}`}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={baseSeed === 0 ? "" : baseSeed}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      setBaseSeed(isNaN(val) ? 0 : val);
+                    }}
+                    placeholder="Enter manual seed (0 for auto)"
+                    className="h-8 text-[10px] font-mono bg-muted/20 border-border/50 focus-visible:ring-primary/20"
+                  />
+                  {baseSeed !== 0 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBaseSeed(0)}
+                      className="h-8 text-[9px] px-2"
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center text-xs pt-2 border-t border-border/40">
                 <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Target Resolution:</span>
                 <span className="font-mono text-[10px] font-semibold text-foreground">
-                  Ultra-HD 4K (3840x2160)
+                  Flux HD (1024x1024)
                 </span>
               </div>
             </div>

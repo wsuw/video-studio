@@ -63,17 +63,14 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
 
 
 # ==========================================
-# 2. OpenRouter High-End Image & Video Generation
+# 2. Local Flux & OpenRouter Video Generation
 # ==========================================
-def generate_image_via_openrouter(prompt: str, entity_type: str = "character") -> str:
+def generate_image(prompt: str, entity_type: str = "character") -> str:
     """
-    Generate an image using OpenRouter's image models via official LangChain ChatOpenRouter.
-    If the API key is not configured or fails, it falls back to high-quality curated illustrations.
+    Generate an image using the local Flux.2 Klein server (running on port 8124).
+    If it is offline or fails, falls back to high-quality curated illustrations.
     """
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("OPENROUTER_IMAGE_MODEL", "x-ai/grok-imagine-image-quality")
-
-    # Deterministic beautiful fallback image dataset if API key is missing
+    # Deterministic beautiful fallback image dataset if generation fails
     FALLBACK_PORTRAITS = {
         "character": [
             "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400",
@@ -93,45 +90,50 @@ def generate_image_via_openrouter(prompt: str, entity_type: str = "character") -
         ],
     }
 
-    # Generate a deterministic fallback image if key is not provided
-    if not api_key:
-        print(
-            "[OpenRouter API] ⚠️ OPENROUTER_API_KEY is not configured in .env. Using fallback curated concept illustration."
-        )
-        val = sum(ord(c) for c in prompt)
-        options = FALLBACK_PORTRAITS.get(entity_type, FALLBACK_PORTRAITS["character"])
-        return options[val % len(options)]
+    import hashlib
+    import time
+    import requests
 
-    print(
-        f"[OpenRouter API] 🎨 Generating image via OpenRouter SDK (model='{model}') for prompt: '{prompt[:50]}'"
-    )
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.abspath(os.path.join(current_dir, "..", ".."))
+    outputs_dir = os.path.join(project_root, "public", "images", "outputs")
+    os.makedirs(outputs_dir, exist_ok=True)
+
+    filename = f"portrait_{hashlib.md5(prompt.encode('utf-8')).hexdigest()[:12]}_{int(time.time())}.png"
+    absolute_output_path = os.path.join(outputs_dir, filename)
+    web_url = f"/images/outputs/{filename}"
+
+    flux_server_url = "http://localhost:8124/generate"
+    print(f"[Image Factory] 🎨 Contacting local Flux.2 Klein server at {flux_server_url} for prompt: '{prompt[:50]}'...")
+
     try:
-        from openrouter import OpenRouter
-
-        openrouter_client = OpenRouter(api_key=api_key)
-
-        result = openrouter_client.chat.send(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            modalities=["image"],
+        response = requests.post(
+            flux_server_url,
+            json={
+                "prompt": prompt,
+                "height": 1024,
+                "width": 1024,
+                "guidance_scale": 1.0,
+                "num_inference_steps": 4,
+                "seed": 0,
+                "output_path": absolute_output_path
+            },
+            timeout=120
         )
-
-        message = result.choices[0].message
-        if message.images:
-            image_url = message.images[0].image_url.url
-            print(f"[OpenRouter API] ✅ Generated image URL: {image_url}")
-            return image_url
-
-        print(
-            f"[OpenRouter API] ❌ No valid image found in OpenRouter SDK response. Message: {message}"
-        )
+        if response.status_code == 200:
+            print(f"[Image Factory] ✅ Successfully generated portrait using local Flux server: {web_url}")
+            return web_url
+        else:
+            print(f"[Image Factory] ⚠️ Flux server returned status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"[OpenRouter API] ❌ Exception occurred while using OpenRouter SDK: {e}")
+        print(f"[Image Factory] ⚠️ Failed to connect to local Flux server: {e}")
 
-    # Ultimate backup
+    # Fallback to curated illustrations
+    print("[Image Factory] ℹ️ Falling back to curated concept illustration.")
     val = sum(ord(c) for c in prompt)
     options = FALLBACK_PORTRAITS.get(entity_type, FALLBACK_PORTRAITS["character"])
     return options[val % len(options)]
+
 
 
 def generate_video_via_openrouter(prompt: str) -> str:
