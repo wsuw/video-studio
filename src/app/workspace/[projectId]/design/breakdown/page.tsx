@@ -182,6 +182,16 @@ After generating the visual profile, please ALSO call the generate_entity_portra
 
         <div className="flex items-center gap-2">
           <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAutoBreakdown}
+            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm"
+          >
+            <Wand2Icon className="w-3.5 h-3.5 mr-2" />
+            Auto-Breakdown Script
+          </Button>
+
+          <Button
             variant="default"
             size="sm"
             onClick={() => router.push(`/workspace/${projectId}/design/style`)}
@@ -208,8 +218,8 @@ After generating the visual profile, please ALSO call the generate_entity_portra
       <div className="flex-1 flex overflow-hidden">
         {hasData ? (
           <>
-            {/* Left Pane: Entity Extraction & Selection (60% width) */}
-            <div className="w-[60%] min-w-[340px] flex flex-col p-6 overflow-y-auto border-r border-border/40">
+            {/* Left Pane: Entity Extraction & Selection (flex-1 width to fill remaining space) */}
+            <div className="flex-1 min-w-[340px] flex flex-col p-6 overflow-y-auto border-r border-border/40">
               {/* Premium spacious layout for left pane header */}
               <div className="flex flex-col gap-4 mb-6 shrink-0">
                 <div className="flex items-center gap-3">
@@ -221,16 +231,6 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                     <p className="text-[10px] text-muted-foreground truncate">Molecular-level entity extraction</p>
                   </div>
                 </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full border-dashed h-9 font-semibold text-xs text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm"
-                  onClick={handleAutoBreakdown}
-                >
-                  <Wand2Icon className="w-3.5 h-3.5 mr-2" />
-                  Auto-Breakdown Script
-                </Button>
               </div>
 
               {/* Premium Tabs Selector */}
@@ -345,8 +345,8 @@ After generating the visual profile, please ALSO call the generate_entity_portra
               )}
             </div>
 
-            {/* Right Pane: Casting & Visual Profile Editor (40% width, max-w-xl safety limit) */}
-            <div className="w-[40%] min-w-[380px] max-w-[500px] flex flex-col bg-muted/10 overflow-y-auto border-l border-border/20">
+            {/* Right Pane: Casting & Visual Profile Editor (Fixed 350px width) */}
+            <div className="w-[350px] shrink-0 flex flex-col bg-muted/10 overflow-y-auto border-l border-border/20">
               <div className="p-6 border-b border-border/40 bg-background/50 flex items-center gap-2.5">
                 <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
                   <FolderSyncIcon className="w-4 h-4 text-indigo-500" />
@@ -418,18 +418,18 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                 className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
                               />
                               <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1.5 transition-all duration-300 backdrop-blur-[1px] p-2 text-center">
-                                <Button 
-                                  size="sm" 
-                                  variant="secondary" 
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
                                   onClick={() => handleAutoPortrait(activeEntity)}
                                   className="text-[10px] font-bold h-6 px-2 w-full"
                                 >
                                   <Wand2Icon className="w-2.5 h-2.5 mr-1" />
                                   Regenerate
                                 </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   className="text-[10px] font-bold h-6 px-2 w-full text-white border-white/25 hover:bg-white/10"
                                   onClick={() => {
                                     const newRef = prompt("Enter Custom Image URL:", activeEntity.visual_reference);
@@ -446,8 +446,8 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
                               <SparklesIcon className="w-5 h-5 text-indigo-500/40 mb-1.5 animate-pulse" />
                               <p className="text-[9px] text-muted-foreground leading-snug">No reference image</p>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 onClick={() => handleAutoPortrait(activeEntity)}
                                 className="text-[9px] font-bold h-5 px-1.5 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white"
                               >

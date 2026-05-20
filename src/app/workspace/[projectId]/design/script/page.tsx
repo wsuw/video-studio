@@ -106,7 +106,6 @@ export default function Page() {
             </Button>
           </div>
 
-          <Separator orientation="vertical" className="h-6" />
 
           {!isChatOpen && (
             <Button

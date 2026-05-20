@@ -33,7 +33,7 @@ import {
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { useAgent } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
 import { getThreadState } from "@/lib/langgraph"
@@ -77,6 +77,7 @@ const MOCK_VIDEOS: Record<string, string[]> = {
 
 export default function VideoExecutionPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
   const { toast } = useToast();
@@ -294,7 +295,7 @@ export default function VideoExecutionPage() {
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
       {/* Header Navigation */}
-      <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -315,17 +316,39 @@ export default function VideoExecutionPage() {
           </Breadcrumb>
         </div>
 
-        {!isChatOpen && (
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsChatOpen?.(true)}
-            className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            onClick={handleRenderAll}
+            disabled={scenes.length === 0}
+            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm font-semibold gap-1.5"
           >
-            <MessageSquareIcon className="h-4 w-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
-            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Open Assistant</span>
+            <SparklesIcon className="w-4 h-4" />
+            Render All Videos ({scenes.length})
           </Button>
-        )}
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => router.push(`/workspace/${projectId}/redesign/review`)}
+            className="h-9 px-4 font-semibold shadow-sm"
+          >
+            Next: HITL Review
+          </Button>
+
+          {!isChatOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsChatOpen?.(true)}
+              className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            >
+              <MessageSquareIcon className="h-4 w-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Open Assistant</span>
+            </Button>
+          )}
+        </div>
       </header>
 
       {/* Main Central Workspace */}
@@ -342,17 +365,6 @@ export default function VideoExecutionPage() {
                 <p className="text-xs text-muted-foreground">Synthesize high-fidelity cinematic video frames with sound dynamically utilizing Lightricks LTX-2</p>
               </div>
             </div>
-
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleRenderAll}
-              disabled={scenes.length === 0}
-              className="text-xs font-bold gap-1.5 shadow-md shadow-primary/5"
-            >
-              <SparklesIcon className="w-4 h-4 animate-spin-slow" />
-              Render All Videos ({scenes.length})
-            </Button>
           </div>
 
           {/* Render Queue Items */}

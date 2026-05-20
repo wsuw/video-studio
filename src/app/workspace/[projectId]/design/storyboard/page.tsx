@@ -149,7 +149,7 @@ export default function StoryboardPage() {
 
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
-      <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -166,17 +166,38 @@ export default function StoryboardPage() {
           </Breadcrumb>
         </div>
 
-        {!isChatOpen && (
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsChatOpen?.(true)}
-            className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            onClick={handleAutoStoryboard}
+            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm"
           >
-            <MessageSquareIcon className="h-4 w-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
-            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Open Assistant</span>
+            <Wand2Icon className="w-4 h-4 mr-2" />
+            Auto-Storyboard
           </Button>
-        )}
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => router.push(`/workspace/${projectId}/generation/keyframes`)}
+            className="h-9 px-4 font-semibold shadow-sm"
+          >
+            Next: Keyframe Gen
+          </Button>
+
+          {!isChatOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsChatOpen?.(true)}
+              className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group"
+            >
+              <MessageSquareIcon className="h-4 w-4 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Open Assistant</span>
+            </Button>
+          )}
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -191,25 +212,6 @@ export default function StoryboardPage() {
                 <h1 className="text-xl font-bold tracking-tight">Composition Viewport</h1>
                 <p className="text-xs text-muted-foreground">Multi-subject visual layout framing</p>
               </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-dashed"
-                onClick={handleAutoStoryboard}
-              >
-                <Wand2Icon className="w-4 h-4 mr-2" />
-                Auto-Storyboard
-              </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => router.push(`/workspace/${projectId}/generation/keyframes`)}
-              >
-                Next: Keyframe Gen
-              </Button>
             </div>
           </div>
 
@@ -315,9 +317,9 @@ export default function StoryboardPage() {
                   <div className="absolute inset-y-0 left-2/3 border-l border-dashed border-foreground/[0.04] pointer-events-none"></div>
                 </div>
 
-                {/* Info Panel Overlay */}
-                <div className="p-6 border-t border-border/40 bg-background/90 sticky bottom-0 z-10">
-                  <div className="flex items-start justify-between gap-6">
+                {/* Info Panel Overlay (with horizontal scroll support for small screens) */}
+                <div className="p-6 border-t border-border/40 bg-background/90 sticky bottom-0 z-10 w-full overflow-x-auto">
+                  <div className="flex items-start justify-between gap-6 min-w-[900px]">
                     {/* Left: Description */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
