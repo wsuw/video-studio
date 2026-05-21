@@ -23,7 +23,10 @@ import {
   MapPinIcon,
   SparklesIcon,
   LayoutGridIcon,
-  FolderSyncIcon
+  FolderSyncIcon,
+  PlayIcon,
+  PauseIcon,
+  Volume2Icon
 } from "lucide-react"
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React, { useState } from "react"
@@ -35,6 +38,7 @@ import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { getThreadState } from "@/lib/langgraph"
 import { v4 as uuidv4 } from "uuid"
+import { PRESET_VOICES } from "@/lib/preset-voices"
 
 interface Entity {
   id: string;
@@ -67,6 +71,34 @@ export default function BreakdownPage() {
   const [loadedDesign, setLoadedDesign] = React.useState<any>(null);
   const [activeTab, setActiveTab] = React.useState<"character" | "prop" | "location">("character");
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+
+  // Real-time audition preview state
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const playPreview = (voicePath: string, voiceId: string) => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.pause();
+      if (playingVoiceId === voiceId) {
+        setPlayingVoiceId(null);
+        return;
+      }
+    }
+
+    const previewUrl = `/api/preview-voice?path=${encodeURIComponent(voicePath)}`;
+    const audio = new Audio(previewUrl);
+    audioPlayerRef.current = audio;
+    setPlayingVoiceId(voiceId);
+
+    audio.play().catch((err) => {
+      console.error("Audition playback failed:", err);
+      setPlayingVoiceId(null);
+    });
+
+    audio.onended = () => {
+      setPlayingVoiceId(null);
+    };
+  };
 
   // Fetch persisted design state directly from LangGraph API on mount
   React.useEffect(() => {
@@ -366,23 +398,23 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                 {activeEntity ? (
                   <div className="space-y-6 flex-1 flex flex-col">
                     {/* Header Card */}
-                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border/60 bg-background/60 shadow-sm relative overflow-hidden shrink-0">
+                    <div className="flex flex-col gap-3 p-4 rounded-xl border border-border/60 bg-background/60 shadow-sm relative overflow-hidden shrink-0">
                       <div className="flex items-center gap-3">
                         <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-md font-bold shadow-sm",
+                          "w-10 h-10 rounded-xl flex items-center justify-center text-md font-bold shadow-sm shrink-0",
                           activeEntity.type === "character" && "bg-blue-500/10 text-blue-500 border border-blue-500/20",
                           activeEntity.type === "prop" && "bg-amber-500/10 text-amber-500 border border-amber-500/20",
                           activeEntity.type === "location" && "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                         )}>
                           {activeEntity.type === "character" ? <UserIcon className="w-5 h-5" /> : activeEntity.type === "prop" ? <PackageIcon className="w-5 h-5" /> : <MapPinIcon className="w-5 h-5" />}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-0.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 mb-1.5">
                             <span className="text-xs font-mono font-bold text-muted-foreground">
                               #{activeEntity.id.toUpperCase()}
                             </span>
                             <Badge variant="outline" className={cn(
-                              "text-xs font-bold uppercase tracking-wider px-2 py-0.5",
+                              "text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 leading-none shrink-0",
                               activeEntity.type === "character" && "bg-blue-500/5 text-blue-500 border-blue-500/20",
                               activeEntity.type === "prop" && "bg-amber-500/5 text-amber-500 border-amber-500/20",
                               activeEntity.type === "location" && "bg-emerald-500/5 text-emerald-500 border-emerald-500/20"
@@ -390,7 +422,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                               {activeEntity.type}
                             </Badge>
                           </div>
-                          <h3 className="text-sm font-bold text-foreground leading-none">
+                          <h3 className="text-sm font-bold text-foreground leading-none truncate">
                             {activeEntity.name}
                           </h3>
                         </div>
@@ -400,10 +432,10 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                         variant="outline"
                         size="sm"
                         onClick={() => handleAutoStyleProfile(activeEntity)}
-                        className="text-xs h-8 px-3 border-dashed transition-all shrink-0"
+                        className="text-xs h-8 w-full border-dashed transition-all hover:bg-indigo-500/10 hover:text-indigo-600 hover:border-indigo-500/30"
                       >
-                        <SparklesIcon className="w-3.5 h-3.5 mr-1.5" />
-                        Auto-Style
+                        <SparklesIcon className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                        AI Auto-Style Description
                       </Button>
                     </div>
 
@@ -477,38 +509,109 @@ After generating the visual profile, please ALSO call the generate_entity_portra
 
                       {/* Character Voice Reference Selection */}
                       {activeEntity.type === "character" && (
-                        <div className="space-y-2 shrink-0">
-                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
-                            Voice Casting (声线克隆配置)
-                          </label>
-                          <select
-                            value={activeEntity.voice_reference || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              handleEntityUpdate(activeEntity.id, { voice_reference: val === "custom" ? "examples/voice_01.wav" : val });
-                            }}
-                            className="flex h-10 w-full rounded-md border border-border/80 bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-foreground focus-visible:border-primary/30"
-                          >
-                            <option value="">-- No Voice / Muted --</option>
-                            <option value="examples/voice_01.wav">Preset Voice 1 (Male Heroic)</option>
-                            <option value="examples/voice_02.wav">Preset Voice 2 (Female Sweet)</option>
-                            <option value="examples/voice_03.wav">Preset Voice 3 (Mature Female)</option>
-                            <option value="examples/voice_04.wav">Preset Voice 4 (Deep Narrator)</option>
-                            <option value="custom">-- Custom Reference Path/URL --</option>
-                          </select>
+                        <div className="space-y-4 shrink-0">
+                          <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                            <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                              Voice Casting Studio (声线克隆配音表)
+                            </label>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEntityUpdate(activeEntity.id, { voice_reference: "" })}
+                              className="h-7 px-2.5 text-xs text-destructive hover:bg-destructive/10 border-destructive/20 transition-all font-medium"
+                            >
+                              Clear / Mute
+                            </Button>
+                          </div>
 
-                          {/* Render custom input if voice_reference is custom or not matching presets */}
-                          {activeEntity.voice_reference && !["", "examples/voice_01.wav", "examples/voice_02.wav", "examples/voice_03.wav", "examples/voice_04.wav"].includes(activeEntity.voice_reference) && (
+                          {/* 12-Voice Preset Audition & Casting Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
+                            {PRESET_VOICES.map((voice) => {
+                              const isSelected = activeEntity.voice_reference === voice.path;
+                              const isPlaying = playingVoiceId === voice.id;
+
+                              return (
+                                <Card
+                                  key={voice.id}
+                                  onClick={() => handleEntityUpdate(activeEntity.id, { voice_reference: voice.path })}
+                                  className={cn(
+                                    "p-3 cursor-pointer transition-all border text-left relative group",
+                                    isSelected
+                                      ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20 shadow-sm"
+                                      : "border-border/60 hover:border-border hover:bg-muted/30"
+                                  )}
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                                    <div className="space-y-1">
+                                      <h4 className={cn(
+                                        "text-xs font-bold transition-colors",
+                                        isSelected ? "text-primary" : "text-foreground"
+                                      )}>
+                                        {voice.name}
+                                      </h4>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wider rounded border",
+                                          voice.gender === "Male" && "text-blue-500 border-blue-500/20 bg-blue-500/5",
+                                          voice.gender === "Female" && "text-pink-500 border-pink-500/20 bg-pink-500/5",
+                                          voice.gender === "Narrator" && "text-amber-500 border-amber-500/20 bg-amber-500/5",
+                                          voice.gender === "Special" && "text-purple-500 border-purple-500/20 bg-purple-500/5"
+                                        )}
+                                      >
+                                        {voice.gender}
+                                      </Badge>
+                                    </div>
+
+                                    {/* Play Audition Preview Button */}
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        playPreview(voice.path, voice.id);
+                                      }}
+                                      className={cn(
+                                        "w-8 h-8 rounded-full border transition-all shrink-0 shadow-sm",
+                                        isPlaying
+                                          ? "bg-primary text-white border-primary animate-pulse"
+                                          : "bg-background/80 hover:bg-primary/10 border-border/80 text-muted-foreground hover:text-primary"
+                                      )}
+                                    >
+                                      {isPlaying ? (
+                                        <PauseIcon className="w-3.5 h-3.5 fill-current" />
+                                      ) : (
+                                        <PlayIcon className="w-3.5 h-3.5 ml-0.5 fill-current" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground leading-normal line-clamp-2">
+                                    {voice.description}
+                                  </p>
+                                </Card>
+                              );
+                            })}
+                          </div>
+
+                          {/* Custom Path/URL Option */}
+                          <div className="space-y-2 pt-1 border-t border-border/40">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
+                                Custom Voice reference (克隆参考路径/URL)
+                              </span>
+                            </div>
                             <Input
-                              value={activeEntity.voice_reference}
+                              value={activeEntity.voice_reference && !PRESET_VOICES.some(v => v.path === activeEntity.voice_reference) ? activeEntity.voice_reference : ""}
                               onChange={(e) => handleEntityUpdate(activeEntity.id, { voice_reference: e.target.value })}
-                              placeholder="Enter WAV path (e.g. examples/voice_01.wav) or URL"
+                              placeholder="Enter local relative path (e.g., examples/voice_01.wav) or remote audio URL"
                               className="bg-background border-border/80 text-xs focus-visible:ring-primary/20 h-9"
                             />
-                          )}
-                          <p className="text-xs text-muted-foreground/80 leading-normal">
-                            Assign an auditory profile to enable Zero-Shot voice cloning in the Voiceover Studio.
-                          </p>
+                            {activeEntity.voice_reference && !PRESET_VOICES.some(v => v.path === activeEntity.voice_reference) && (
+                              <p className="text-[10px] text-emerald-500 font-semibold">
+                                ✓ Custom Voice Active: {activeEntity.voice_reference}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       )}
 
