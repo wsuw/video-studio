@@ -128,7 +128,12 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
             timeout=120
         )
         if response.status_code == 200:
-            print(f"[Image Factory] ✅ Successfully generated portrait using local Flux server: {web_url}")
+            res_json = response.json()
+            generated_url = res_json.get("url")
+            if generated_url:
+                print(f"[Image Factory] ✅ Successfully generated portrait using local Flux server: {generated_url}")
+                return generated_url
+            print(f"[Image Factory] ✅ Successfully generated portrait using local Flux server, but 'url' not in response. Using legacy web_url: {web_url}")
             return web_url
         else:
             print(f"[Image Factory] ⚠️ Flux server returned status {response.status_code}: {response.text}")

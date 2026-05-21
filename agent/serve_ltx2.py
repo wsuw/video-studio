@@ -1,17 +1,20 @@
 import os
 import time
 import logging
+from typing import Optional
 import torch
 import uvicorn
 import huggingface_hub
 import diffusers
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from diffusers import LTX2Pipeline, FlowMatchEulerDiscreteScheduler
 from diffusers.pipelines.ltx2 import LTX2LatentUpsamplePipeline
 from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
 from diffusers.pipelines.ltx2.utils import DISTILLED_SIGMA_VALUES, STAGE_2_DISTILLED_SIGMA_VALUES
 from diffusers.pipelines.ltx2.export_utils import encode_video
+from storage_minio import get_storage_client, LocalStorageClient, S3StorageClient
 
 # Enable logging and progress reporting
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -19,6 +22,10 @@ huggingface_hub.logging.set_verbosity_info()
 diffusers.utils.logging.set_verbosity_info()
 
 app = FastAPI(title="LTX-2 Video Model Server")
+
+# Ensure outputs folder exists and mount it as StaticFiles
+os.makedirs("outputs", exist_ok=True)
+app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 # Global pipeline references
 pipe = None
@@ -39,7 +46,7 @@ class VideoGenerationRequest(BaseModel):
     guidance_scale_stage1: float = 1.0  # Distilled models usually work best with guidance scale 1.0
     guidance_scale_stage2: float = 1.0
     seed: int = 0
-    output_path: str = "video.mp4"
+    output_path: Optional[str] = None
     stage1_only: bool = False  # Set to True to skip latent upsampling and Stage 2 refinement
 
 
@@ -112,7 +119,7 @@ def load_model():
 
 
 @app.post("/generate")
-async def generate_video(request: VideoGenerationRequest):
+async def generate_video(request: VideoGenerationRequest, fastapi_req: Request):
     global pipe, upsample_pipe
     if pipe is None or (upsample_pipe is None and not request.stage1_only):
         raise HTTPException(
@@ -124,8 +131,17 @@ async def generate_video(request: VideoGenerationRequest):
     print(f"[{time.strftime('%H:%M:%S')}] Generating video via {mode_str} for prompt: '{request.prompt}'...")
     start_time = time.time()
     try:
+        storage_client = get_storage_client()
+        
+        # Determine secure output path inside outputs/
+        if isinstance(storage_client, LocalStorageClient):
+            local_save_path = storage_client.generate_unique_path("mp4")
+        else:
+            import uuid
+            local_save_path = os.path.join("outputs", f"{uuid.uuid4()}.mp4")
+
         # Create output directory if it doesn't exist
-        output_dir = os.path.dirname(os.path.abspath(request.output_path))
+        output_dir = os.path.dirname(os.path.abspath(local_save_path))
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
 
@@ -252,17 +268,26 @@ async def generate_video(request: VideoGenerationRequest):
             fps=request.frame_rate,
             audio=audio_tensor,
             audio_sample_rate=audio_sample_rate,
-            output_path=request.output_path,
+            output_path=local_save_path,
         )
+
+        # Upload and generate direct downloadable web URL
+        web_url = storage_client.upload_file(local_save_path, request=fastapi_req)
+
+        # Cleanup temporary local file if using S3
+        if isinstance(storage_client, S3StorageClient):
+            if os.path.exists(local_save_path):
+                os.remove(local_save_path)
 
         elapsed = time.time() - start_time
         print(
-            f"[{time.strftime('%H:%M:%S')}] Generation completed in {elapsed:.2f} seconds! Saved to {request.output_path}"
+            f"[{time.strftime('%H:%M:%S')}] Generation completed in {elapsed:.2f} seconds! Saved to {local_save_path} -> URL: {web_url}"
         )
         return {
             "status": "success",
             "elapsed_seconds": round(elapsed, 2),
-            "output_path": request.output_path,
+            "output_path": local_save_path,
+            "url": web_url,
         }
     except Exception as e:
         print(f"Error during video generation: {e}")

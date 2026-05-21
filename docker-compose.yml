@@ -1,0 +1,40 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: video-studio-minio
+    ports:
+      - "9000:9000"      # MinIO S3 API Endpoint
+      - "9001:9001"      # MinIO Console Dashboard
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: always
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: video-studio-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to start...';
+      for i in \$(seq 1 30); do
+        /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin > /dev/null 2>&1 && break;
+        echo 'Retrying connection to MinIO...';
+        sleep 1;
+      done;
+      if ! /usr/bin/mc ls myminio/video-studio > /dev/null 2>&1; then
+        /usr/bin/mc mb myminio/video-studio;
+        /usr/bin/mc anonymous set download myminio/video-studio;
+        echo 'Bucket [video-studio] successfully created and set to anonymous public read!';
+      else
+        echo 'Bucket [video-studio] already exists.';
+      fi;
+      exit 0;
+      "
+
+volumes:
+  minio_data:

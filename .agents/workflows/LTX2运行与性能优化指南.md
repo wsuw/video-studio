@@ -130,11 +130,23 @@ video, audio = pipe(
 
 ---
 
-## 五、 FastAPI 本地微服务部署规范
+## 五、 FastAPI 本地微服务部署与存储解耦规范
 
-为了将重算力渲染引擎与 Next.js 前端/LangGraph 状态机解耦，系统将渲染逻辑封装在 `agent/serve_ltx2.py` 的 FastAPI 微服务中。
+为了将重算力渲染引擎与 Next.js 前端/LangGraph 状态机解耦，系统将渲染逻辑封装在 `agent/serve_ltx2.py` 的 FastAPI 微服务中，并提供内置的**静态存储分发能力**以支持跨服务器物理隔离部署。
 
-### 5.1 运行与健康自检
+### 5.1 存储与双态分发机制
+1. **多态存储驱动 (storage.py)**：服务器通过 `get_storage_client()` 动态加载存储客户端。支持 `LocalStorageClient`（默认本地挂载）与 `S3StorageClient`（本地/云端 S3 对象存储，如 MinIO）。
+2. **本地虚拟挂载 (LocalStorage)**：在未启用 S3 或 S3 离线时，服务器自动在根目录创建 `outputs/` 本地物理文件夹，并将其挂载在 `/outputs` 虚拟路由下，向局域网或公网直接暴露静态媒体资源：
+   ```python
+   app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+   ```
+3. **S3/MinIO 对象存储分发 (S3Storage)**：若启用 S3 驱动，生成的文件先暂存在本地，然后通过 `boto3` 客户端上传至本地/云端 MinIO 存储桶中，并在上传时利用 `mimetypes` 精准写入 Content-Type 头（例如 `video/mp4` 或 `image/png`），从而使浏览器能够直接进行流式播放和直接渲染，避免成为强制下载资源。
+4. **并发覆盖防护**：API 自动丢弃不安全的用户命名，统一采用 `uuid.uuid4()` 分配唯一物理文件名，确保多用户/多 Graph 实例并发请求时资产不发生交叉覆盖。
+5. **动态网络 URL 拼接**：
+   - 采用本地挂载时，根据传入的 Request 动态解析调用端的主机头 (Host) 和网络协议 (Scheme)，将本地物理路径转化为绝对 Web 相对/绝对 URL 返回给前端。
+   - 采用 S3 存储时，直接通过 S3 的 endpoint（如 `http://localhost:9000/video-studio/<uuid>.mp4`）或设定的 `STORAGE_S3_PUBLIC_URL` 返回高可用的免签公网直链（因存储桶已配置为 anonymous download 权限），彻底避免前后端分布式部署时，前端因物理隔离无法读取本地文件的痛点。
+
+### 5.2 运行与健康自检
 * **默认端口**：`8125`
 * **启动指令 (PowerShell)**：
 ```powershell
@@ -153,7 +165,7 @@ Invoke-RestMethod -Uri "http://localhost:8125/health" -Method Get
 }
 ```
 
-### 5.2 渲染调度 POST API `/generate` Schema
+### 5.3 渲染调度 POST API `/generate` Schema
 客户端通过向 `/generate` 发送 JSON 负载触发双流视频渲染。
 
 * **接口请求参数 (Pydantic Model)**：
@@ -170,10 +182,62 @@ Invoke-RestMethod -Uri "http://localhost:8125/health" -Method Get
   "guidance_scale_stage1": 1.0,
   "guidance_scale_stage2": 1.0,
   "seed": 42,
-  "output_path": "output/sunset.mp4",
+  "output_path": null,  // 设为 null，允许服务端使用 uuid4() 安全自动分配文件名
   "stage1_only": true
+}
+```
+
+* **接口响应参数 (Response Body)**：
+```json
+{
+  "status": "success",
+  "elapsed_seconds": 110.23,
+  "output_path": "outputs/a8f3b9d0-c3d5-4a12-87ff-43f1b4a921d2.mp4",
+  "url": "http://192.168.1.100:8125/outputs/a8f3b9d0-c3d5-4a12-87ff-43f1b4a921d2.mp4" // 前端可直接引用的网络资产 URL
 }
 ```
 
 * **渲染后台自适应机制**：
   当 `stage1_only` 设为 `true` 时，服务内部仅运行 Stage 1 流程，完成 8 步去噪后立即对隐空间进行 VAE tiling numpy 解码并利用 FFmpeg 快速编码为 mp4 返回给调用端，主动触发 VRAM 清理机制，保证服务具备高交互效率与物理稳定性。
+
+### 5.4 本地 MinIO 容器部署与生命周期管理
+
+为了方便开发者一键部署本地 S3 兼容的资产存储服务，我们在项目根目录下提供了容器化编排方案：
+
+1. **一键启动（在项目根目录下运行）**：
+   ```powershell
+   docker compose up -d
+   ```
+   这会拉起两个容器：
+   - `video-studio-minio`：主 MinIO 存储服务，S3 API 端口为 `9000`，管理后台 Console 端口为 `9001`（默认账号/密码均为 `minioadmin`）。
+   - `video-studio-minio-init`：一过性脚本容器，等待主服务就绪后，自动创建 `video-studio` 存储桶，并将其匿名访问策略配置为 `download`（公共下载）。
+
+2. **环境变量配置（在 .env 中进行定义）**：
+   ```bash
+   STORAGE_BACKEND=s3
+   STORAGE_S3_ENDPOINT=http://localhost:9000
+   STORAGE_S3_ACCESS_KEY=minioadmin
+   STORAGE_S3_SECRET_KEY=minioadmin
+   STORAGE_S3_BUCKET=video-studio
+   ```
+
+3. **微服务自适应加载与健壮性**：
+   当 `STORAGE_BACKEND=s3` 且微服务能够正常连接 MinIO 时，视频/图像生成接口（如 LTX-2 和 Flux Klein）返回的 `url` 将自适应切换为 S3 高可用直链。例如：
+   ```json
+   {
+     "status": "success",
+     "elapsed_seconds": 110.23,
+     "output_path": "outputs/a8f3b9d0-c3d5-4a12-87ff-43f1b4a921d2.mp4",
+     "url": "http://localhost:9000/video-studio/a8f3b9d0-c3d5-4a12-87ff-43f1b4a921d2.mp4"
+   }
+   ```
+   若本地 Docker 未启动或连接超时，服务不会崩溃，而是会安全回退到本地静态挂载方案，输出本地直链 URL：
+   ```json
+   {
+     "status": "success",
+     "elapsed_seconds": 110.23,
+     "output_path": "outputs/a8f3b9d0-c3d5-4a12-87ff-43f1b4a921d2.mp4",
+     "url": "http://localhost:8125/outputs/a8f3b9d0-c3d5-4a12-87ff-43f1b4a921d2.mp4"
+   }
+   ```
+
