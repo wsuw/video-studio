@@ -88,7 +88,7 @@ class S3StorageClient(StorageClient):
                 ContentType=content_type
             )
             
-        # Return direct public access URL from MinIO
+        # Return direct public access URL from MinIO (using public_url if available)
         endpoint_clean = self.endpoint.rstrip("/")
         return f"{endpoint_clean}/{self.bucket_name}/{filename}"
 
