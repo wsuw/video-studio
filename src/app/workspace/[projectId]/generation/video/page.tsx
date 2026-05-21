@@ -53,6 +53,10 @@ interface Scene {
   lens?: string;
   shot_type?: string;
   motion?: string;
+  audio_url?: string;
+  audio_duration?: number;
+  dialogue?: string;
+  voice_actor_id?: string;
 }
 
 // Premium stock video placeholders for mock mode
@@ -89,6 +93,7 @@ export default function VideoExecutionPage() {
 
   // States
   const [loadedDesign, setLoadedDesign] = useState<any>(null);
+  const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [renderingStates, setRenderingStates] = useState<Record<string, { progress: number; log: string }>>({});
 
   // Generated/Mocked video outputs mapping: sceneId -> video URL path
@@ -125,6 +130,17 @@ export default function VideoExecutionPage() {
   const scenes: Scene[] = design.scenes || [];
   const globalArtStyle = design.art_style || "cyberpunk";
 
+  // Auto-select the first scene if activeSceneId is not set yet
+  useEffect(() => {
+    if (scenes.length > 0 && !activeSceneId) {
+      setActiveSceneId(scenes[0].id);
+    }
+  }, [scenes, activeSceneId]);
+
+  const activeScene = scenes.find(s => s.id === activeSceneId);
+  const isAudioSynced = !!(activeScene && activeScene.audio_duration && activeScene.audio_duration > 0);
+  const lockedFrameCount = isAudioSynced && activeScene && activeScene.audio_duration ? Math.round(activeScene.audio_duration * frameRate) : null;
+
   const handleUpdateSceneStatus = (sceneId: string, status: "pending" | "locked" | "rendered") => {
     if (!agent) return;
     const updatedScenes = scenes.map(s => s.id === sceneId ? { ...s, status } : s);
@@ -142,6 +158,11 @@ export default function VideoExecutionPage() {
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
 
+    const isSceneAudioSynced = !!(scene.audio_duration && scene.audio_duration > 0);
+    const finalNumFrames = isSceneAudioSynced && scene.audio_duration
+      ? Math.round(scene.audio_duration * frameRate)
+      : numFrames;
+
     // Compound prompt with lens and movement language
     const fullPrompt = `${scene.description}.${stylePrompt ? ` Style: ${stylePrompt}.` : ""} ${globalArtStyle} cinematic aesthetic, ${scene.shot_type || "medium"} shot, ${scene.lens || "50mm"} lens, ${scene.motion || "static"} camera movement.`;
 
@@ -154,7 +175,7 @@ export default function VideoExecutionPage() {
       const stages = [
         { progress: 20, log: "Parsing scene screenplay structures..." },
         { progress: 40, log: "Distributing spatial bounding coordinates..." },
-        { progress: 65, log: "Synthesizing 121 frames of latent motion..." },
+        { progress: 65, log: `Synthesizing ${finalNumFrames} frames of latent motion...` },
         { progress: 85, log: "Offloading neural pipelines to CPU..." },
         { progress: 95, log: "Encoding cinematic raw MP4 container..." },
         { progress: 100, log: "Video synthesis complete." }
@@ -203,7 +224,7 @@ export default function VideoExecutionPage() {
 
       toast({
         title: "⚡ Video Generation Initiated",
-        description: "Executing real-time LTX-2 diffusion on CUDA (121 frames).",
+        description: `Executing real-time LTX-2 diffusion on CUDA (${finalNumFrames} frames).`,
       });
 
       // Periodic progress ticker
@@ -236,7 +257,7 @@ export default function VideoExecutionPage() {
             negative_prompt: negativePrompt,
             guidance_scale: guidanceScale,
             num_inference_steps: numInferenceSteps,
-            num_frames: numFrames,
+            num_frames: finalNumFrames,
             frame_rate: frameRate,
             seed: baseSeed || Math.floor(Math.random() * 1000000),
             sceneId: scene.id,
@@ -325,7 +346,7 @@ export default function VideoExecutionPage() {
             size="sm"
             onClick={handleRenderAll}
             disabled={scenes.length === 0}
-            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm font-semibold gap-1.5"
+            className="h-9 px-3 border-dashed transition-all shadow-sm font-semibold gap-1.5"
           >
             <SparklesIcon className="w-4 h-4" />
             Render All Videos ({scenes.length})
@@ -377,30 +398,51 @@ export default function VideoExecutionPage() {
               const renderState = renderingStates[scene.id];
               const videoUrl = videoOutputs[scene.id];
               const isRendered = scene.status === "rendered" && !!videoUrl;
+              const isActive = activeSceneId === scene.id;
 
               return (
                 <div
                   key={scene.id}
                   className={cn(
-                    "p-6 rounded-2xl border bg-card transition-all duration-300 flex flex-col gap-4 relative overflow-hidden",
+                    "p-6 rounded-2xl border bg-card transition-all duration-300 flex flex-col gap-4 relative overflow-hidden cursor-pointer hover:border-primary/40",
+                    isActive ? "border-primary shadow-[0_0_15px_rgba(99,102,241,0.12)] ring-1 ring-primary/20 bg-primary/[0.01]" : "border-border/60",
                     isRendering && "border-primary bg-primary/[0.01]",
                     isRendered && "border-emerald-500/20 bg-emerald-500/[0.01]"
                   )}
+                  onClick={() => setActiveSceneId(scene.id)}
                 >
                   {/* Top Line Details */}
                   <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1 w-full">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="font-mono font-bold text-[10px]">
                           #{scene.id.toUpperCase()}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
                           {scene.lens || "50mm"} Lens • {scene.shot_type || "medium"} Framing • {scene.motion || "static"} Motion
                         </span>
+                        {scene.audio_duration && (
+                          <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
+                            Audio Synced ({scene.audio_duration.toFixed(1)}s)
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-xs text-foreground/80 leading-relaxed max-w-xl">
                         {scene.description}
                       </p>
+                      {scene.dialogue && (
+                        <p className="text-[11px] text-indigo-400/90 italic mt-2 border-l-2 border-indigo-500/30 pl-2">
+                          “{scene.dialogue}”
+                        </p>
+                      )}
+                      {scene.audio_url && (
+                        <div className="mt-3 flex items-center gap-2 bg-muted/40 p-2 rounded-lg border border-border/40 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                          <audio src={scene.audio_url} className="h-6 w-full max-w-[200px]" controls />
+                          <span className="text-[9px] font-mono text-muted-foreground font-semibold">
+                            {scene.audio_duration?.toFixed(1)}s
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="shrink-0">
@@ -598,16 +640,45 @@ export default function VideoExecutionPage() {
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between text-[10px] text-muted-foreground">
                   <span className="uppercase font-bold tracking-wider">Target Frame Count</span>
-                  <span className="font-mono font-bold text-primary">{numFrames} Frames</span>
+                  <span className="font-mono font-bold text-primary">
+                    {isAudioSynced ? `${lockedFrameCount} Frames` : `${numFrames} Frames`}
+                  </span>
                 </div>
-                <Slider
-                  min={24}
-                  max={240}
-                  step={8}
-                  value={[numFrames]}
-                  onValueChange={(val) => setNumFrames(val[0])}
-                  className="py-1 cursor-pointer"
-                />
+                {isAudioSynced && activeScene ? (
+                  <div className="space-y-2">
+                    <div className="relative py-1 opacity-50 cursor-not-allowed">
+                      <Slider
+                        min={24}
+                        max={240}
+                        step={8}
+                        value={[lockedFrameCount || 120]}
+                        disabled
+                        className="py-1 pointer-events-none"
+                      />
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-bold">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                        </span>
+                        Voiceover Lock Active
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        Synced to voiceover duration of <span className="text-foreground font-semibold">{activeScene.audio_duration?.toFixed(2)}s</span> at <span className="text-foreground font-semibold">{frameRate} FPS</span> to ensure frame-perfect lip sync.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <Slider
+                    min={24}
+                    max={240}
+                    step={8}
+                    value={[numFrames]}
+                    onValueChange={(val) => setNumFrames(val[0])}
+                    className="py-1 cursor-pointer"
+                  />
+                )}
               </div>
 
               <div className="space-y-2 pt-2">

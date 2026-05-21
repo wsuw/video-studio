@@ -87,6 +87,14 @@ const data = {
         />
       ),
     },
+    {
+      title: "Voiceover",
+      url: "/design/voiceover",
+      icon: (
+        <AudioLinesIcon
+        />
+      ),
+    },
   ],
   generation: [
     {

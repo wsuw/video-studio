@@ -214,7 +214,7 @@ export default function StylePage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Aesthetic Rendering Presets
               </h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5 ml-3.5">
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5 ml-3.5">
                 Select a baseline artistic rendering model or pipeline style for the generated shots.
               </p>
             </div>
@@ -235,7 +235,7 @@ export default function StylePage() {
                   >
                     <div className={cn("absolute inset-0 opacity-[0.08] blur-xl -z-10 bg-gradient-to-br", style.preview)}></div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-muted-foreground group-hover:text-primary transition-colors">
+                      <span className="text-xs font-mono font-bold tracking-wider uppercase text-muted-foreground group-hover:text-primary transition-colors">
                         {style.name}
                       </span>
                       {isSelected && <CheckCircle2Icon className="w-4.5 h-4.5 text-primary" />}
@@ -258,7 +258,7 @@ export default function StylePage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Aspect Ratio Console (Canvas Format)
               </h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5 ml-3.5">
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5 ml-3.5">
                 Configure the widescreen or portrait dimensions for video rendering.
               </p>
             </div>
@@ -280,7 +280,7 @@ export default function StylePage() {
                     {/* Visual aspect ratio helper */}
                     <div className="h-16 flex items-center justify-center w-full">
                       <div className={cn(
-                        "rounded bg-muted border border-border/80 group-hover:border-primary/20 transition-all flex items-center justify-center text-[8px] font-bold text-muted-foreground/60 shadow-inner",
+                        "rounded bg-muted border border-border/80 group-hover:border-primary/20 transition-all flex items-center justify-center text-xs font-bold text-muted-foreground/80 shadow-inner",
                         ratio.ratioClass,
                         isSelected && "border-primary/40 bg-primary/5 text-primary/80"
                       )}>
@@ -291,7 +291,7 @@ export default function StylePage() {
                       <p className={cn("text-xs font-bold leading-none mb-1", isSelected ? "text-primary" : "text-foreground")}>
                         {ratio.label}
                       </p>
-                      <p className="text-[9px] text-muted-foreground leading-none">
+                      <p className="text-xs text-muted-foreground leading-none">
                         {ratio.sub}
                       </p>
                     </div>
@@ -310,7 +310,7 @@ export default function StylePage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Cinematic Color Grading & Mood
               </h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5 ml-3.5">
+              <p className="text-xs md:text-sm text-muted-foreground mt-0.5 ml-3.5">
                 Apply master film grade palettes to enforce harmonious atmospheric lights.
               </p>
             </div>
@@ -340,7 +340,7 @@ export default function StylePage() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mt-2">
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mt-2">
                       {palette.description}
                     </p>
                   </div>
@@ -358,7 +358,7 @@ export default function StylePage() {
               <label className="text-xs font-bold tracking-wider text-foreground block">
                 Atmosphere Styling Prompts
               </label>
-              <p className="text-[10px] text-muted-foreground leading-normal">
+              <p className="text-xs text-muted-foreground/90 leading-normal">
                 Global lighting elements, detail qualifiers, and camera render styles added to positive prompts.
               </p>
               <Textarea
@@ -374,7 +374,7 @@ export default function StylePage() {
               <label className="text-xs font-bold tracking-wider text-foreground block">
                 Director Negative Prompts
               </label>
-              <p className="text-[10px] text-muted-foreground leading-normal">
+              <p className="text-xs text-muted-foreground/90 leading-normal">
                 Standard elements to exclude from all generated images and videos during pre-rendering.
               </p>
               <Textarea

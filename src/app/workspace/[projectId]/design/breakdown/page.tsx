@@ -42,6 +42,7 @@ interface Entity {
   type: "character" | "prop" | "location";
   description: string;
   visual_reference?: string;
+  voice_reference?: string;
 }
 
 // ── Entity type → icon & color mapping ─────────────────────────────
@@ -232,7 +233,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                   </div>
                   <div className="min-w-0">
                     <h1 className="text-md font-bold tracking-tight truncate">Script Decomposition</h1>
-                    <p className="text-[10px] text-muted-foreground truncate">Molecular-level entity extraction</p>
+                    <p className="text-xs text-muted-foreground truncate">Molecular-level entity extraction</p>
                   </div>
                 </div>
               </div>
@@ -257,13 +258,13 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                         }
                       }}
                       className={cn(
-                        "flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-md font-bold text-[10px] transition-all focus:outline-none text-muted-foreground hover:text-foreground truncate",
+                        "flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-md font-bold text-xs transition-all focus:outline-none text-muted-foreground hover:text-foreground truncate",
                         isActive ? tab.activeColor : "bg-transparent border-transparent"
                       )}
                     >
                       <TabIcon className="w-3 h-3 shrink-0" />
                       <span className="truncate">{tab.label}</span>
-                      <Badge variant={isActive ? "default" : "secondary"} className="text-[8px] px-1 py-0 font-bold shrink-0">
+                      <Badge variant={isActive ? "default" : "secondary"} className="text-xs px-2 py-0.5 font-bold shrink-0">
                         {tab.count}
                       </Badge>
                     </button>
@@ -315,11 +316,11 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                             <span className="font-bold text-xs tracking-tight text-foreground truncate">
                               {entity.name}
                             </span>
-                            <Badge variant="outline" className="text-[8px] font-mono shrink-0 px-1.5 py-0 font-bold">
+                            <Badge variant="outline" className="text-xs font-mono shrink-0 px-2 py-0.5 font-bold">
                               {entity.id.toUpperCase()}
                             </Badge>
                           </div>
-                          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
+                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
                             {entity.description}
                           </p>
                         </div>
@@ -327,7 +328,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
 
                       {/* Bottom Visual Reference Badge */}
                       {entity.visual_reference && (
-                        <div className="mt-2 flex items-center gap-1 text-[9px] text-muted-foreground relative z-10 self-start">
+                        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground relative z-10 self-start">
                           <span className="font-mono px-1.5 py-0.5 rounded bg-muted/60 border border-border/40">
                             Ref: {entity.visual_reference}
                           </span>
@@ -357,7 +358,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                 </div>
                 <div>
                   <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Casting & Asset Details</h2>
-                  <p className="text-[10px] text-muted-foreground/60">Configure identity descriptions of extracted entities</p>
+                  <p className="text-xs text-muted-foreground/85">Configure identity descriptions of extracted entities</p>
                 </div>
               </div>
 
@@ -377,11 +378,11 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                         </div>
                         <div>
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="text-[10px] font-mono font-bold text-muted-foreground">
+                            <span className="text-xs font-mono font-bold text-muted-foreground">
                               #{activeEntity.id.toUpperCase()}
                             </span>
                             <Badge variant="outline" className={cn(
-                              "text-[8px] font-bold uppercase tracking-wider px-1.5 py-0",
+                              "text-xs font-bold uppercase tracking-wider px-2 py-0.5",
                               activeEntity.type === "character" && "bg-blue-500/5 text-blue-500 border-blue-500/20",
                               activeEntity.type === "prop" && "bg-amber-500/5 text-amber-500 border-amber-500/20",
                               activeEntity.type === "location" && "bg-emerald-500/5 text-emerald-500 border-emerald-500/20"
@@ -399,7 +400,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                         variant="outline"
                         size="sm"
                         onClick={() => handleAutoStyleProfile(activeEntity)}
-                        className="text-xs h-8 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 transition-all shrink-0"
+                        className="text-xs h-8 px-3 border-dashed transition-all shrink-0"
                       >
                         <SparklesIcon className="w-3.5 h-3.5 mr-1.5" />
                         Auto-Style
@@ -410,7 +411,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                     <div className="flex-1 flex flex-col gap-5 overflow-y-auto pr-1">
                       {/* Master Portrait Section */}
                       <div className="space-y-2 shrink-0">
-                        <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                        <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
                           Master Portrait (主视觉人设档案)
                         </label>
                         <div className="w-40 h-40 relative group rounded-xl overflow-hidden border border-border/60 bg-muted/20 shadow-inner flex items-center justify-center">
@@ -426,7 +427,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                   size="sm"
                                   variant="secondary"
                                   onClick={() => handleAutoPortrait(activeEntity)}
-                                  className="text-[10px] font-bold h-6 px-2 w-full"
+                                  className="text-xs font-bold h-6 px-2 w-full"
                                 >
                                   <Wand2Icon className="w-2.5 h-2.5 mr-1" />
                                   Regenerate
@@ -434,7 +435,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="text-[10px] font-bold h-6 px-2 w-full text-white border-white/25 hover:bg-white/10"
+                                  className="text-xs font-bold h-6 px-2 w-full text-white border-white/25 hover:bg-white/10"
                                   onClick={() => {
                                     const newRef = prompt("Enter Custom Image URL:", activeEntity.visual_reference);
                                     if (newRef !== null) {
@@ -449,11 +450,11 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
                               <SparklesIcon className="w-5 h-5 text-indigo-500/40 mb-1.5 animate-pulse" />
-                              <p className="text-[9px] text-muted-foreground leading-snug">No reference image</p>
+                              <p className="text-xs text-muted-foreground leading-snug">No reference image</p>
                               <Button
                                 size="sm"
                                 onClick={() => handleAutoPortrait(activeEntity)}
-                                className="text-[9px] font-bold h-5 px-1.5 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                                className="text-xs font-bold h-5 px-1.5 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white"
                               >
                                 Auto-Draw
                               </Button>
@@ -464,7 +465,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
 
                       {/* Asset Name Input */}
                       <div className="space-y-2 shrink-0">
-                        <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                        <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
                           Asset Name
                         </label>
                         <Input
@@ -474,13 +475,50 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                         />
                       </div>
 
+                      {/* Character Voice Reference Selection */}
+                      {activeEntity.type === "character" && (
+                        <div className="space-y-2 shrink-0">
+                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                            Voice Casting (声线克隆配置)
+                          </label>
+                          <select
+                            value={activeEntity.voice_reference || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleEntityUpdate(activeEntity.id, { voice_reference: val === "custom" ? "examples/voice_01.wav" : val });
+                            }}
+                            className="flex h-10 w-full rounded-md border border-border/80 bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-foreground focus-visible:border-primary/30"
+                          >
+                            <option value="">-- No Voice / Muted --</option>
+                            <option value="examples/voice_01.wav">Preset Voice 1 (Male Heroic)</option>
+                            <option value="examples/voice_02.wav">Preset Voice 2 (Female Sweet)</option>
+                            <option value="examples/voice_03.wav">Preset Voice 3 (Mature Female)</option>
+                            <option value="examples/voice_04.wav">Preset Voice 4 (Deep Narrator)</option>
+                            <option value="custom">-- Custom Reference Path/URL --</option>
+                          </select>
+
+                          {/* Render custom input if voice_reference is custom or not matching presets */}
+                          {activeEntity.voice_reference && !["", "examples/voice_01.wav", "examples/voice_02.wav", "examples/voice_03.wav", "examples/voice_04.wav"].includes(activeEntity.voice_reference) && (
+                            <Input
+                              value={activeEntity.voice_reference}
+                              onChange={(e) => handleEntityUpdate(activeEntity.id, { voice_reference: e.target.value })}
+                              placeholder="Enter WAV path (e.g. examples/voice_01.wav) or URL"
+                              className="bg-background border-border/80 text-xs focus-visible:ring-primary/20 h-9"
+                            />
+                          )}
+                          <p className="text-xs text-muted-foreground/80 leading-normal">
+                            Assign an auditory profile to enable Zero-Shot voice cloning in the Voiceover Studio.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Visual Identity Profile Textarea */}
                       <div className="space-y-2 flex flex-col flex-1 min-h-[200px]">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold tracking-[0.15em] uppercase text-muted-foreground">
+                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground">
                             Visual Identity Profile (Casting Visual Styling)
                           </label>
-                          <span className="text-[8px] font-medium text-muted-foreground/60">
+                          <span className="text-xs font-medium text-muted-foreground/85">
                             Aligns with global: {customStylePrompt || "cinematic"}
                           </span>
                         </div>

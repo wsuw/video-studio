@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END, START
 from src.state import AgentState
 from src.nodes.design_node import design_node
 from src.nodes.breakdown_node import breakdown_node
+from src.nodes.voiceover_node import voiceover_node
 from src.nodes.storyboard_node import storyboard_node
 from src.nodes.generation_node import generation_node
 from src.nodes.redesign_node import redesign_node
@@ -15,6 +16,7 @@ workflow = StateGraph(AgentState)
 workflow.add_node("supervisor", supervisor_node)
 workflow.add_node("design", design_node)
 workflow.add_node("breakdown", breakdown_node)
+workflow.add_node("voiceover", voiceover_node)
 workflow.add_node("storyboard", storyboard_node)
 workflow.add_node("generate", generation_node)
 workflow.add_node("redesign", redesign_node)
@@ -30,6 +32,7 @@ workflow.add_conditional_edges(
     {
         "design": "design",
         "breakdown": "breakdown",
+        "voiceover": "voiceover",
         "storyboard": "storyboard",
         "generate": "generate",
         "redesign": "redesign",
@@ -39,6 +42,7 @@ workflow.add_conditional_edges(
 
 workflow.add_edge("design", END)
 workflow.add_edge("breakdown", END)
+workflow.add_edge("voiceover", END)
 workflow.add_edge("storyboard", END)
 workflow.add_edge("generate", END)
 workflow.add_edge("redesign", END)

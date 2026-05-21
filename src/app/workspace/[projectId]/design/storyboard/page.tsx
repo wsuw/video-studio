@@ -11,7 +11,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, CompassIcon, VideoIcon, EyeIcon } from "lucide-react"
+import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, CompassIcon, VideoIcon, EyeIcon, SaveIcon, Loader2Icon } from "lucide-react"
 import { WorkspaceContext } from "@/app/workspace/[projectId]/layout"
 import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
@@ -19,7 +19,7 @@ import { useAgent } from "@copilotkit/react-core/v2"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useRouter, useParams } from "next/navigation"
-import { getThreadState } from "@/lib/langgraph"
+import { getThreadState, updateThreadState } from "@/lib/langgraph"
 import { v4 as uuidv4 } from "uuid"
 
 
@@ -71,34 +71,55 @@ export default function StoryboardPage() {
 
   const { agent } = useAgent({ agentId: "default" });
 
-  // Local state for data loaded directly from LangGraph checkpoint
-  const [loadedDesign, setLoadedDesign] = React.useState<any>(null);
+  // Local state as the single source of truth
+  const [scenes, setScenes] = React.useState<Scene[]>([]);
+  const [entities, setEntities] = React.useState<any[]>([]);
+  const [script, setScript] = React.useState<string>("");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const initializedRef = React.useRef<boolean>(false);
+  const aiRunningRef = React.useRef<boolean>(false);
 
   // On mount: fetch persisted state directly from LangGraph API
   React.useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !agent || initializedRef.current) return;
     getThreadState(projectId)
       .then((data) => {
         const design = data?.values?.design;
         if (design) {
-          setLoadedDesign(design);
-          // Also sync to CopilotKit agent state so both stay consistent
-          if (agent && (!agent.state?.design?.scenes?.length)) {
-            agent.setState({
-              ...agent.state,
-              design,
-            });
-          }
+          const loadedScenes = design.scenes || [];
+          const loadedEntities = design.entities || [];
+          setScenes(loadedScenes);
+          setEntities(loadedEntities);
+          setScript(design.script || "");
+
+          agent.setState({
+            ...agent.state,
+            design,
+          });
+          initializedRef.current = true;
         }
       })
       .catch((err) => console.warn("[Storyboard] Failed to load state:", err));
-  }, [projectId]);
+  }, [projectId, agent]);
 
-  // Prefer live agent state, fall back to loaded state from API
-  const design = agent?.state?.design || loadedDesign || {};
-  const scenes: Scene[] = design.scenes || [];
-  const entities = design.entities || [];
+  // Sync AI state changes (from CopilotKit Agent runs) to local state
+  React.useEffect(() => {
+    if (initializedRef.current && agent?.state?.design?.scenes && agent.state.design.scenes.length > 0) {
+      if (scenes.length === 0 || aiRunningRef.current) {
+        setScenes(agent.state.design.scenes);
+      }
+    }
+  }, [agent?.state?.design?.scenes]);
+
+  React.useEffect(() => {
+    if (initializedRef.current && agent?.state?.design?.entities && agent.state.design.entities.length > 0) {
+      if (entities.length === 0 || aiRunningRef.current) {
+        setEntities(agent.state.design.entities);
+      }
+    }
+  }, [agent?.state?.design?.entities]);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId) || scenes[0];
 
@@ -107,8 +128,47 @@ export default function StoryboardPage() {
     return entities.find((e: any) => e.id === entityId);
   };
 
+  // Auto-select first scene if none is selected
+  React.useEffect(() => {
+    if (scenes.length > 0 && !selectedSceneId) {
+      setSelectedSceneId(scenes[0].id);
+    }
+  }, [scenes, selectedSceneId]);
+
+  const handleSaveStoryboard = async () => {
+    if (!projectId) return;
+    aiRunningRef.current = false;
+    setIsSaving(true);
+    try {
+      console.log("[Storyboard] Manually persisting storyboard layouts...");
+      const updatedDesign = {
+        script,
+        entities,
+        scenes,
+      };
+
+      await updateThreadState(projectId, {
+        design: updatedDesign,
+      });
+
+      if (agent) {
+        agent.setState({
+          ...agent.state,
+          design: updatedDesign,
+        });
+      }
+      alert("Storyboard saved successfully!");
+    } catch (err) {
+      console.error("[Storyboard] Failed to save state:", err);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleAutoStoryboard = () => {
     if (!agent) return;
+    aiRunningRef.current = true;
     agent.addMessage({
       role: "user",
       id: uuidv4(),
@@ -118,22 +178,28 @@ export default function StoryboardPage() {
   };
 
   const handleUpdateSceneField = (sceneId: string, fields: Partial<Scene>) => {
-    if (!agent) return;
+    aiRunningRef.current = false;
     const updatedScenes = scenes.map(s => {
       if (s.id === sceneId) {
         return { ...s, ...fields };
       }
       return s;
     });
-    agent.setState({
-      ...agent.state,
-      design: {
-        ...design,
-        scenes: updatedScenes
-      }
-    });
-  };
 
+    setScenes(updatedScenes);
+
+    // Sync back to agent state asynchronously (lag-free!)
+    if (agent) {
+      agent.setState({
+        ...agent.state,
+        design: {
+          script,
+          entities,
+          scenes: updatedScenes
+        }
+      });
+    }
+  };
   // Safe fallback to reconstruct multi-layout elements from legacy layout_bbox if layout is empty
   const getActiveLayout = (scene: Scene): LayoutElement[] => {
     if (scene.layout && scene.layout.length > 0) {
@@ -175,19 +241,36 @@ export default function StoryboardPage() {
             variant="outline"
             size="sm"
             onClick={handleAutoStoryboard}
-            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm"
+            className="h-9 px-3 border-dashed transition-all shadow-sm"
           >
             <Wand2Icon className="w-4 h-4 mr-2" />
             Auto-Storyboard
           </Button>
 
           <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveStoryboard}
+            disabled={isSaving}
+            className="h-9 px-3 border-dashed hover:border-primary/50 hover:bg-primary/5 transition-all group shadow-sm"
+          >
+            {isSaving ? (
+              <Loader2Icon className="w-3.5 h-3.5 mr-2 animate-spin text-muted-foreground" />
+            ) : (
+              <SaveIcon className="w-3.5 h-3.5 mr-2 text-muted-foreground group-hover:text-primary transition-colors" />
+            )}
+            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+              {isSaving ? "Saving..." : "Save Changes"}
+            </span>
+          </Button>
+
+          <Button
             variant="default"
             size="sm"
-            onClick={() => router.push(`/workspace/${projectId}/generation/keyframes`)}
+            onClick={() => router.push(`/workspace/${projectId}/design/voiceover`)}
             className="h-9 px-4 font-semibold shadow-sm"
           >
-            Next: Keyframe Gen
+            Next: Voiceover Studio
           </Button>
 
           {!isChatOpen && (
@@ -245,15 +328,15 @@ export default function StoryboardPage() {
 
                   {/* Action Safe Zone Border (90% Boundary) */}
                   <div className="absolute inset-[5%] border border-dashed border-foreground/[0.04] rounded-xl pointer-events-none">
-                    <span className="absolute top-1.5 left-2.5 text-[8px] font-mono text-muted-foreground/30 uppercase tracking-widest">90% Action Safe</span>
+                    <span className="absolute top-1.5 left-2.5 text-xs font-mono text-muted-foreground/50 uppercase tracking-widest">90% Action Safe</span>
                   </div>
 
                   {/* Camera Telemetry Overlay */}
-                  <div className="absolute top-3 right-4 flex items-center gap-3 text-[9px] font-mono text-muted-foreground/40 select-none pointer-events-none">
+                  <div className="absolute top-3 right-4 flex items-center gap-3 text-xs font-mono text-muted-foreground/50 select-none pointer-events-none">
                     <span>STBY</span>
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500/80 animate-pulse"></span>
                   </div>
-                  <div className="absolute bottom-3 left-4 flex items-center gap-4 text-[9px] font-mono text-muted-foreground/35 select-none pointer-events-none">
+                  <div className="absolute bottom-3 left-4 flex items-center gap-4 text-xs font-mono text-muted-foreground/50 select-none pointer-events-none">
                     <span>RAW 4K UHD</span>
                     <span>FPS 24.00</span>
                     <span>TC 00:01:24:12</span>
@@ -285,7 +368,7 @@ export default function StoryboardPage() {
                       >
                         {/* Elegant floating badge label INSIDE the box */}
                         <div className={cn(
-                          "absolute top-2 left-2 text-[9px] font-bold tracking-wider font-mono flex items-center gap-1.5 px-2 py-0.5 rounded-md backdrop-blur-md border select-none z-10 shadow-sm",
+                          "absolute top-2 left-2 text-xs font-bold tracking-wider font-mono flex items-center gap-1.5 px-2 py-0.5 rounded-md backdrop-blur-md border select-none z-10 shadow-sm",
                           isCharacter && "bg-blue-500/10 text-blue-400 border-blue-500/20",
                           isProp && "bg-amber-500/10 text-amber-400 border-amber-500/20",
                           isLocation && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
@@ -307,7 +390,7 @@ export default function StoryboardPage() {
 
 
                         {/* Centered subtle visual focus text */}
-                        <div className="m-auto opacity-20 text-[9px] font-mono tracking-widest uppercase">
+                        <div className="m-auto opacity-20 text-xs font-mono tracking-widest uppercase">
                           Focus
                         </div>
                       </div>
@@ -327,10 +410,10 @@ export default function StoryboardPage() {
                     {/* Left: Description */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold tracking-widest uppercase">
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs font-bold tracking-widest uppercase">
                           Scene {selectedScene.id.toUpperCase()}
                         </Badge>
-                        <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-widest">
+                        <Badge variant="secondary" className="text-xs font-bold uppercase tracking-widest">
                           {selectedScene.status}
                         </Badge>
                       </div>
@@ -343,7 +426,7 @@ export default function StoryboardPage() {
                     <div className="flex shrink-0 gap-6 border-l border-border/40 pl-6">
                       {/* Lens Control */}
                       <div className="space-y-1.5 flex flex-col justify-center">
-                        <span className="text-[9px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                        <span className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground/80 block">
                           Camera Lens
                         </span>
                         <div className="flex gap-1 bg-muted/40 p-0.5 rounded-lg border border-border/50">
@@ -358,14 +441,14 @@ export default function StoryboardPage() {
                                 key={opt.id}
                                 onClick={() => handleUpdateSceneField(selectedScene.id, { lens: opt.id })}
                                 className={cn(
-                                  "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none focus:outline-none flex flex-col items-center min-w-[56px]",
+                                  "px-2.5 py-1.5 text-xs font-bold rounded-md transition-all select-none focus:outline-none flex flex-col items-center min-w-[56px] shadow-sm",
                                   isSelected
                                     ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                 )}
                               >
                                 <span>{opt.label}</span>
-                                <span className={cn("text-[7px] font-semibold opacity-60", isSelected ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
+                                <span className={cn("text-xs font-semibold opacity-80", isSelected ? "text-primary-foreground/90" : "text-muted-foreground/90")}>
                                   {opt.desc}
                                 </span>
                               </button>
@@ -376,7 +459,7 @@ export default function StoryboardPage() {
 
                       {/* Shot Framing Control */}
                       <div className="space-y-1.5 flex flex-col justify-center">
-                        <span className="text-[9px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                        <span className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground/80 block">
                           Shot Framing
                         </span>
                         <div className="flex gap-1 bg-muted/40 p-0.5 rounded-lg border border-border/50">
@@ -391,14 +474,14 @@ export default function StoryboardPage() {
                                 key={opt.id}
                                 onClick={() => handleUpdateSceneField(selectedScene.id, { shot_type: opt.id })}
                                 className={cn(
-                                  "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none focus:outline-none flex flex-col items-center min-w-[62px]",
+                                  "px-2.5 py-1.5 text-xs font-bold rounded-md transition-all select-none focus:outline-none flex flex-col items-center min-w-[62px] shadow-sm",
                                   isSelected
                                     ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                 )}
                               >
                                 <span>{opt.label}</span>
-                                <span className={cn("text-[7px] font-semibold opacity-60", isSelected ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
+                                <span className={cn("text-xs font-semibold opacity-80", isSelected ? "text-primary-foreground/90" : "text-muted-foreground/90")}>
                                   {opt.desc}
                                 </span>
                               </button>
@@ -409,7 +492,7 @@ export default function StoryboardPage() {
 
                       {/* Camera Motion Control */}
                       <div className="space-y-1.5 flex flex-col justify-center">
-                        <span className="text-[9px] font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                        <span className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground/80 block">
                           Camera Motion
                         </span>
                         <div className="flex gap-1 bg-muted/40 p-0.5 rounded-lg border border-border/50">
@@ -425,14 +508,14 @@ export default function StoryboardPage() {
                                 key={opt.id}
                                 onClick={() => handleUpdateSceneField(selectedScene.id, { motion: opt.id })}
                                 className={cn(
-                                  "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all select-none focus:outline-none flex flex-col items-center min-w-[56px]",
+                                  "px-2.5 py-1.5 text-xs font-bold rounded-md transition-all select-none focus:outline-none flex flex-col items-center min-w-[56px] shadow-sm",
                                   isSelected
                                     ? "bg-primary text-primary-foreground shadow-sm"
                                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                                 )}
                               >
                                 <span>{opt.label}</span>
-                                <span className={cn("text-[7px] font-semibold opacity-60", isSelected ? "text-primary-foreground/80" : "text-muted-foreground/80")}>
+                                <span className={cn("text-xs font-semibold opacity-80", isSelected ? "text-primary-foreground/90" : "text-muted-foreground/90")}>
                                   {opt.desc}
                                 </span>
                               </button>
@@ -464,7 +547,7 @@ export default function StoryboardPage() {
         <div className="w-80 border-l border-border bg-background flex flex-col overflow-hidden">
           <div className="p-6 border-b border-border">
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground mb-1">Storyboard Flow</h2>
-            <p className="text-[10px] text-muted-foreground/60">Sequential scene breakdown</p>
+            <p className="text-xs text-muted-foreground/80">Sequential scene breakdown</p>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 scroll-smooth">
@@ -528,21 +611,21 @@ export default function StoryboardPage() {
                         <div>
                           <div className="flex items-center justify-between gap-1 mb-1">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] font-mono font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                              <span className="text-xs font-mono font-bold text-muted-foreground group-hover:text-primary transition-colors">
                                 #{scene.id.toUpperCase()}
                               </span>
-                              <span className="text-[8px] font-bold px-1.5 py-0 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors scale-90 origin-left">
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors origin-left">
                                 {scene.lens || "50mm"}
                               </span>
-                              <span className="text-[8px] font-bold px-1.5 py-0 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors scale-90 origin-left">
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors origin-left">
                                 {scene.shot_type || "medium"}
                               </span>
-                              <span className="text-[8px] font-bold px-1.5 py-0 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors scale-90 origin-left">
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors origin-left">
                                 {scene.motion || "static"}
                               </span>
                             </div>
                           </div>
-                          <p className="text-[11px] leading-relaxed text-muted-foreground group-hover:text-foreground transition-colors line-clamp-3 italic font-serif">
+                          <p className="text-xs leading-relaxed text-muted-foreground group-hover:text-foreground transition-colors line-clamp-3 italic font-serif">
                             "{scene.description}"
                           </p>
                         </div>
@@ -556,7 +639,7 @@ export default function StoryboardPage() {
               {scenes.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-40 text-center space-y-2 opacity-30">
                   <InfoIcon className="w-5 h-5" />
-                  <p className="text-[10px]">Decompose script to populate</p>
+                  <p className="text-xs">Decompose script to populate</p>
                 </div>
               )}
             </div>

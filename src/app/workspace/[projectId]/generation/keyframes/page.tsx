@@ -497,7 +497,7 @@ export default function QueuePage() {
             size="sm"
             onClick={handleRenderAll}
             disabled={scenes.length === 0}
-            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm font-semibold gap-1.5"
+            className="h-9 px-3 border-dashed transition-all shadow-sm font-semibold gap-1.5"
           >
             <SparklesIcon className="w-4 h-4" />
             Batch Render All ({scenes.length})
