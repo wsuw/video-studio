@@ -554,7 +554,7 @@ export default function Page() {
 
         {/* Dynamic Glowing Pipeline Initialization Overlay */}
         {isInitializing && (
-          <div className="absolute inset-0 bg-slate-50/95 dark:bg-zinc-950/95 z-50 flex items-center justify-center p-6 backdrop-blur-sm transition-colors duration-300">
+          <div className="fixed inset-0 bg-slate-50/95 dark:bg-zinc-950/95 z-50 flex items-center justify-center p-6 backdrop-blur-sm transition-colors duration-300">
             <div className="max-w-md w-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-8 shadow-2xl space-y-8 animate-in fade-in zoom-in-95 duration-300">
 
               {/* Glow effect at top */}

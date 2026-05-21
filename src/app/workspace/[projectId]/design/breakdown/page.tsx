@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { getThreadState } from "@/lib/langgraph"
+import { v4 as uuidv4 } from "uuid"
 
 interface Entity {
   id: string;
@@ -115,7 +116,7 @@ export default function BreakdownPage() {
     if (!agent) return;
     agent.addMessage({
       role: "user",
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       content: "Please analyze the script and extract all character, prop, and location entities.",
     });
     agent.runAgent();
@@ -143,7 +144,7 @@ export default function BreakdownPage() {
     if (!agent) return;
     agent.addMessage({
       role: "user",
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       content: `Please generate a highly detailed, professional visual prompt profile (style parameters, appearance, and textures) for the extracted asset "${entity.name}" (ID: ${entity.id}, Type: ${entity.type}). Align it with our current global style description: "${customStylePrompt || 'cinematic'}".
 After generating the visual profile, please ALSO call the generate_entity_portrait tool to regenerate/update the portrait image for this entity.`,
     });
@@ -154,7 +155,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
     if (!agent) return;
     agent.addMessage({
       role: "user",
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       content: `Please generate a canonical visual reference image (Master Portrait) using the generate_entity_portrait tool for the entity "${entity.name}" (ID: ${entity.id}) with the style prompt: "${entity.description}"`,
     });
     agent.runAgent();
@@ -166,7 +167,10 @@ After generating the visual profile, please ALSO call the generate_entity_portra
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+          />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
@@ -185,7 +189,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
             variant="outline"
             size="sm"
             onClick={handleAutoBreakdown}
-            className="h-9 px-3 border-dashed text-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/5 hover:border-indigo-500/30 transition-all shadow-sm"
+            className="h-9 px-3 border-dashed transition-all shadow-sm"
           >
             <Wand2Icon className="w-3.5 h-3.5 mr-2" />
             Auto-Breakdown Script

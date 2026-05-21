@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useRouter, useParams } from "next/navigation"
 import { getThreadState } from "@/lib/langgraph"
+import { v4 as uuidv4 } from "uuid"
 
 
 interface LayoutElement {
@@ -69,7 +70,7 @@ export default function StoryboardPage() {
   usePhaseSync("storyboard");
 
   const { agent } = useAgent({ agentId: "default" });
-  
+
   // Local state for data loaded directly from LangGraph checkpoint
   const [loadedDesign, setLoadedDesign] = React.useState<any>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
@@ -110,7 +111,7 @@ export default function StoryboardPage() {
     if (!agent) return;
     agent.addMessage({
       role: "user",
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       content: "Please plan the visual storyboard for the script, assigning layout bounding boxes and mapping our extracted entities to each scene.",
     });
     agent.runAgent();
@@ -152,7 +153,10 @@ export default function StoryboardPage() {
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+          />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">

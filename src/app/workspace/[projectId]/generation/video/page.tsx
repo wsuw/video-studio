@@ -90,7 +90,7 @@ export default function VideoExecutionPage() {
   // States
   const [loadedDesign, setLoadedDesign] = useState<any>(null);
   const [renderingStates, setRenderingStates] = useState<Record<string, { progress: number; log: string }>>({});
-  
+
   // Generated/Mocked video outputs mapping: sceneId -> video URL path
   const [videoOutputs, setVideoOutputs] = useState<Record<string, string>>({});
 
@@ -109,13 +109,13 @@ export default function VideoExecutionPage() {
     if (!projectId) return;
     getThreadState(projectId)
       .then((data) => {
-         const design = data?.values?.design;
-         if (design) {
-           setLoadedDesign(design);
-           if (design.style_prompt) {
-             setStylePrompt(design.style_prompt);
-           }
-         }
+        const design = data?.values?.design;
+        if (design) {
+          setLoadedDesign(design);
+          if (design.style_prompt) {
+            setStylePrompt(design.style_prompt);
+          }
+        }
       })
       .catch((err) => console.warn("[Video] Load design state error:", err));
   }, [projectId]);
@@ -168,7 +168,7 @@ export default function VideoExecutionPage() {
           // Render completed
           const styleVideos = MOCK_VIDEOS[globalArtStyle] || MOCK_VIDEOS.cyberpunk;
           const matchedVideo = styleVideos[Math.floor(Math.random() * styleVideos.length)];
-          
+
           setVideoOutputs(prev => ({ ...prev, [sceneId]: matchedVideo }));
           handleUpdateSceneStatus(sceneId, "rendered");
 
@@ -298,7 +298,10 @@ export default function VideoExecutionPage() {
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+          />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">

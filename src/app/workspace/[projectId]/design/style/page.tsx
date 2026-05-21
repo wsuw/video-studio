@@ -81,7 +81,7 @@ export default function StylePage() {
   usePhaseSync("design");
 
   const { agent } = useAgent({ agentId: "default" });
-  
+
   // Local state persistence fallback
   const [loadedDesign, setLoadedDesign] = React.useState<any>(null);
 
@@ -137,7 +137,10 @@ export default function StylePage() {
       <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 border-b border-border bg-background/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+          <Separator
+            orientation="vertical"
+            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
+          />
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
@@ -167,7 +170,7 @@ export default function StylePage() {
       {/* Main Centralized Single-Column Workspace */}
       <div className="flex-1 overflow-y-auto bg-background/30">
         <div className="max-w-4xl mx-auto py-8 px-6 space-y-10">
-          
+
           {/* Section 0: Majestic Header Card */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl border border-border bg-card/60 shadow-sm">
             <div className="flex items-center gap-4">
@@ -181,7 +184,7 @@ export default function StylePage() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3 shrink-0">
               <Button
                 variant="outline"
@@ -215,7 +218,7 @@ export default function StylePage() {
                 Select a baseline artistic rendering model or pipeline style for the generated shots.
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {PRESET_ART_STYLES.map((style) => {
                 const isSelected = globalArtStyle === style.id;
@@ -382,7 +385,7 @@ export default function StylePage() {
               />
             </div>
           </div>
-          
+
           {/* Bottom Launcher Row */}
           <div className="flex justify-end pt-4">
             <Button

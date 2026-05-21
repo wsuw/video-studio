@@ -73,10 +73,6 @@ export default function Page() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbLink>{projectName}</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
                 <BreadcrumbPage>Script</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
