@@ -55,6 +55,7 @@ class S3StorageClient(StorageClient):
         self.access_key = os.getenv("STORAGE_S3_ACCESS_KEY", "minioadmin")
         self.secret_key = os.getenv("STORAGE_S3_SECRET_KEY", "minioadmin")
         self.bucket_name = os.getenv("STORAGE_S3_BUCKET", "video-studio")
+        self.public_url = os.getenv("STORAGE_S3_PUBLIC_URL")
         
         self.s3 = boto3.client(
             "s3",
@@ -89,7 +90,8 @@ class S3StorageClient(StorageClient):
             )
             
         # Return direct public access URL from MinIO (using public_url if available)
-        endpoint_clean = self.endpoint.rstrip("/")
+        base_url = self.public_url if self.public_url else self.endpoint
+        endpoint_clean = base_url.rstrip("/")
         return f"{endpoint_clean}/{self.bucket_name}/{filename}"
 
 def get_storage_client() -> StorageClient:

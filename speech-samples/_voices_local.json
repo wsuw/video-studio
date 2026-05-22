@@ -4545,15 +4545,6 @@
     "sampleUrl": "speech-samples/tr-TR_Male_Adult_Ahmet.wav"
   },
   {
-    "id": "c5b73621-18c5-425b-9020-79aae71f827e",
-    "name": "Xiaotong",
-    "locale": "wuu-CN",
-    "gender": "Female",
-    "ageGroup": "Adult",
-    "description": "A warm, friendly, and soothing voice, providing comfort and a relaxed tone for a pleasant conversation.",
-    "sampleUrl": "speech-samples/wuu-CN_Female_Adult_Xiaotong.wav"
-  },
-  {
     "id": "090b3817-3fe2-4c37-8c5f-025db1335032",
     "name": "HoaiMy",
     "locale": "vi-VN",
@@ -4590,15 +4581,6 @@
     "sampleUrl": "speech-samples/zh-CN_Female_YoungAdult_Xiaoxiao_Dialects.wav"
   },
   {
-    "id": "2c5617a6-37b8-44dc-b4c0-ac73be78acf8",
-    "name": "Yunzhe",
-    "locale": "wuu-CN",
-    "gender": "Male",
-    "ageGroup": "Adult",
-    "description": "A calm, deep, and gentle voice, bringing serenity and trust to each word spoken.",
-    "sampleUrl": "speech-samples/wuu-CN_Male_Adult_Yunzhe.wav"
-  },
-  {
     "id": "fcf9b60e-1a55-4a08-841b-83085ecd3213",
     "name": "Sardor",
     "locale": "uz-UZ",
@@ -4617,15 +4599,6 @@
     "sampleUrl": "speech-samples/zh-CN_Female_YoungAdult_Xiaoxiao2_Dragon_HD_Flash_Latest.wav"
   },
   {
-    "id": "7f98d131-4cb7-4799-9f4b-83d4803b2fea",
-    "name": "YunSong",
-    "locale": "yue-CN",
-    "gender": "Male",
-    "ageGroup": "Adult",
-    "description": "A deep, calm, and formal voice, exuding authority and professionalism in a composed manner.",
-    "sampleUrl": "speech-samples/yue-CN_Male_Adult_YunSong.wav"
-  },
-  {
     "id": "7ea726c9-9cde-49eb-ad47-e3ab8a49f4b6",
     "name": "Xiaochen Dragon HD Latest",
     "locale": "zh-CN",
@@ -4642,15 +4615,6 @@
     "ageGroup": "YoungAdult",
     "description": "Xiaoxiao voice with multilingual capability",
     "sampleUrl": "speech-samples/zh-CN_Female_YoungAdult_Xiaoxiao_Multilingual.wav"
-  },
-  {
-    "id": "d6db2ea7-2048-4c35-8733-ea7de8e8278d",
-    "name": "XiaoMin",
-    "locale": "yue-CN",
-    "gender": "Female",
-    "ageGroup": "YoungAdult",
-    "description": "A bright, crisp, and confident voice, delivering clarity and assurance in every statement.",
-    "sampleUrl": "speech-samples/yue-CN_Female_YoungAdult_XiaoMin.wav"
   },
   {
     "id": "7d850c27-ac8a-468c-980e-134770bf970d",
@@ -4923,15 +4887,6 @@
     "sampleUrl": "speech-samples/zh-CN_Male_Adult_Yunhao.wav"
   },
   {
-    "id": "39c0d9f1-cae5-4c64-a4dd-701e9baad3ca",
-    "name": "Yunqi",
-    "locale": "zh-CN-guangxi",
-    "gender": "Male",
-    "ageGroup": "Adult",
-    "description": "A middle-aged male with a strong Southern Chinese Guangxi accent, speaking in a high-pitched, theatrical, and nagging tone suitable for character acting or comedy.",
-    "sampleUrl": "speech-samples/zh-CN-guangxi_Male_Adult_Yunqi.wav"
-  },
-  {
     "id": "e624d4e0-6400-4743-97e9-99e083994f53",
     "name": "Yunxia Dragon HD Flash Latest",
     "locale": "zh-CN",
@@ -4950,33 +4905,6 @@
     "sampleUrl": "speech-samples/zh-HK_Female_Adult_HiuGaai.wav"
   },
   {
-    "id": "8b49a818-048b-4251-a1c3-f5b97d978db3",
-    "name": "Yunxiang",
-    "locale": "zh-CN-shandong",
-    "gender": "Male",
-    "ageGroup": "Adult",
-    "description": "A casual, animated, and strong voice, full of energy and strength, ideal for captivating listeners.",
-    "sampleUrl": "speech-samples/zh-CN-shandong_Male_Adult_Yunxiang.wav"
-  },
-  {
-    "id": "d79eb070-849b-4b42-9ef5-d077965b075a",
-    "name": "Yundeng",
-    "locale": "zh-CN-henan",
-    "gender": "Male",
-    "ageGroup": "Adult",
-    "description": "A casual, friendly, and animated voice that adds fun and energy to relaxed conversations.",
-    "sampleUrl": "speech-samples/zh-CN-henan_Male_Adult_Yundeng.wav"
-  },
-  {
-    "id": "ed0cbbff-e662-4159-bc8f-51e4d652db47",
-    "name": "Xiaoni",
-    "locale": "zh-CN-shaanxi",
-    "gender": "Female",
-    "ageGroup": "YoungAdult",
-    "description": "A confident, engaging, and casual voice that keeps the conversation both lively and relaxed.",
-    "sampleUrl": "speech-samples/zh-CN-shaanxi_Female_YoungAdult_Xiaoni.wav"
-  },
-  {
     "id": "3f845c8a-1e92-4b44-8217-da0f9f634dc4",
     "name": "WanLung",
     "locale": "zh-HK",
@@ -4984,15 +4912,6 @@
     "ageGroup": "Adult",
     "description": "A calm and formal voice, delivering information with both serenity and professionalism.",
     "sampleUrl": "speech-samples/zh-HK_Male_Adult_WanLung.wav"
-  },
-  {
-    "id": "77125dfb-e70c-4d7d-b79b-6b56dd011a92",
-    "name": "Yunbiao",
-    "locale": "zh-CN-liaoning",
-    "gender": "Male",
-    "ageGroup": "Adult",
-    "description": "A confident, casual, and cheerful voice, offering positivity and assurance in a balanced tone.",
-    "sampleUrl": "speech-samples/zh-CN-liaoning_Male_Adult_Yunbiao.wav"
   },
   {
     "id": "ca5ae3d3-efd7-4219-8a12-91c94e4f1872",
@@ -5047,24 +4966,6 @@
     "ageGroup": "Adult",
     "description": "A calm and grounded voice with a rich, dark timbre, exuding quiet confidence and steady warmth, ideal for creating a soothing and reflective atmosphere.",
     "sampleUrl": "speech-samples/zu-ZA_Male_Adult_Themba.wav"
-  },
-  {
-    "id": "67f27a5a-944a-4590-8a79-741d3780e48a",
-    "name": "Xiaobei",
-    "locale": "zh-CN-liaoning",
-    "gender": "Female",
-    "ageGroup": "YoungAdult",
-    "description": "A friendly, casual, and gentle voice that makes interactions feel approachable and soothing.",
-    "sampleUrl": "speech-samples/zh-CN-liaoning_Female_YoungAdult_Xiaobei.wav"
-  },
-  {
-    "id": "383b7b38-8e3c-4ac1-a64c-8387ddee905e",
-    "name": "Yunxi",
-    "locale": "zh-CN-sichuan",
-    "gender": "Male",
-    "ageGroup": "YoungAdult",
-    "description": "A casual, animated, and gentle voice, offering a lively yet soft and calming presence.",
-    "sampleUrl": "speech-samples/zh-CN-sichuan_Male_YoungAdult_Yunxi.wav"
   },
   {
     "id": "7dde73d4-b5f8-418d-a8ce-87944c7d71bd",

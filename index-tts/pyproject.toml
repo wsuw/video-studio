@@ -29,9 +29,11 @@ dependencies = [
   # WARNING: Ensure that you don't have a local `uv.toml` which overrides PyPI
   # while generating the lockfile: https://github.com/astral-sh/uv/issues/15741
   "accelerate==1.8.1",
+  "boto3>=1.43.13",
   "cn2an==0.5.22",
   "cython==3.0.7",
   "descript-audiotools==0.7.2",
+  "dotenv>=0.9.9",
   "einops>=0.8.1",
   "fastapi>=0.116.2",
   "ffmpeg-python==0.2.0",

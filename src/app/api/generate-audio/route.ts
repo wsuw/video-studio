@@ -3,153 +3,169 @@ import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
-// Local Helper: Scan WAV binary headers to calculate precise duration
-function getWavDuration(buffer: Buffer): number {
-  try {
-    // Read byte rate at offset 28 (32-bit unsigned int)
-    const byteRate = buffer.readUInt32LE(28);
-    if (byteRate <= 0) return 0;
-
-    // Scan chunks to locate the 'data' chunk
-    let offset = 12; // Skip 'RIFF', file size, 'WAVE'
-    while (offset < buffer.length - 8) {
-      const chunkId = buffer.toString("ascii", offset, offset + 4);
-      const chunkSize = buffer.readUInt32LE(offset + 4);
-
-      if (chunkId === "data") {
-        const duration = chunkSize / byteRate;
-        return parseFloat(duration.toFixed(3));
-      }
-
-      // Safeguard against malformed/infinite chunks
-      if (chunkSize <= 0) break;
-      offset += 8 + chunkSize;
-    }
-
-    // Fallback: simple byte rate division
-    return parseFloat((buffer.length / byteRate).toFixed(3));
-  } catch (err) {
-    console.error("[WAV Parser] Error reading WAV duration from header:", err);
-  }
-  return 0;
-}
-
+// ── 类型定义 ──────────────────────────────────────────────
 interface SpeakerTurn {
   speaker: string;
   text: string;
 }
 
-// Parses dialogue lines into speaker turns
-function parseDialogue(text: string, characterVoices: Record<string, string>): SpeakerTurn[] {
-  const speakerNames = new Set(
-    Object.keys(characterVoices).map(name => name.toUpperCase())
-  );
-  speakerNames.add("NARRATOR");
-  speakerNames.add("SYSTEM");
-  
-  const genericSpeakerRegex = /(?:^|\s|\n)([A-Z0-9_\-\u4e00-\u9fa5]+)\s*[:：]/g;
-  let match;
-  while ((match = genericSpeakerRegex.exec(text)) !== null) {
-    const candidate = match[1].toUpperCase();
-    if (candidate.length > 1) {
-      speakerNames.add(candidate);
-    }
-  }
-
-  const sortedSpeakers = Array.from(speakerNames).sort((a, b) => b.length - a.length);
-  if (sortedSpeakers.length === 0) {
-    return [];
-  }
-
-  const escapedSpeakers = sortedSpeakers.map(s => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
-  const turnRegex = new RegExp(`(?:^|\\s|\\n)(${escapedSpeakers.join("|")})\\s*[:：]\\s*`, "i");
-
-  const parts = text.split(turnRegex);
-  const turns: SpeakerTurn[] = [];
-  
-  let currentSpeaker = "NARRATOR";
-  const firstPart = parts[0]?.trim();
-  if (firstPart) {
-    turns.push({ speaker: currentSpeaker, text: firstPart });
-  }
-
-  for (let i = 1; i < parts.length; i += 2) {
-    const speaker = parts[i]?.trim().toUpperCase();
-    const dialogue = parts[i + 1]?.trim();
-    if (speaker && dialogue) {
-      turns.push({ speaker, text: dialogue });
-    }
-  }
-
-  return turns;
+interface TtsApiResult {
+  status: string;
+  url: string;
+  filename: string;
 }
 
-// Extracts the header and raw PCM data chunk from a WAV buffer
-function extractWavPcmAndHeader(buffer: Buffer): { header: Buffer; pcm: Buffer } {
-  let offset = 12; // Skip 'RIFF', file size, 'WAVE'
-  while (offset < buffer.length - 8) {
-    const chunkId = buffer.toString("ascii", offset, offset + 4);
-    const chunkSize = buffer.readUInt32LE(offset + 4);
+// ── WAV 工具函数 ───────────────────────────────────────────
 
-    if (chunkId === "data") {
-      const header = buffer.subarray(0, offset + 8);
-      const pcm = buffer.subarray(offset + 8, offset + 8 + chunkSize);
-      return { header, pcm };
+/** 从 WAV 头精确计算时长（秒） */
+function getWavDuration(buf: Buffer): number {
+  try {
+    const byteRate = buf.readUInt32LE(28);
+    if (byteRate <= 0) return 0;
+    let offset = 12;
+    while (offset < buf.length - 8) {
+      const chunkId = buf.toString("ascii", offset, offset + 4);
+      const chunkSize = buf.readUInt32LE(offset + 4);
+      if (chunkId === "data") return parseFloat((chunkSize / byteRate).toFixed(3));
+      if (chunkSize <= 0) break;
+      offset += 8 + chunkSize;
     }
+    return parseFloat((buf.length / byteRate).toFixed(3));
+  } catch {
+    return 0;
+  }
+}
 
+/** 从 WAV buffer 中分离 header 和 PCM 数据 */
+function extractWavPcm(buf: Buffer): { header: Buffer; pcm: Buffer } {
+  let offset = 12;
+  while (offset < buf.length - 8) {
+    const chunkId = buf.toString("ascii", offset, offset + 4);
+    const chunkSize = buf.readUInt32LE(offset + 4);
+    if (chunkId === "data") {
+      return {
+        header: buf.subarray(0, offset + 8),
+        pcm: buf.subarray(offset + 8, offset + 8 + chunkSize),
+      };
+    }
     if (chunkSize <= 0) break;
     offset += 8 + chunkSize;
   }
-  
-  return {
-    header: buffer.subarray(0, 44),
-    pcm: buffer.subarray(44),
-  };
+  return { header: buf.subarray(0, 44), pcm: buf.subarray(44) };
 }
 
-// Downloads remote speaker voices locally or resolves local relative path
-async function resolveSpeakerPrompt(spk_audio_prompt: string): Promise<{ resolvedPath: string; tempPath: string | null }> {
-  let resolvedSpkPath = spk_audio_prompt;
-  let tempFilePath: string | null = null;
+/** 将多段 PCM 拼接成完整 WAV（自动插入静音间隔） */
+function stitchWav(segments: Buffer[], header: Buffer, silenceMs: number): Buffer {
+  const sampleRate = header.readUInt32LE(24);
+  const blockAlign = header.readUInt16LE(32);
+  const silenceBytes = Math.round(sampleRate * (silenceMs / 1000)) * blockAlign;
+  const silenceBuf = Buffer.alloc(silenceBytes, 0);
 
-  if (
-    spk_audio_prompt.startsWith("http://") ||
-    spk_audio_prompt.startsWith("https://")
-  ) {
-    const tempDir = path.join(process.cwd(), "public", "audio", "temp");
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    const tempFilename = `spk_temp_${uuidv4()}.wav`;
-    tempFilePath = path.join(tempDir, tempFilename);
-
-    console.log(`[Generate Audio API] Downloading speaker prompt URL: ${spk_audio_prompt} -> ${tempFilePath}`);
-    const downloadRes = await fetch(spk_audio_prompt);
-    if (!downloadRes.ok) {
-      throw new Error(`Failed to download remote speaker reference WAV file: ${downloadRes.statusText}`);
-    }
-
-    const arrayBuffer = await downloadRes.arrayBuffer();
-    fs.writeFileSync(tempFilePath, Buffer.from(arrayBuffer));
-    resolvedSpkPath = path.resolve(tempFilePath);
-  } else {
-    if (!path.isAbsolute(spk_audio_prompt)) {
-      const absoluteIndexTtsPath = path.resolve(process.cwd(), "index-tts", spk_audio_prompt);
-      if (fs.existsSync(absoluteIndexTtsPath)) {
-        resolvedSpkPath = absoluteIndexTtsPath;
-      }
-    }
+  const parts: Buffer[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    if (i > 0 && silenceBytes > 0) parts.push(silenceBuf);
+    parts.push(segments[i]);
   }
 
-  return { resolvedPath: resolvedSpkPath, tempPath: tempFilePath };
+  const combinedPcm = Buffer.concat(parts);
+  const finalHeader = Buffer.from(header);
+  finalHeader.writeUInt32LE(finalHeader.length + combinedPcm.length - 8, 4);
+  finalHeader.writeUInt32LE(combinedPcm.length, finalHeader.length - 4);
+  return Buffer.concat([finalHeader, combinedPcm]);
 }
 
+// ── 音色参考解析 ───────────────────────────────────────────
+
+/** 将音色 URL 下载到本地临时文件，或解析本地相对路径为绝对路径 */
+async function resolveSpeakerPath(
+  ref: string
+): Promise<{ resolved: string; temp: string | null }> {
+  if (ref.startsWith("http://") || ref.startsWith("https://")) {
+    const dir = path.join(process.cwd(), "public", "audio", "temp");
+    fs.mkdirSync(dir, { recursive: true });
+    const tempPath = path.join(dir, `spk_${uuidv4()}.wav`);
+    const res = await fetch(ref);
+    if (!res.ok) throw new Error(`Failed to download speaker ref: ${res.statusText}`);
+    fs.writeFileSync(tempPath, Buffer.from(await res.arrayBuffer()));
+    return { resolved: path.resolve(tempPath), temp: tempPath };
+  }
+  if (!path.isAbsolute(ref)) {
+    const abs = path.resolve(process.cwd(), "index-tts", ref);
+    if (fs.existsSync(abs)) return { resolved: abs, temp: null };
+  }
+  return { resolved: ref, temp: null };
+}
+
+// ── TTS API 调用 ───────────────────────────────────────────
+
+/** 调用 IndexTTS2，返回 TTS 服务上传后的结果 */
+async function callTts(url: string, payload: Record<string, unknown>): Promise<TtsApiResult> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`TTS API error ${res.status}: ${msg}`);
+  }
+  return res.json() as Promise<TtsApiResult>;
+}
+
+/** 从 TTS 返回的 url 下载 WAV buffer（兼容相对路径和 MinIO 绝对路径） */
+async function fetchAudioBuffer(audioUrl: string, serverBase: string): Promise<Buffer> {
+  const full = audioUrl.startsWith("http") ? audioUrl : `${serverBase}${audioUrl}`;
+  const res = await fetch(full);
+  if (!res.ok) throw new Error(`Failed to download audio from ${full}: ${res.statusText}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// ── 对话解析 ──────────────────────────────────────────────
+
+/** 将多人对话文本拆分为 [{ speaker, text }] */
+function parseDialogue(text: string, characterVoices: Record<string, string>): SpeakerTurn[] {
+  const speakers = new Set([
+    ...Object.keys(characterVoices).map(k => k.toUpperCase()),
+    "NARRATOR",
+    "SYSTEM",
+  ]);
+
+  // 自动识别文本中 "名字:" 格式的角色
+  for (const m of text.matchAll(/(?:^|\s|\n)([A-Z0-9_\-\u4e00-\u9fa5]{2,})\s*[:：]/g)) {
+    speakers.add(m[1].toUpperCase());
+  }
+
+  const sorted = [...speakers].sort((a, b) => b.length - a.length);
+  const escaped = sorted.map(s => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
+  const re = new RegExp(`(?:^|\\s|\\n)(${escaped.join("|")})\\s*[:：]\\s*`, "i");
+
+  const parts = text.split(re);
+  const turns: SpeakerTurn[] = [];
+
+  if (parts[0]?.trim()) turns.push({ speaker: "NARRATOR", text: parts[0].trim() });
+  for (let i = 1; i < parts.length; i += 2) {
+    const speaker = parts[i]?.trim().toUpperCase();
+    const dialogue = parts[i + 1]?.trim();
+    if (speaker && dialogue) turns.push({ speaker, text: dialogue });
+  }
+  return turns;
+}
+
+// ── 清理临时文件 ───────────────────────────────────────────
+function cleanupFiles(files: (string | null)[]) {
+  for (const f of files) {
+    if (f && fs.existsSync(f)) {
+      try { fs.unlinkSync(f); } catch { /* ignore */ }
+    }
+  }
+}
+
+// ── POST Handler ───────────────────────────────────────────
+
 export async function POST(req: Request) {
-  let tempFilePath: string | null = null;
-  const tempFilesToDelete: string[] = [];
+  const tempFiles: (string | null)[] = [];
+
   try {
-    const body = await req.json();
     const {
       text,
       spk_audio_prompt,
@@ -161,195 +177,94 @@ export async function POST(req: Request) {
       use_random = false,
       interval_silence = 200,
       sceneId = "default",
-      character_voices = {},
-    } = body;
+      character_voices = {} as Record<string, string>,
+    } = await req.json();
 
     if (!text || !spk_audio_prompt) {
-      return NextResponse.json(
-        { error: "Text and spk_audio_prompt are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "text and spk_audio_prompt are required" }, { status: 400 });
     }
 
     const ttsServerUrl = process.env.INDEX_TTS_API_URL || "http://127.0.0.1:8000/synthesize";
+    const ttsServerBase = new URL(ttsServerUrl).origin;
 
     const outputsDir = path.join(process.cwd(), "public", "audio", "outputs");
-    if (!fs.existsSync(outputsDir)) {
-      fs.mkdirSync(outputsDir, { recursive: true });
-    }
+    fs.mkdirSync(outputsDir, { recursive: true });
 
-    // Parse the dialogue lines for multiple speakers
+    // 基础 TTS 参数（无需每次重复声明）
+    const baseTtsPayload = { emo_audio_prompt, emo_alpha, emo_vector, use_emo_text, use_random };
+
     const turns = parseDialogue(text, character_voices);
-    console.log(`[Generate Audio API] Parsed ${turns.length} dialogue turns:`, turns);
+    console.log(`[Audio API] ${turns.length} turn(s) parsed`);
 
     let audioBuffer: Buffer;
 
     if (turns.length <= 1) {
-      // 1. Backwards-compatible path: Single speaker/narrator synthesis as usual
-      let resolvedSpkPath = spk_audio_prompt;
-      
-      const { resolvedPath, tempPath } = await resolveSpeakerPrompt(spk_audio_prompt);
-      resolvedSpkPath = resolvedPath;
-      tempFilePath = tempPath;
+      // ── 单人路径 ──────────────────────────────────────────
+      const { resolved, temp } = await resolveSpeakerPath(spk_audio_prompt);
+      tempFiles.push(temp);
 
-      console.log(`[Generate Audio API] Calling IndexTTS2 FastAPI synthesis... Ref: ${resolvedSpkPath}`);
-
-      const payload = {
+      const result = await callTts(ttsServerUrl, {
+        ...baseTtsPayload,
         text,
-        spk_audio_prompt: resolvedSpkPath,
-        emo_audio_prompt,
-        emo_alpha,
-        emo_vector,
-        use_emo_text,
+        spk_audio_prompt: resolved,
         emo_text,
-        use_random,
         interval_silence,
-      };
-
-      const response = await fetch(ttsServerUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Generate Audio API] IndexTTS2 returned error status ${response.status}: ${errorText}`);
-        return NextResponse.json(
-          { error: `IndexTTS2 server synthesis failed: ${errorText}` },
-          { status: response.status }
-        );
-      }
-
-      const audioArrayBuffer = await response.arrayBuffer();
-      audioBuffer = Buffer.from(audioArrayBuffer);
+      audioBuffer = await fetchAudioBuffer(result.url, ttsServerBase);
     } else {
-      // 2. High-Fidelity path: Multi-speaker individual synthesis and PCM stitching
-      const pcmBuffers: Buffer[] = [];
-      let firstHeader: Buffer | null = null;
+      // ── 多人路径：逐 turn 合成后 PCM 拼接 ─────────────────
+      const pcmSegments: Buffer[] = [];
+      let wavHeader: Buffer | null = null;
 
-      for (const turn of turns) {
-        const { speaker, text: turnText } = turn;
-        
-        // Find speaker voice reference
-        let speakerVoiceRef = spk_audio_prompt; // Fallback
-        if (character_voices[speaker]) {
-          speakerVoiceRef = character_voices[speaker];
-        } else if (speaker === "NARRATOR") {
-          speakerVoiceRef = "examples/voice_04.wav"; // Narrator preset
-        }
+      for (const { speaker, text: turnText } of turns) {
+        const voiceRef =
+          character_voices[speaker] ??
+          (speaker === "NARRATOR" ? "examples/voice_04.wav" : spk_audio_prompt);
 
-        const { resolvedPath, tempPath } = await resolveSpeakerPrompt(speakerVoiceRef);
-        if (tempPath) {
-          tempFilesToDelete.push(tempPath);
-        }
+        const { resolved, temp } = await resolveSpeakerPath(voiceRef);
+        tempFiles.push(temp);
 
-        console.log(`[Generate Audio API] Synthesizing turn for speaker [${speaker}] with voice [${resolvedPath}]: "${turnText}"`);
+        console.log(`[Audio API] Synthesizing [${speaker}]: "${turnText.slice(0, 30)}..."`);
 
-        const payload = {
+        const result = await callTts(ttsServerUrl, {
+          ...baseTtsPayload,
           text: turnText,
-          spk_audio_prompt: resolvedPath,
-          emo_audio_prompt,
-          emo_alpha,
-          emo_vector,
-          use_emo_text,
+          spk_audio_prompt: resolved,
           emo_text: use_emo_text ? turnText : null,
-          use_random,
-          interval_silence: 0, // Control silence directly in our node stitching logic
-        };
-
-        const response = await fetch(ttsServerUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+          interval_silence: 0,
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`TTS synthesis failed for speaker ${speaker}: ${errorText}`);
-        }
-
-        const turnArrayBuffer = await response.arrayBuffer();
-        const turnWavBuffer = Buffer.from(turnArrayBuffer);
-
-        const { header, pcm } = extractWavPcmAndHeader(turnWavBuffer);
-        if (!firstHeader) {
-          firstHeader = header;
-        }
-
-        // Insert silence between turns
-        if (pcmBuffers.length > 0 && interval_silence > 0 && firstHeader) {
-          const sampleRate = firstHeader.readUInt32LE(24);
-          const blockAlign = firstHeader.readUInt16LE(32);
-          const silenceSamples = Math.round(sampleRate * (interval_silence / 1000));
-          const silenceBytes = silenceSamples * blockAlign;
-          const silenceBuffer = Buffer.alloc(silenceBytes, 0);
-          pcmBuffers.push(silenceBuffer);
-        }
-
-        pcmBuffers.push(pcm);
+        const wavBuf = await fetchAudioBuffer(result.url, ttsServerBase);
+        const { header, pcm } = extractWavPcm(wavBuf);
+        if (!wavHeader) wavHeader = header;
+        pcmSegments.push(pcm);
       }
 
-      if (!firstHeader) {
-        throw new Error("Failed to synthesize audio for any speaker turn");
-      }
-
-      const combinedPcm = Buffer.concat(pcmBuffers);
-      const finalHeader = Buffer.from(firstHeader);
-      
-      const totalPcmLength = combinedPcm.length;
-      const totalFileSize = finalHeader.length + totalPcmLength - 8;
-      
-      finalHeader.writeUInt32LE(totalFileSize, 4);
-      finalHeader.writeUInt32LE(totalPcmLength, finalHeader.length - 4);
-
-      audioBuffer = Buffer.concat([finalHeader, combinedPcm]);
+      if (!wavHeader) throw new Error("No audio generated for any speaker turn");
+      audioBuffer = stitchWav(pcmSegments, wavHeader, interval_silence);
     }
 
-    // Save final stitched WAV to public outputs
-    const outputFilename = `scene_${sceneId}_${Date.now()}.wav`;
-    const absoluteOutputPath = path.join(outputsDir, outputFilename);
-    fs.writeFileSync(absoluteOutputPath, audioBuffer);
+    // ── 保存最终 WAV 并返回结果 ────────────────────────────
+    const filename = `scene_${sceneId}_${Date.now()}.wav`;
+    const outPath = path.join(outputsDir, filename);
+    fs.writeFileSync(outPath, audioBuffer);
 
-    // Calculate precision duration
     const duration = getWavDuration(audioBuffer);
-    console.log(`[Generate Audio API] Generation success! Output: ${absoluteOutputPath}, Duration: ${duration}s`);
-
-    const webUrl = `/audio/outputs/${outputFilename}`;
+    console.log(`[Audio API] Done → ${filename} (${duration}s)`);
 
     return NextResponse.json({
       status: "success",
-      url: webUrl,
-      duration: duration,
+      url: `/audio/outputs/${filename}`,
+      duration,
     });
-  } catch (error: any) {
-    console.error("[Generate Audio API] Error calling IndexTTS2 FastAPI:", error);
+  } catch (err: any) {
+    console.error("[Audio API] Error:", err);
     return NextResponse.json(
-      { error: error.message || "Failed to synthesize voiceover with local model server" },
+      { error: err.message || "Audio synthesis failed" },
       { status: 500 }
     );
   } finally {
-    // Cleanup downloaded temporary speaker file if it exists
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
-      try {
-        fs.unlinkSync(tempFilePath);
-      } catch (cleanupErr) {
-        console.error("[Generate Audio API] Error deleting temp file:", cleanupErr);
-      }
-    }
-    // Cleanup all temp files generated for multi-speaker turns
-    for (const fileToDelete of tempFilesToDelete) {
-      if (fileToDelete && fs.existsSync(fileToDelete)) {
-        try {
-          fs.unlinkSync(fileToDelete);
-        } catch (cleanupErr) {
-          console.error("[Generate Audio API] Error deleting turn temp file:", cleanupErr);
-        }
-      }
-    }
+    cleanupFiles(tempFiles);
   }
 }
