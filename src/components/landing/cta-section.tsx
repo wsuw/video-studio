@@ -51,14 +51,13 @@ export function CtaSection() {
               {/* Left content */}
               <div className="flex-1">
                 <h2 className="text-6xl md:text-7xl lg:text-[72px] font-display tracking-tight mb-8 leading-[0.95]">
-                  Ready to delegate
+                  Ready to co-create
                   <br />
-                  to AI agents?
+                  with VideoAgent?
                 </h2>
 
                 <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-xl">
-                  Join teams automating complex workflows with COMPUTE agents. 
-                  Launch your studio in minutes.
+                  Join content teams building cooperative scripts, emotional voiceovers, and premium cinematic renders in one unified workspace.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -81,7 +80,7 @@ export function CtaSection() {
                 </div>
 
                 <p className="text-sm text-muted-foreground mt-8 font-mono">
-                  1,000 free tasks with COMPUTE
+                  Free Explorer tier available with local rendering
                 </p>
               </div>
 

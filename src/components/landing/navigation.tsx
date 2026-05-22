@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 
 const navLinks = [
-  { name: "Capabilities", href: "#features" },
-  { name: "Process", href: "#how-it-works" },
-  { name: "Infra", href: "#infra" },
+  { name: "Features", href: "#features" },
+  { name: "Workflow", href: "#how-it-works" },
+  { name: "Render Cloud", href: "#infra" },
   { name: "Integrations", href: "#integrations" },
-  { name: "Security", href: "#security" },
+  { name: "Brand Safety", href: "#security" },
 ];
 
 export function Navigation() {
@@ -43,8 +43,8 @@ export function Navigation() {
         >
           {/* Logo */}
           <a href="#" className="flex items-center gap-2 group">
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>COMPUTE</span>
-            <span className={`font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>TM</span>
+            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>VIDEOAGENT</span>
+            <span className={`font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>™</span>
           </a>
 
           {/* Desktop Navigation */}
@@ -63,7 +63,7 @@ export function Navigation() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <a href="#" className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}>
+            <a href="/login" className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}>
               Sign in
             </a>
             <a href="/studio">
@@ -126,13 +126,14 @@ export function Navigation() {
             }`}
             style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
           >
-            <Button
-              variant="outline"
-              className="flex-1 rounded-full h-14 text-base"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Sign in
-            </Button>
+            <a href="/login" className="flex-1" onClick={() => setIsMobileMenuOpen(false)}>
+              <Button
+                variant="outline"
+                className="w-full rounded-full h-14 text-base"
+              >
+                Sign in
+              </Button>
+            </a>
             <a href="/studio" className="flex-1" onClick={() => setIsMobileMenuOpen(false)}>
               <Button
                 className="w-full bg-foreground text-background rounded-full h-14 text-base"

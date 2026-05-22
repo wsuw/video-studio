@@ -6,47 +6,44 @@ import { ArrowRight, Check, Zap } from "lucide-react";
 const plans = [
   {
     name: "Explorer",
-    description: "For tinkering and small automations",
+    description: "For tinkering and individual creators",
     price: { monthly: 0, annual: 0 },
     features: [
-      "3 concurrent agents",
-      "1,000 tasks/month",
-      "Community support",
-      "Basic logging",
-      "Public integrations",
+      "1 active video project",
+      "Stage-1 fast draft renders (~110s)",
+      "Standard TTS voices",
+      "Local filesystem storage",
+      "LangGraph cooperative chat",
     ],
     cta: "Start free",
     highlight: false,
   },
   {
-    name: "Builder",
-    description: "For teams shipping with agents",
-    price: { monthly: 79, annual: 65 },
+    name: "Studio Pro",
+    description: "For professional content studios",
+    price: { monthly: 49, annual: 39 },
     features: [
-      "25 concurrent agents",
-      "50,000 tasks/month",
-      "Priority support",
-      "Full audit trails",
-      "Private integrations",
-      "Team workspaces",
-      "Custom agent roles",
+      "Unlimited active projects",
+      "Stage-2 HD final renders",
+      "Custom emotional TTS voices",
+      "Local S3 MinIO storage support",
+      "Storyboard LayoutGPT visualizer",
+      "Automatic quality checker loop",
     ],
     cta: "Start trial",
     highlight: true,
   },
   {
     name: "Scale",
-    description: "For agent-first organizations",
+    description: "For commercial production agencies",
     price: { monthly: null, annual: null },
     features: [
-      "Unlimited agents",
-      "Unlimited tasks",
-      "24/7 dedicated support",
-      "On-premise deployment",
-      "SLA guarantee",
-      "Custom LLM routing",
-      "Advanced security",
-      "Dedicated compute",
+      "Dedicated local GPU clusters",
+      "Custom model fine-tuning",
+      "Multi-user shared workspace",
+      "Full version history rollback",
+      "Structural script exports",
+      "24/7 priority pipeline support",
     ],
     cta: "Contact sales",
     highlight: false,
@@ -190,15 +187,15 @@ export function PricingSection() {
           <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
             <span className="flex items-center gap-2">
               <Check className="w-4 h-4 text-[#eca8d6]" />
-              Encrypted execution
+              Local secure renders
             </span>
             <span className="flex items-center gap-2">
               <Check className="w-4 h-4 text-[#eca8d6]" />
-              Full audit logs
+              Durable checkpointers
             </span>
             <span className="flex items-center gap-2">
               <Check className="w-4 h-4 text-[#eca8d6]" />
-              Multi-model routing
+              VRAM safe scheduling
             </span>
           </div>
           <a href="#" className="text-sm underline underline-offset-4 hover:text-foreground transition-colors">

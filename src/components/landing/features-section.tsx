@@ -5,27 +5,27 @@ import { useEffect, useRef, useState } from "react";
 const features = [
   {
     number: "01",
-    title: "Autonomous Execution",
-    description: "Deploy AI agents that work independently. They analyze, decide, and execute complex multi-step tasks without human intervention.",
-    stats: { value: "99.7%", label: "task completion" },
+    title: "Cooperative Screenplay",
+    description: "Write and edit scripts collaboratively with a LangGraph-powered AI assistant that understands narrative structure, character dynamics, and pacing.",
+    stats: { value: "80%", label: "faster pre-production" },
   },
   {
     number: "02",
-    title: "Distributed Computing",
-    description: "Offload compute-heavy tasks to our global network. Your agents run on optimized infrastructure across 50+ regions worldwide.",
-    stats: { value: "50+", label: "global regions" },
+    title: "LayoutGPT Storyboarding",
+    description: "Automatically translate descriptive scene prose into precise 2D layout coordinates (x, y, w, h) for structural visual composition and framing.",
+    stats: { value: "100%", label: "framing control" },
   },
   {
     number: "03",
-    title: "Multi-Agent Orchestration",
-    description: "Coordinate teams of specialized agents. They communicate, delegate, and collaborate to solve complex problems together.",
-    stats: { value: "1000x", label: "parallel execution" },
+    title: "Studio-Grade Voiceover",
+    description: "Synthesize actor voices via a local offline TTS microservice. Extracted audio duration automatically locks video rendering timecodes to prevent desync.",
+    stats: { value: "<2s", label: "vocal synthesis latency" },
   },
   {
     number: "04",
-    title: "Secure Sandboxing",
-    description: "Each agent runs in isolated environments. Full audit trails, encrypted execution, and zero data leakage between tasks.",
-    stats: { value: "0", label: "data breaches" },
+    title: "Local High-Fidelity Rendering",
+    description: "Render premium cinematic action shots locally. Quantized FP8 weights, CPU offload hooks, and VAE tiling prevent memory overflows.",
+    stats: { value: "24GB", label: "VRAM physical footprint" },
   },
 ];
 
@@ -174,7 +174,7 @@ export function FeaturesSection() {
               <p className={`text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}>
-                Deploy autonomous AI agents that execute complex tasks across distributed infrastructure. No supervision required.
+                Deploy cooperative AI agents to streamline your entire video production workflow, from draft screenplay to final cinematic rendering.
               </p>
             </div>
           </div>

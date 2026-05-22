@@ -215,13 +215,46 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
     return `🌐 ${parts[0].toUpperCase()}-${parts[1]?.toUpperCase() || ""}`;
   };
 
+  // --- LANG PRIORITY RESOLVER ---
+  const getLocalePriority = (locale: string): number => {
+    const l = locale.toLowerCase();
+    
+    // 1. English & Chinese -> Highest Priority
+    if (l.startsWith("zh") || l.startsWith("yue") || l.startsWith("wuu")) return 100;
+    if (l.startsWith("en")) return 90;
+    
+    // 2. Other common major languages -> Medium-High Priority
+    if (l === "ja-jp") return 80;
+    if (l === "ko-kr") return 80;
+    
+    // 3. European & major American languages -> Medium Priority
+    if (l === "de-de") return 70;
+    if (l === "fr-fr") return 70;
+    if (l.startsWith("es")) return 70;
+    if (l.startsWith("pt")) return 70;
+    if (l === "ru-ru") return 70;
+    
+    // 4. Other languages -> Low Priority
+    return 0;
+  };
+
   // --- DYNAMIC OPTION LISTS ---
   const localesWithCounts = useMemo(() => {
     const counts: { [key: string]: number } = {};
     initialVoices.forEach(v => { counts[v.locale] = (counts[v.locale] || 0) + 1; });
     return Object.entries(counts)
       .map(([code, count]) => ({ code, count, label: getLocaleLabel(code) }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => {
+        const priorityA = getLocalePriority(a.code);
+        const priorityB = getLocalePriority(b.code);
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA; // Higher priority first
+        }
+        if (b.count !== a.count) {
+          return b.count - a.count; // Sort by voice count descending
+        }
+        return a.code.localeCompare(b.code); // Stable alphabetical sort
+      });
   }, [initialVoices]);
 
   // --- STATISTICS ---
@@ -235,9 +268,9 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
     return { total, female, male };
   }, [initialVoices]);
 
-  // --- FILTERING LOGIC ---
+  // --- FILTERING & SORTING LOGIC ---
   const filteredVoices = useMemo(() => {
-    return initialVoices.filter(v => {
+    const filtered = initialVoices.filter(v => {
       const matchesSearch =
         v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         v.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -248,6 +281,19 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
       const matchesLocale = selectedLocale === "all" || v.locale === selectedLocale;
 
       return matchesSearch && matchesGender && matchesAge && matchesLocale;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const priorityA = getLocalePriority(a.locale);
+      const priorityB = getLocalePriority(b.locale);
+      if (priorityA !== priorityB) {
+        return priorityB - priorityA; // Higher priority first
+      }
+      const localeCompare = a.locale.localeCompare(b.locale);
+      if (localeCompare !== 0) {
+        return localeCompare; // Group by locale code alphabetically
+      }
+      return a.name.localeCompare(b.name); // Sort by voice name alphabetically
     });
   }, [initialVoices, searchQuery, selectedGender, selectedAge, selectedLocale]);
 

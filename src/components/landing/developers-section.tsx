@@ -4,20 +4,20 @@ import { useState, useEffect, useRef } from "react";
 
 const features = [
   { 
-    title: "TypeScript native", 
-    description: "Full type safety for agent configs and responses."
+    title: "Cooperative State", 
+    description: "Bidirectional synchronization of scripts, layout, and video assets via useAgent."
   },
   { 
-    title: "Streaming results", 
-    description: "Watch your agents think and act in real-time."
+    title: "A2UI Framework", 
+    description: "Watch the AI agent stream rich React components instead of text chat."
   },
   { 
-    title: "Multi-model support", 
-    description: "OpenAI, Anthropic, Mistral, or bring your own."
+    title: "VRAM-Safe Scheduling", 
+    description: "Quantized weights and CPU offloading keep huge 19B models under 24GB VRAM footprint."
   },
   { 
-    title: "Local debugging", 
-    description: "Test agents locally before deploying to cloud."
+    title: "Dual-Path Fallback", 
+    description: "Robust S3 Storage Client automatically cascading down to Local Files on error."
   },
 ];
 
@@ -71,9 +71,9 @@ export function DevelopersSection() {
             Developer SDK
           </span>
           <h2 className="text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9]">
-            Code your agents.
+            Code your pipelines.
             <br />
-            <span className="text-muted-foreground">Or let them code.</span>
+            <span className="text-muted-foreground">Or let agents build.</span>
           </h2>
         </div>
 
@@ -84,8 +84,7 @@ export function DevelopersSection() {
           }`}
         >
           <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-md">
-            A powerful SDK for building, deploying, and orchestrating AI agents. 
-            Define behaviors in code or natural language.
+            An industrial-grade collaborative video production workspace combining Next.js, LangGraph state-graphs, and CopilotKit integration.
           </p>
           <div className="grid grid-cols-2 gap-6">
             {features.map((feature, index) => (

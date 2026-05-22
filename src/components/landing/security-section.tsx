@@ -6,31 +6,31 @@ import { Shield, Lock, Eye, FileCheck } from "lucide-react";
 const securityFeatures = [
   {
     icon: Shield,
-    title: "Isolated execution",
-    description: "Each agent runs in its own secure sandbox.",
+    title: "Durable Interrupts",
+    description: "AI execution pauses at gate checkpoints, letting you edit screenplays before rendering.",
     image: "/images/isolated.jpg",
   },
   {
     icon: Lock,
-    title: "Encrypted memory",
-    description: "Data encrypted at rest and in transit.",
+    title: "Secure MinIO S3",
+    description: "Isolated containerized asset storage with automated MIME type streaming.",
     image: "/images/encrypted.jpg",
   },
   {
     icon: Eye,
-    title: "Full audit trails",
-    description: "Every action logged and inspectable.",
+    title: "State Version History",
+    description: "Fully inspect and rollback script drafts using LangGraph checkpointers.",
     image: "/images/audit.jpg",
   },
   {
     icon: FileCheck,
-    title: "Permission boundaries",
-    description: "Principle of least privilege by design.",
+    title: "Production Boundaries",
+    description: "Strict gateway separation between low-compute Design and high-compute Generation.",
     image: "/images/permissions.jpg",
   },
 ];
 
-const certifications = ["SOC 2", "ISO 27001", "HIPAA", "GDPR"];
+const certifications = ["LangGraph", "CopilotKit v2", "MinIO S3", "FastAPI"];
 
 export function SecuritySection() {
   const [isVisible, setIsVisible] = useState(false);
@@ -74,7 +74,7 @@ export function SecuritySection() {
           <h2 className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9] mb-12 transition-all duration-1000 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}>
-            Autonomous,
+            Cooperative,
             <br />
             <span className="text-muted-foreground">not uncontrolled.</span>
           </h2>
@@ -84,7 +84,7 @@ export function SecuritySection() {
             isVisible ? "opacity-100" : "opacity-0"
           }`}>
             <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">
-              Your agents are powerful but constrained. Enterprise-grade security ensures they only do what you allow.
+              Our human-in-the-loop (HITL) architecture ensures that critical video generation and high-compute tasks only run after your explicit approval.
             </p>
           </div>
         </div>

@@ -5,32 +5,32 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 
 const testimonials = [
   {
-    quote: "Our agents handle 80% of our customer support tickets autonomously. The ROI was immediate.",
+    quote: "Co-authoring screenplays with LangGraph and getting instant storyboards saved us days of pre-production.",
     author: "Sarah Chen",
-    role: "CTO",
-    company: "Meridian Labs",
-    metric: { value: "80%", label: "Ticket resolution" },
+    role: "Creative Director",
+    company: "Horizon Media",
+    metric: { value: "80%", label: "Pre-prod speedup" },
   },
   {
-    quote: "We deployed research agents that work 24/7. They surface insights we'd never find manually.",
+    quote: "The VRAM-optimized rendering pipeline generates breathtaking video keyframes directly in our local workstation.",
     author: "Marcus Webb",
-    role: "Head of Research",
-    company: "Flux Systems",
-    metric: { value: "10x", label: "Research output" },
+    role: "Lead Animator",
+    company: "Nexus Studio",
+    metric: { value: "10x", label: "Render efficiency" },
   },
   {
-    quote: "The multi-agent orchestration is incredible. Complex workflows that took weeks now run in hours.",
+    quote: "Perfect audio-to-video alignment out of the box. The dynamic frame-rate lock matching the TTS vocal track is a game-changer.",
     author: "Elena Rodriguez",
-    role: "VP Engineering",
-    company: "Beacon AI",
-    metric: { value: "40x", label: "Faster workflows" },
+    role: "Executive Producer",
+    company: "Zenith Films",
+    metric: { value: "Perfect", label: "Sync rate" },
   },
   {
-    quote: "Security was our biggest concern. The sandboxing and audit trails gave us full confidence.",
+    quote: "Deploying local MinIO S3 storage was seamless. Dual-path fallback guarantees we never lose high-fidelity raw renders.",
     author: "James Liu",
-    role: "CISO",
-    company: "Prism Analytics",
-    metric: { value: "0", label: "Security incidents" },
+    role: "IT Director",
+    company: "Alpha Video",
+    metric: { value: "Zero", label: "Asset loss" },
   },
 ];
 
