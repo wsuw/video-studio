@@ -6,7 +6,7 @@ import requests
 from typing import Optional, List
 from dotenv import load_dotenv
 
-from storage_minio import get_storage_client, S3StorageClient, LocalStorageClient
+from minio import get_storage_client, S3StorageClient
 
 
 # Ensure script dir is in sys.path

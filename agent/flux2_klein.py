@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from diffusers import Flux2KleinPipeline
-from storage_minio import get_storage_client, LocalStorageClient, S3StorageClient
+from minio import get_storage_client, LocalStorageClient, S3StorageClient
 
 app = FastAPI(title="Flux.2 Klein Model Server")
 
