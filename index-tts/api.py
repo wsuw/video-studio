@@ -257,7 +257,17 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
                 detail="Inference ran but output WAV file was not generated.",
             )
 
-        logger.info(f"Synthesis successful! Audio saved to {output_path}")
+        # 5. 计算音频时长（秒）
+        import wave
+        duration = 0.0
+        try:
+            with wave.open(output_path, 'rb') as wav_file:
+                frames = wav_file.getnframes()
+                rate = wav_file.getframerate()
+                if rate > 0:
+                    duration = float(frames) / float(rate)
+        except Exception as e:
+            logger.error(f"Failed to calculate WAV duration: {e}")
 
         # 上传到 MinIO / 本地存储，返回公开 URL
         storage_client = get_storage_client()
@@ -272,6 +282,7 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
             "status": "success",
             "url": url,
             "filename": filename,
+            "duration": round(duration, 3),
         }
 
     except Exception as e:

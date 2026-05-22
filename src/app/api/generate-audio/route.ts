@@ -13,6 +13,7 @@ interface TtsApiResult {
   status: string;
   url: string;
   filename: string;
+  duration?: number;
 }
 
 // ── WAV 工具函数 ───────────────────────────────────────────
@@ -112,9 +113,18 @@ async function callTts(url: string, payload: Record<string, unknown>): Promise<T
   return res.json() as Promise<TtsApiResult>;
 }
 
-/** 从 TTS 返回的 url 下载 WAV buffer（兼容相对路径和 MinIO 绝对路径） */
+/** 从 TTS 返回的 url 下载 WAV buffer（自动将公网 MinIO 域名替换为局域网 Endpoint 域名以绕过 403 限制） */
 async function fetchAudioBuffer(audioUrl: string, serverBase: string): Promise<Buffer> {
-  const full = audioUrl.startsWith("http") ? audioUrl : `${serverBase}${audioUrl}`;
+  let full = audioUrl.startsWith("http") ? audioUrl : `${serverBase}${audioUrl}`;
+  
+  const publicUrl = process.env.STORAGE_S3_PUBLIC_URL;
+  const s3Endpoint = process.env.STORAGE_S3_ENDPOINT || "http://127.0.0.1:9000";
+  
+  if (publicUrl && full.startsWith(publicUrl)) {
+    full = full.replace(publicUrl, s3Endpoint);
+    console.log(`[Audio API] S3 public URL translated to local endpoint: ${full}`);
+  }
+
   const res = await fetch(full);
   if (!res.ok) throw new Error(`Failed to download audio from ${full}: ${res.statusText}`);
   return Buffer.from(await res.arrayBuffer());
@@ -211,7 +221,13 @@ export async function POST(req: Request) {
         interval_silence,
       });
 
-      audioBuffer = await fetchAudioBuffer(result.url, ttsServerBase);
+      // 直接将 Python 产生并上传至存储的公网链接及算好的时长返回给前端，免去下载缓存环路！
+      console.log(`[Audio API] Single-speaker direct URL returned: ${result.url} (${result.duration || 0}s)`);
+      return NextResponse.json({
+        status: "success",
+        url: result.url,
+        duration: result.duration || 0,
+      });
     } else {
       // ── 多人路径：逐 turn 合成后 PCM 拼接 ─────────────────
       const pcmSegments: Buffer[] = [];

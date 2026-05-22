@@ -46,7 +46,7 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
   const playingIdRef = useRef<string | null>(null);
 
   // --- SYNTHESIS PANEL STATE ---
-  const [synthText, setSynthText] = useState("Hello! This is a test of the voice synthesis system. How does it sound?");
+  const [synthText, setSynthText] = useState("Hello! This is a test of the next-generation neural voice synthesis system. It is designed to create highly expressive, lifelike, and natural voiceovers from text in real time. How does it sound to you?");
   const [synthStatus, setSynthStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [synthError, setSynthError] = useState<string | null>(null);
   const [synthAudioUrl, setSynthAudioUrl] = useState<string | null>(null);
@@ -448,7 +448,7 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
       </div>
 
       {/* MAIN: VOICE GRID + SYNTHESIS PANEL */}
-      <div className="flex gap-6 items-start">
+      <div className="flex gap-6">
         {/* LEFT: VOICE GRID */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {displayedVoices.length > 0 ? (
@@ -610,9 +610,10 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
           )}
         </div>
 
-        {/* RIGHT: SYNTHESIS PANEL (sticky) */}
-        <div className="w-[340px] shrink-0 sticky top-4">
-          {selectedVoice ? (
+        {/* RIGHT: SYNTHESIS PANEL */}
+        <div className="w-[340px] shrink-0">
+          <div className="sticky top-6 space-y-4">
+            {selectedVoice ? (
             <Card className="border border-border/80 rounded-2xl overflow-hidden shadow-lg bg-card">
               {/* Panel Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 bg-gradient-to-r from-primary/5 to-indigo-500/5">
@@ -812,6 +813,7 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
               </div>
             </Card>
           )}
+          </div>
         </div>
       </div>
     </div>

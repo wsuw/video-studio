@@ -32,7 +32,7 @@ export default function VoicesPage() {
         <SiteHeader title="Voice Library" />
 
         {/* Main Content Area: Dynamic Glassmorphic Showcase */}
-        <div className="flex-1 overflow-y-auto bg-slate-50/60 dark:bg-zinc-950/40 p-4 md:p-8 lg:p-10">
+        <div className="flex-1 bg-slate-50/60 dark:bg-zinc-950/40 p-4 md:p-8 lg:p-10">
           <div className="max-w-7xl mx-auto space-y-6">
             <VoiceViewer initialVoices={voices} />
           </div>
