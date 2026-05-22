@@ -1,0 +1,57 @@
+{
+  "nav": {
+    "features": "Features",
+    "workflow": "Workflow",
+    "infra": "Render Cloud",
+    "integrations": "Integrations",
+    "security": "Brand Safety",
+    "signin": "Sign in",
+    "launch": "Launch Studio"
+  },
+  "hero": {
+    "eyebrow": "Cooperative AI video production workspace",
+    "title1": "Distributed rendering,",
+    "title2": "agents that",
+    "words": ["script", "storyboard", "voiceover", "render"],
+    "stat1": "high-fidelity frames generated",
+    "stat2": "audio-to-video alignment",
+    "stat3": "average Stage-1 render time"
+  },
+  "studio": {
+    "projects": "Projects",
+    "dataLibrary": "Data Library",
+    "voices": "Voices",
+    "docs": "Documentation",
+    "newProject": "New Project",
+    "search": "Search projects..."
+  },
+  "workspace": {
+    "backToStudio": "Back to Studio",
+    "design": "Design",
+    "generation": "Generation",
+    "redesign": "Redesign",
+    "distribution": "Distribution",
+    "script": "Script",
+    "breakdown": "Breakdown",
+    "storyboard": "Storyboard",
+    "style": "Style",
+    "voiceover": "Voiceover",
+    "video": "Video",
+    "keyframes": "Keyframes",
+    "correction": "Correction",
+    "review": "Review",
+    "timeline": "Timeline",
+    "export": "Export",
+    "viewProject": "View Project",
+    "shareProject": "Share Project",
+    "deleteProject": "Delete Project",
+    "more": "More"
+  },
+  "auth": {
+    "login": "Sign In",
+    "signup": "Sign Up",
+    "email": "Email Address",
+    "password": "Password",
+    "submit": "Submit"
+  }
+}

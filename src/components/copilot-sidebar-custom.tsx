@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { BotIcon, PanelRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { WorkspaceContext } from "@/app/workspace/[projectId]/layout";
+import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout";
 
 export function CopilotSidebarCustom() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);

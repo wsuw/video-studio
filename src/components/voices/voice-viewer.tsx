@@ -27,7 +27,6 @@ interface VoiceViewerProps {
   initialVoices: Voice[];
 }
 
-const INDEXTTS_API = "http://localhost:8000";
 
 export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
   // --- FILTER STATE ---
@@ -144,29 +143,33 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
       use_emo_text: useEmoText,
       use_random: false,
       interval_silence: 200,
+      sceneId: "preview",
     };
     if (useEmoText && emoText.trim()) {
       body.emo_text = emoText;
     }
 
     try {
-      const res = await fetch(`${INDEXTTS_API}/synthesize`, {
+      const res = await fetch("/api/generate-audio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({ detail: "Unknown error" }));
-        throw new Error(errData.detail || `HTTP ${res.status}`);
+        const errData = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
       }
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setSynthAudioUrl(url);
+      const data = await res.json();
+      if (data.error || data.status !== "success") {
+        throw new Error(data.error || "Audio synthesis failed");
+      }
+
+      setSynthAudioUrl(data.url);
       setSynthStatus("success");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to connect to IndexTTS2 API (localhost:8000)";
+      const message = err instanceof Error ? err.message : "Failed to synthesize voiceover with local model server";
       setSynthError(message);
       setSynthStatus("error");
     }
@@ -190,29 +193,32 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
   };
 
   // --- LANG RESOLVER ---
-  const getLocaleLabel = (code: string) => {
-    const special: { [key: string]: string } = {
-      "zh-CN": "🇨🇳 Chinese (Mandarin)",
-      "zh-HK": "🇭🇰 Chinese (Cantonese HK)",
-      "zh-TW": "🇹🇼 Chinese (Taiwanese)",
-      "wuu-CN": "🇨🇳 Wu Chinese (Shanghainese)",
-      "yue-CN": "🇨🇳 Cantonese (Mainland)",
-      "en-US": "🇺🇸 English (US)",
-      "en-GB": "🇬🇧 English (UK)",
-      "ja-JP": "🇯🇵 Japanese",
-      "ko-KR": "🇰🇷 Korean",
-      "de-DE": "🇩🇪 German",
-      "fr-FR": "🇫🇷 French",
-      "es-ES": "🇪🇸 Spanish (Spain)",
-      "es-MX": "🇲🇽 Spanish (Mexico)",
-      "en-AU": "🇦🇺 English (Australia)",
-      "en-IN": "🇮🇳 English (India)",
-      "pt-BR": "🇧🇷 Portuguese (Brazil)",
-      "ru-RU": "🇷🇺 Russian",
+  const getLocaleInfo = (code: string): { flag: string; name: string } => {
+    const special: { [key: string]: { flag: string; name: string } } = {
+      "zh-CN": { flag: "🇨🇳", name: "Chinese (Mandarin)" },
+      "zh-HK": { flag: "🇭🇰", name: "Chinese (Cantonese HK)" },
+      "zh-TW": { flag: "🇹🇼", name: "Chinese (Taiwanese)" },
+      "wuu-CN": { flag: "🇨🇳", name: "Wu Chinese (Shanghainese)" },
+      "yue-CN": { flag: "🇨🇳", name: "Cantonese (Mainland)" },
+      "en-US": { flag: "🇺🇸", name: "English (US)" },
+      "en-GB": { flag: "🇬🇧", name: "English (UK)" },
+      "ja-JP": { flag: "🇯🇵", name: "Japanese" },
+      "ko-KR": { flag: "🇰🇷", name: "Korean" },
+      "de-DE": { flag: "🇩🇪", name: "German" },
+      "fr-FR": { flag: "🇫🇷", name: "French" },
+      "es-ES": { flag: "🇪🇸", name: "Spanish (Spain)" },
+      "es-MX": { flag: "🇲🇽", name: "Spanish (Mexico)" },
+      "en-AU": { flag: "🇦🇺", name: "English (Australia)" },
+      "en-IN": { flag: "🇮🇳", name: "English (India)" },
+      "pt-BR": { flag: "🇧🇷", name: "Portuguese (Brazil)" },
+      "ru-RU": { flag: "🇷🇺", name: "Russian" },
     };
     if (code in special) return special[code];
     const parts = code.split("-");
-    return `🌐 ${parts[0].toUpperCase()}-${parts[1]?.toUpperCase() || ""}`;
+    return {
+      flag: "🌐",
+      name: `${parts[0].toUpperCase()}-${parts[1]?.toUpperCase() || ""}`
+    };
   };
 
   // --- LANG PRIORITY RESOLVER ---
@@ -243,7 +249,10 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
     const counts: { [key: string]: number } = {};
     initialVoices.forEach(v => { counts[v.locale] = (counts[v.locale] || 0) + 1; });
     return Object.entries(counts)
-      .map(([code, count]) => ({ code, count, label: getLocaleLabel(code) }))
+      .map(([code, count]) => {
+        const info = getLocaleInfo(code);
+        return { code, count, label: `${info.flag} ${info.name}` };
+      })
       .sort((a, b) => {
         const priorityA = getLocalePriority(a.code);
         const priorityB = getLocalePriority(b.code);
@@ -486,7 +495,7 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
                             {voice.locale}
                           </span>
                           <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/10">
-                            {getLocaleLabel(voice.locale).substring(3)}
+                            {getLocaleInfo(voice.locale).name}
                           </span>
                         </div>
 
@@ -636,7 +645,7 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-foreground truncate">{selectedVoice.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{getLocaleLabel(selectedVoice.locale).substring(3)}</p>
+                    <p className="text-xs text-muted-foreground truncate">{getLocaleInfo(selectedVoice.locale).name}</p>
                   </div>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted border text-muted-foreground shrink-0">
                     {selectedVoice.locale}

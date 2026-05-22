@@ -1,0 +1,57 @@
+{
+  "nav": {
+    "features": "核心特性",
+    "workflow": "协作流",
+    "infra": "渲染云",
+    "integrations": "集成生态",
+    "security": "安全合规",
+    "signin": "登录",
+    "launch": "启动控制台"
+  },
+  "hero": {
+    "eyebrow": "协同式 AI 视频生产工作空间",
+    "title1": "分布式渲染，",
+    "title2": "代理负责",
+    "words": ["撰写剧本", "绘制分镜", "录制配音", "执行渲染"],
+    "stat1": "已生成的高保真画幅",
+    "stat2": "音视频对齐精度",
+    "stat3": "平均第一阶段渲染时间"
+  },
+  "studio": {
+    "projects": "我的项目",
+    "dataLibrary": "资产库",
+    "voices": "声音库",
+    "docs": "技术文档",
+    "newProject": "新建项目",
+    "search": "搜索项目..."
+  },
+  "workspace": {
+    "backToStudio": "返回控制台",
+    "design": "创意设计",
+    "generation": "渲染生成",
+    "redesign": "重塑修改",
+    "distribution": "分发导出",
+    "script": "脚本设计",
+    "breakdown": "剧本拆解",
+    "storyboard": "分镜绘制",
+    "style": "视觉风格",
+    "voiceover": "音轨配音",
+    "video": "视频渲染",
+    "keyframes": "关键帧",
+    "correction": "智能纠偏",
+    "review": "版本评审",
+    "timeline": "时间轴",
+    "export": "打包导出",
+    "viewProject": "查看项目",
+    "shareProject": "分享项目",
+    "deleteProject": "删除项目",
+    "more": "更多"
+  },
+  "auth": {
+    "login": "登录",
+    "signup": "注册账号",
+    "email": "邮箱地址",
+    "password": "密码",
+    "submit": "提交"
+  }
+}

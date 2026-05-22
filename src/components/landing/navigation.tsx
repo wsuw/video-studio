@@ -3,18 +3,26 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
-
-const navLinks = [
-  { name: "Features", href: "#features" },
-  { name: "Workflow", href: "#how-it-works" },
-  { name: "Render Cloud", href: "#infra" },
-  { name: "Integrations", href: "#integrations" },
-  { name: "Brand Safety", href: "#security" },
-];
+import { useRouter, usePathname } from "next/navigation";
+import { useTranslation } from "@/components/i18n/translation-provider";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 
 export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const { t, locale } = useTranslation();
+
+  const navLinks = [
+    { name: t("nav.features", "Features"), href: "#features" },
+    { name: t("nav.workflow", "Workflow"), href: "#how-it-works" },
+    { name: t("nav.infra", "Render Cloud"), href: "#infra" },
+    { name: t("nav.integrations", "Integrations"), href: "#integrations" },
+    { name: t("nav.security", "Brand Safety"), href: "#security" },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,6 +31,13 @@ export function Navigation() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleLanguageChange = (newLocale: string) => {
+    const segments = pathname.split("/");
+    segments[1] = newLocale; // Replace current locale segment (e.g. segments[1] is 'en' or 'zh')
+    const newPath = segments.join("/");
+    router.push(newPath);
+  };
 
   return (
     <header
@@ -48,7 +63,7 @@ export function Navigation() {
           </a>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-12">
+          <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <a
                 key={link.name}
@@ -61,17 +76,19 @@ export function Navigation() {
             ))}
           </div>
 
-          {/* Desktop CTA */}
+          {/* Desktop CTA & Language Switcher */}
           <div className="hidden md:flex items-center gap-4">
-            <a href="/login" className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}>
-              Sign in
+            <LanguageSwitcher isDark={!isScrolled} />
+
+            <a href={`/${locale}/login`} className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}>
+              {t("nav.signin", "Sign in")}
             </a>
-            <a href="/studio">
+            <a href={`/${locale}/studio`}>
               <Button
                 size="sm"
                 className={`rounded-full transition-all duration-500 ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"}`}
               >
-                Launch Studio
+                {t("nav.launch", "Launch Studio")}
               </Button>
             </a>
           </div>
@@ -117,6 +134,27 @@ export function Navigation() {
                 {link.name}
               </a>
             ))}
+
+            {/* Mobile Language Toggle */}
+            <div
+              className={`flex items-center gap-4 mt-4 transition-all duration-500 ${isMobileMenuOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
+              style={{ transitionDelay: isMobileMenuOpen ? `${navLinks.length * 75}ms` : "0ms" }}
+            >
+              <Button
+                variant={locale === "en" ? "default" : "outline"}
+                onClick={() => handleLanguageChange("en")}
+                className="rounded-full flex-1"
+              >
+                English
+              </Button>
+              <Button
+                variant={locale === "zh" ? "default" : "outline"}
+                onClick={() => handleLanguageChange("zh")}
+                className="rounded-full flex-1"
+              >
+                简体中文
+              </Button>
+            </div>
           </div>
 
           {/* Bottom CTAs */}
@@ -124,21 +162,21 @@ export function Navigation() {
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-4"
             }`}
-            style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
+            style={{ transitionDelay: isMobileMenuOpen ? "350ms" : "0ms" }}
           >
-            <a href="/login" className="flex-1" onClick={() => setIsMobileMenuOpen(false)}>
+            <a href={`/${locale}/login`} className="flex-1" onClick={() => setIsMobileMenuOpen(false)}>
               <Button
                 variant="outline"
                 className="w-full rounded-full h-14 text-base"
               >
-                Sign in
+                {t("nav.signin", "Sign in")}
               </Button>
             </a>
-            <a href="/studio" className="flex-1" onClick={() => setIsMobileMenuOpen(false)}>
+            <a href={`/${locale}/studio`} className="flex-1" onClick={() => setIsMobileMenuOpen(false)}>
               <Button
                 className="w-full bg-foreground text-background rounded-full h-14 text-base"
               >
-                Launch Studio
+                {t("nav.launch", "Launch Studio")}
               </Button>
             </a>
           </div>

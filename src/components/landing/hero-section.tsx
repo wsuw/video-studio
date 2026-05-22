@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-
-const words = ["script", "storyboard", "voiceover", "render"];
+import { useTranslation } from "@/components/i18n/translation-provider";
 
 function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   const letters = word.split("");
@@ -107,6 +106,14 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
 export function HeroSection() {
   const [isVisible, setIsVisible] = useState(false);
   const [wordIndex, setWordIndex] = useState(0);
+  const { t } = useTranslation();
+
+  const words = [
+    t("hero.words.0", "script"),
+    t("hero.words.1", "storyboard"),
+    t("hero.words.2", "voiceover"),
+    t("hero.words.3", "render")
+  ];
 
   useEffect(() => {
     setIsVisible(true);
@@ -117,7 +124,7 @@ export function HeroSection() {
       setWordIndex((prev) => (prev + 1) % words.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, []);
+  }, [words.length]);
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center items-start overflow-hidden bg-black">
@@ -174,7 +181,7 @@ export function HeroSection() {
         >
           <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
             <span className="w-8 h-px bg-white/30" />
-            Cooperative AI video production workspace
+            {t("hero.eyebrow", "Cooperative AI video production workspace")}
           </span>
         </div>
         
@@ -185,11 +192,11 @@ export function HeroSection() {
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
           >
-            <span className="block whitespace-nowrap">Distributed rendering,</span>
-            <span className="block whitespace-nowrap">
-              agents that{" "}
+            <span className="block">{t("hero.title1", "Distributed rendering,")}</span>
+            <span className="block">
+              {t("hero.title2", "agents that")}{" "}
               <span className="relative inline-block">
-                <BlurWord word={words[wordIndex]} trigger={wordIndex} />
+                <BlurWord word={words[wordIndex] || ""} trigger={wordIndex} />
               </span>
             </span>
           </h1>
@@ -205,9 +212,9 @@ export function HeroSection() {
       >
         <div className="max-w-[1400px] mx-auto flex items-start gap-10 lg:gap-20">
           {[
-            { value: "10,000+", label: "high-fidelity frames generated" },
-            { value: "99.8%", label: "audio-to-video alignment" },
-            { value: "~110s", label: "average Stage-1 render time" },
+            { value: "10,000+", label: t("hero.stat1", "high-fidelity frames generated") },
+            { value: "99.8%", label: t("hero.stat2", "audio-to-video alignment") },
+            { value: "~110s", label: t("hero.stat3", "average Stage-1 render time") },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col gap-2">
               <span className="text-3xl lg:text-4xl font-display text-white">{stat.value}</span>
