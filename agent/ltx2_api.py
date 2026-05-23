@@ -52,15 +52,44 @@ def load_models():
     global pipe, upscale_pipe
     print("Loading LTX2 pipeline into memory…")
     start = time.time()
+
+    # 1. Load the main LTX2 pipeline with bfloat16
     pipe = LTX2Pipeline.from_pretrained(model_path, torch_dtype=torch.bfloat16)
-    pipe.enable_sequential_cpu_offload(device=device)
+
+    # 2. Enable FP8 Layerwise Casting for the main Transformer to compress weights from 38GB to 19GB
+    if hasattr(pipe, "transformer") and hasattr(
+        pipe.transformer, "enable_layerwise_casting"
+    ):
+        print("Enabling FP8 Layerwise Casting for LTX2 Transformer...")
+        pipe.transformer.enable_layerwise_casting(
+            storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
+        )
+
+    # 3. Load the Latent Upsampler Model
     latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
         model_path, subfolder="latent_upsampler", torch_dtype=torch.bfloat16
     )
+
+    # 4. Enable FP8 Layerwise Casting for the Latent Upsampler to save extra VRAM
+    if hasattr(latent_upsampler, "enable_layerwise_casting"):
+        print("Enabling FP8 Layerwise Casting for Latent Upsampler...")
+        latent_upsampler.enable_layerwise_casting(
+            storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
+        )
+
     upscale_pipe = LTX2LatentUpsamplePipeline(
         vae=pipe.vae, latent_upsampler=latent_upsampler
     )
+
+    # 5. Enable VAE Tiling to prevent VAE OOM during decoding
+    pipe.vae.enable_tiling()
+
+    # 6. Enable component-level CPU offload instead of slow layer-by-layer sequential offload.
+    # This keeps the active model component in GPU memory during computation (utilizing the 24GB VRAM),
+    # while automatically offloading idle components (like Text Encoder / VAE) to CPU.
+    pipe.enable_model_cpu_offload(device=device)
     upscale_pipe.enable_model_cpu_offload(device=device)
+
     print(f"Models loaded in {time.time() - start:.2f}s")
 
 
