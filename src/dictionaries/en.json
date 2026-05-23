@@ -21,6 +21,7 @@
     "projects": "Projects",
     "dataLibrary": "Data Library",
     "voices": "Voices",
+    "playground": "Playground",
     "docs": "Documentation",
     "newProject": "New Project",
     "search": "Search projects..."
@@ -53,5 +54,259 @@
     "email": "Email Address",
     "password": "Password",
     "submit": "Submit"
+  },
+  "features": {
+    "eyebrow": "Capabilities",
+    "title": "Intelligent",
+    "titleMuted": "workers.",
+    "description": "Deploy cooperative AI agents to streamline your entire video production workflow, from draft screenplay to final cinematic rendering.",
+    "item0": {
+      "title": "Cooperative Screenplay",
+      "description": "Write and edit scripts collaboratively with a LangGraph-powered AI assistant that understands narrative structure, character dynamics, and pacing.",
+      "statLabel": "faster pre-production"
+    },
+    "item1": {
+      "title": "LayoutGPT Storyboarding",
+      "description": "Automatically translate descriptive scene prose into precise 2D layout coordinates (x, y, w, h) for structural visual composition and framing.",
+      "statLabel": "framing control"
+    },
+    "item2": {
+      "title": "Studio-Grade Voiceover",
+      "description": "Synthesize actor voices via a local offline TTS microservice. Extracted audio duration automatically locks video rendering timecodes to prevent desync.",
+      "statLabel": "vocal synthesis latency"
+    },
+    "item3": {
+      "title": "Local High-Fidelity Rendering",
+      "description": "Render premium cinematic action shots locally. Quantized FP8 weights, CPU offload hooks, and VAE tiling prevent memory overflows.",
+      "statLabel": "VRAM physical footprint"
+    }
+  },
+  "howItWorks": {
+    "eyebrow": "Process",
+    "title1": "Design.",
+    "title2": "Narrate.",
+    "title3": "Render.",
+    "step0": {
+      "title": "Design",
+      "subtitle": "script & storyboard",
+      "description": "Co-create screenplays with our LangGraph agent. Structure scenes, define styles, and let LayoutGPT map out precise camera compositions."
+    },
+    "step1": {
+      "title": "Narrate",
+      "subtitle": "voices & duration",
+      "description": "Synthesize lifelike actor voices using local TTS models. The exact audio duration dynamically locks the target frame count for perfect alignment."
+    },
+    "step2": {
+      "title": "Render",
+      "subtitle": "local video diffusion",
+      "description": "Execute multi-stage rendering on your local GPU cluster. Watch the VRAM-optimized rendering engine bring your storyboard to life in ~110 seconds."
+    }
+  },
+  "infra": {
+    "eyebrow": "Render & storage architecture",
+    "title1": "Local speed,",
+    "title2": "S3 scale.",
+    "description": "VideoAgent runs models locally on your GPU workstations, utilizing high-performance offline FastAPI servers and a robust local MinIO S3 container.",
+    "renderingPort": "rendering port",
+    "renderPortDescription": "High-performance offline FastAPI gateway hosting quantized video diffusion.",
+    "s3Uptime": "Local MinIO S3 Uptime",
+    "ttsPort": "TTS Vocal Synthesizer Port",
+    "status": "operational",
+    "region0": { "name": "Local GPU Worker", "nodes": "Video Diffusion Server" },
+    "region1": { "name": "Local MinIO S3", "nodes": "S3 Object Storage" },
+    "region2": { "name": "TTS Audio Synthesizer", "nodes": "TTS Service (Port 8000)" },
+    "region3": { "name": "Next.js Web UI", "nodes": "Cooperative Workspace" }
+  },
+  "security": {
+    "eyebrow": "Security",
+    "title1": "Cooperative,",
+    "title2": "not uncontrolled.",
+    "description": "Our human-in-the-loop (HITL) architecture ensures that critical video generation and high-compute tasks only run after your explicit approval.",
+    "activeProtection": "Active protection",
+    "incidents": "Security incidents this year",
+    "feature0": {
+      "title": "Durable Interrupts",
+      "description": "AI execution pauses at gate checkpoints, letting you edit screenplays before rendering."
+    },
+    "feature1": {
+      "title": "Secure MinIO S3",
+      "description": "Isolated containerized asset storage with automated MIME type streaming."
+    },
+    "feature2": {
+      "title": "State Version History",
+      "description": "Fully inspect and rollback script drafts using LangGraph checkpointers."
+    },
+    "feature3": {
+      "title": "Production Boundaries",
+      "description": "Strict gateway separation between low-compute Design and high-compute Generation."
+    }
+  },
+  "developers": {
+    "eyebrow": "Developer SDK",
+    "title1": "Code your pipelines.",
+    "title2": "Or let agents build.",
+    "description": "An industrial-grade collaborative video production workspace combining Next.js, LangGraph state-graphs, and CopilotKit integration.",
+    "feature0": {
+      "title": "Cooperative State",
+      "description": "Bidirectional synchronization of scripts, layout, and video assets via useAgent."
+    },
+    "feature1": {
+      "title": "A2UI Framework",
+      "description": "Watch the AI agent stream rich React components instead of text chat."
+    },
+    "feature2": {
+      "title": "VRAM-Safe Scheduling",
+      "description": "Quantized weights and CPU offloading keep huge 19B models under 24GB VRAM footprint."
+    },
+    "feature3": {
+      "title": "Dual-Path Fallback",
+      "description": "Robust S3 Storage Client automatically cascading down to Local Files on error."
+    }
+  },
+  "metrics": {
+    "title1": "Real-time",
+    "title2": "render metrics.",
+    "metric0": {
+      "label": "Video frames generated today",
+      "sublabel": "across all local GPU workers"
+    },
+    "metric1": {
+      "label": "Temporal audio-to-video lock",
+      "sublabel": "perfect alignment rate"
+    },
+    "metric2": {
+      "label": "Average Stage-1 render time",
+      "sublabel": "p90 draft generation latency"
+    }
+  },
+  "integrations": {
+    "eyebrow": "Integrations",
+    "title1": "Connect",
+    "title2": "everything.",
+    "description": "Your agents connect to 100+ tools and services. They read, write, and act autonomously across your entire stack.",
+    "stat0Label": "Integrations",
+    "stat1Label": "Auth built-in",
+    "stat2Label": "Real-time sync",
+    "viewAll": "View all integrations"
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title1": "Pay for",
+    "title2": "results.",
+    "perMonth": "/month",
+    "custom": "Custom",
+    "billedAnnually": "billed annually",
+    "billedMonthly": "billed monthly",
+    "mostPopular": "Most Popular",
+    "compareAll": "Compare all features",
+    "badge0": "Local secure renders",
+    "badge1": "Durable checkpointers",
+    "badge2": "VRAM safe scheduling",
+    "plan0": {
+      "name": "Explorer",
+      "description": "For tinkering and individual creators",
+      "cta": "Start free",
+      "feature0": "1 active video project",
+      "feature1": "Stage-1 fast draft renders (~110s)",
+      "feature2": "Standard TTS voices",
+      "feature3": "Local filesystem storage",
+      "feature4": "LangGraph cooperative chat"
+    },
+    "plan1": {
+      "name": "Studio Pro",
+      "description": "For professional content studios",
+      "cta": "Start trial",
+      "feature0": "Unlimited active projects",
+      "feature1": "Stage-2 HD final renders",
+      "feature2": "Custom emotional TTS voices",
+      "feature3": "Local S3 MinIO storage support",
+      "feature4": "Storyboard LayoutGPT visualizer",
+      "feature5": "Automatic quality checker loop"
+    },
+    "plan2": {
+      "name": "Scale",
+      "description": "For commercial production agencies",
+      "cta": "Contact sales",
+      "feature0": "Dedicated local GPU clusters",
+      "feature1": "Custom model fine-tuning",
+      "feature2": "Multi-user shared workspace",
+      "feature3": "Full version history rollback",
+      "feature4": "Structural script exports",
+      "feature5": "24/7 priority pipeline support"
+    }
+  },
+  "testimonials": {
+    "eyebrow": "Testimonials",
+    "title1": "Trusted by teams",
+    "title2": "worldwide.",
+    "featuredCompanies": "Featured companies",
+    "item0": {
+      "quote": "Co-authoring screenplays with LangGraph and getting instant storyboards saved us days of pre-production.",
+      "author": "Sarah Chen",
+      "role": "Creative Director",
+      "company": "Horizon Media",
+      "metricValue": "80%",
+      "metricLabel": "Pre-prod speedup"
+    },
+    "item1": {
+      "quote": "The VRAM-optimized rendering pipeline generates breathtaking video keyframes directly in our local workstation.",
+      "author": "Marcus Webb",
+      "role": "Lead Animator",
+      "company": "Nexus Studio",
+      "metricValue": "10x",
+      "metricLabel": "Render efficiency"
+    },
+    "item2": {
+      "quote": "Perfect audio-to-video alignment out of the box. The dynamic frame-rate lock matching the TTS vocal track is a game-changer.",
+      "author": "Elena Rodriguez",
+      "role": "Executive Producer",
+      "company": "Zenith Films",
+      "metricValue": "Perfect",
+      "metricLabel": "Sync rate"
+    },
+    "item3": {
+      "quote": "Deploying local MinIO S3 storage was seamless. Dual-path fallback guarantees we never lose high-fidelity raw renders.",
+      "author": "James Liu",
+      "role": "IT Director",
+      "company": "Alpha Video",
+      "metricValue": "Zero",
+      "metricLabel": "Asset loss"
+    }
+  },
+  "cta": {
+    "title1": "Ready to co-create",
+    "title2": "with VideoAgent?",
+    "description": "Join content teams building cooperative scripts, emotional voiceovers, and premium cinematic renders in one unified workspace.",
+    "launch": "Launch Studio",
+    "demo": "Book a demo",
+    "footnote": "Free Explorer tier available with local rendering"
+  },
+  "footer": {
+    "tagline": "Industrial-grade collaborative video generation workspace powered by Next.js, LangGraph, and CopilotKit v2.",
+    "copyright": "© 2026 VIDEOAGENT. All rights reserved.",
+    "systemStatus": "All rendering systems operational",
+    "group0": "Product",
+    "group1": "Developers",
+    "group2": "Company",
+    "group3": "Legal",
+    "link_agentCapabilities": "Agent capabilities",
+    "link_howItWorks": "How it works",
+    "link_pricing": "Pricing",
+    "link_integrations": "Integrations",
+    "link_documentation": "Documentation",
+    "link_agentSdk": "Agent SDK",
+    "link_apiReference": "API Reference",
+    "link_status": "Status",
+    "link_about": "About",
+    "link_blog": "Blog",
+    "link_careers": "Careers",
+    "link_contact": "Contact",
+    "link_privacy": "Privacy",
+    "link_terms": "Terms",
+    "link_security": "Security",
+    "badge_hiring": "Hiring",
+    "social_twitter": "Twitter",
+    "social_github": "GitHub",
+    "social_linkedin": "LinkedIn"
   }
 }

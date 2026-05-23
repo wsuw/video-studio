@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 
 export async function POST(req: Request) {
   try {
@@ -10,28 +8,17 @@ export async function POST(req: Request) {
       height = 1024,
       width = 1024,
       guidance_scale = 1.0,
-      num_inference_steps = 4,
+      num_inference_steps = 8,
       seed = 0,
-      sceneId = "default"
     } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // Ensure public/images/outputs directory exists
-    const outputsDir = path.join(process.cwd(), "public", "images", "outputs");
-    if (!fs.existsSync(outputsDir)) {
-      fs.mkdirSync(outputsDir, { recursive: true });
-    }
-
-    // Generate a unique filename using sceneId, seed, and timestamp
-    const filename = `scene_${sceneId}_seed_${seed}_${Date.now()}.png`;
-    const absoluteOutputPath = path.join(outputsDir, filename);
-
     // Call the local Python Flux.2 Klein server on port 8124
     const fluxServerUrl = process.env.FLUX_SERVER_URL || "http://localhost:8124/generate";
-    console.log(`[API Proxy] Sending request to Flux.2 Klein Server... Path: ${absoluteOutputPath} (URL: ${fluxServerUrl})`);
+    console.log(`[API Proxy] Sending request to Flux.2 Klein Server... (URL: ${fluxServerUrl})`);
     const response = await fetch(fluxServerUrl, {
       method: "POST",
       headers: {
@@ -44,7 +31,6 @@ export async function POST(req: Request) {
         guidance_scale,
         num_inference_steps,
         seed,
-        output_path: absoluteOutputPath,
       }),
     });
 
@@ -60,12 +46,12 @@ export async function POST(req: Request) {
     const data = await response.json();
     console.log(`[API Proxy] Flux server generation success:`, data);
     
-    // Web-accessible URL for Next.js static files
-    const webUrl = `/images/outputs/${filename}`;
+    // The backend returns the complete URL directly in data.url
+    const url = data.url;
 
     return NextResponse.json({
       status: "success",
-      url: webUrl,
+      url: url,
       elapsed_seconds: data.elapsed_seconds,
     });
   } catch (error: any) {

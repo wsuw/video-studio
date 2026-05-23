@@ -1,26 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { match as matchLocale } from '@formatjs/intl-localematcher';
-import Negotiator from 'negotiator';
 
 const locales = ['en', 'zh'];
 const defaultLocale = 'en';
 
 function getLocale(request: NextRequest): string {
-  // Negotiator expects plain object headers
-  const negotiatorHeaders: Record<string, string> = {};
-  request.headers.forEach((value, key) => {
-    negotiatorHeaders[key] = value;
-  });
-
-  // Get languages from Negotiator
-  const languages = new Negotiator({ headers: negotiatorHeaders }).languages();
-
-  try {
-    return matchLocale(languages, locales, defaultLocale);
-  } catch (e) {
-    return defaultLocale;
-  }
+  return defaultLocale;
 }
 
 export function middleware(request: NextRequest) {

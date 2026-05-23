@@ -15,7 +15,7 @@ export function SiteHeader({ title = "Studio" }: SiteHeaderProps) {
           <SidebarTrigger className="-ml-1" />
           <Separator
             orientation="vertical"
-            className="mr-2 h-4"
+            className="mr-2 data-vertical:h-4 data-vertical:self-auto"
           />
           <h1 className="text-base font-medium">{title}</h1>
         </div>

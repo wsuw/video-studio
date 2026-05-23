@@ -1,6 +1,53 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import http from "http";
+import https from "https";
+
+export const maxDuration = 900; // 15 minutes execution limit
+
+function httpRequest(url: string, body: string, timeoutMs: number): Promise<{ statusCode?: number, body: string }> {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+      timeout: timeoutMs,
+    };
+
+    const client = parsedUrl.protocol === "https:" ? https : http;
+
+    const req = client.request(options, (res) => {
+      let responseBody = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        responseBody += chunk;
+      });
+      res.on("end", () => {
+        resolve({
+          statusCode: res.statusCode,
+          body: responseBody,
+        });
+      });
+    });
+
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error(`Connection timed out after ${timeoutMs}ms`));
+    });
+
+    req.write(body);
+    req.end();
+  });
+}
 
 export async function POST(req: Request) {
   try {
@@ -12,66 +59,50 @@ export async function POST(req: Request) {
       height = 512,
       num_frames = 121,
       frame_rate = 24.0,
-      num_inference_steps = 40,
+      num_inference_steps = 8,
       guidance_scale = 4.0,
       seed = 0,
-      sceneId = "default"
     } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // Ensure public/videos/outputs directory exists
-    const outputsDir = path.join(process.cwd(), "public", "videos", "outputs");
-    if (!fs.existsSync(outputsDir)) {
-      fs.mkdirSync(outputsDir, { recursive: true });
-    }
-
-    // Generate a unique filename using sceneId, seed, and timestamp
-    const filename = `scene_${sceneId}_seed_${seed}_${Date.now()}.mp4`;
-    const absoluteOutputPath = path.join(outputsDir, filename);
-
     // Call the local Python LTX-2 server on port 8125
     const ltxServerUrl = process.env.LTX_SERVER_URL || "http://localhost:8125/generate";
-    console.log(`[API Proxy] Sending request to LTX-2 Server... Path: ${absoluteOutputPath} (URL: ${ltxServerUrl})`);
-    const response = await fetch(ltxServerUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        negative_prompt,
-        width,
-        height,
-        num_frames,
-        frame_rate,
-        num_inference_steps,
-        guidance_scale,
-        seed,
-        output_path: absoluteOutputPath,
-      }),
+    console.log(`[API Proxy] Sending request to LTX-2 Server... (URL: ${ltxServerUrl})`);
+
+    const requestPayload = JSON.stringify({
+      prompt,
+      negative_prompt,
+      width,
+      height,
+      num_frames,
+      frame_rate,
+      num_inference_steps_stage1: num_inference_steps,
+      guidance_scale_stage1: guidance_scale,
+      seed,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[API Proxy] LTX-2 server returned status ${response.status}: ${errorText}`);
+    const result = await httpRequest(ltxServerUrl, requestPayload, 900000); // 15 minutes timeout
+
+    if (result.statusCode !== 200) {
+      console.error(`[API Proxy] LTX-2 server returned status ${result.statusCode}: ${result.body}`);
       return NextResponse.json(
-        { error: `Python model server error: ${errorText}` },
-        { status: response.status }
+        { error: `Python model server error: ${result.body}` },
+        { status: result.statusCode || 500 }
       );
     }
 
-    const data = await response.json();
+    const data = JSON.parse(result.body);
     console.log(`[API Proxy] LTX-2 server generation success:`, data);
     
-    // Web-accessible URL for Next.js static files
-    const webUrl = `/videos/outputs/${filename}`;
+    // The backend returns the complete URL directly in data.url
+    const url = data.url;
 
     return NextResponse.json({
       status: "success",
-      url: webUrl,
+      url: url,
       elapsed_seconds: data.elapsed_seconds,
     });
   } catch (error: any) {

@@ -32,7 +32,7 @@ export function LanguageSwitcher({ className = "", isDark = true }: LanguageSwit
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono border transition-all duration-300 ${
           isDark
             ? "border-white/10 hover:border-white/20 text-white/80 hover:text-white bg-white/5 hover:bg-white/10"
-            : "border-foreground/10 hover:border-foreground/20 text-foreground/80 hover:text-foreground bg-foreground/5 hover:bg-foreground/10"
+            : "border-border hover:bg-accent hover:text-accent-foreground bg-background text-foreground"
         }`}
       >
         <Languages className="w-3.5 h-3.5" />
@@ -48,15 +48,15 @@ export function LanguageSwitcher({ className = "", isDark = true }: LanguageSwit
             className={`absolute right-0 mt-2 w-32 rounded-xl border p-1.5 shadow-2xl backdrop-blur-xl z-50 transition-all duration-300 ${
               isDark
                 ? "bg-black/90 border-white/10 text-white"
-                : "bg-white/90 border-foreground/10 text-foreground"
+                : "bg-popover border-border text-popover-foreground"
             }`}
           >
             <button
               onClick={() => handleLanguageChange("en")}
               className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors duration-200 ${
                 locale === "en"
-                  ? isDark ? "bg-white/10 font-semibold text-white" : "bg-foreground/10 font-semibold text-foreground"
-                  : isDark ? "text-white/70 hover:bg-white/5 hover:text-white" : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                  ? isDark ? "bg-white/10 font-semibold text-white" : "bg-accent font-semibold text-accent-foreground"
+                  : isDark ? "text-white/70 hover:bg-white/5 hover:text-white" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
               }`}
             >
               English
@@ -65,8 +65,8 @@ export function LanguageSwitcher({ className = "", isDark = true }: LanguageSwit
               onClick={() => handleLanguageChange("zh")}
               className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors duration-200 ${
                 locale === "zh"
-                  ? isDark ? "bg-white/10 font-semibold text-white" : "bg-foreground/10 font-semibold text-foreground"
-                  : isDark ? "text-white/70 hover:bg-white/5 hover:text-white" : "text-foreground/70 hover:bg-foreground/5 hover:text-foreground"
+                  ? isDark ? "bg-white/10 font-semibold text-white" : "bg-accent font-semibold text-accent-foreground"
+                  : isDark ? "text-white/70 hover:bg-white/5 hover:text-white" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
               }`}
             >
               简体中文

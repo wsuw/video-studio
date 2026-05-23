@@ -16,7 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, Volume2 } from "lucide-react"
+import { LayoutDashboardIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, Settings2Icon, CircleHelpIcon, SearchIcon, DatabaseIcon, FileChartColumnIcon, FileIcon, CommandIcon, Volume2, Wand2 } from "lucide-react"
 
 const data = {
   user: {
@@ -42,10 +42,10 @@ const data = {
       ),
     },
     {
-      title: "Brand & Assets",
-      url: "/studio/data-library",
+      title: "Playground",
+      url: "/studio/playground",
       icon: (
-        <DatabaseIcon
+        <Wand2
         />
       ),
     },
@@ -93,9 +93,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       icon: <Volume2 />,
     },
     {
-      title: t("studio.dataLibrary", "Brand & Assets"),
-      url: `/${locale}/studio/data-library`,
-      icon: <DatabaseIcon />,
+      title: t("studio.playground", "Playground"),
+      url: `/${locale}/studio/playground`,
+      icon: <Wand2 />,
     },
   ];
 

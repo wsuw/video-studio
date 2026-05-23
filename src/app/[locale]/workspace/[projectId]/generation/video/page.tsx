@@ -28,7 +28,8 @@ import {
   Undo2Icon,
   LayersIcon,
   VideoIcon,
-  DownloadIcon
+  DownloadIcon,
+  Loader2
 } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
@@ -108,6 +109,37 @@ export default function VideoExecutionPage() {
   const [baseSeed, setBaseSeed] = useState<number>(0);
   const [negativePrompt, setNegativePrompt] = useState<string>("worst quality, inconsistent motion, blurry, jittery, distorted");
   const [stylePrompt, setStylePrompt] = useState<string>("");
+  const [downloadingIds, setDownloadingIds] = useState<Record<string, boolean>>({});
+
+  const handleDownload = async (url: string, defaultFilename: string, itemId: string) => {
+    setDownloadingIds(prev => ({ ...prev, [itemId]: true }));
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Network response was not ok");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = defaultFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast({
+        title: "📥 Download started",
+        description: "The video file download has started.",
+      });
+    } catch (error) {
+      console.error("Failed to download file directly:", error);
+      window.open(url, "_blank", "noopener,noreferrer");
+      toast({
+        title: "ℹ️ Link opened",
+        description: "Opening link in a new tab to download.",
+      });
+    } finally {
+      setDownloadingIds(prev => ({ ...prev, [itemId]: false }));
+    }
+  };
 
   // Load state on mount
   useEffect(() => {
@@ -491,12 +523,20 @@ export default function VideoExecutionPage() {
                           loop
                           className="w-full h-full object-cover"
                         />
-                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <a href={videoUrl} download={`scene_${scene.id}.mp4`}>
-                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-lg shadow-md">
+                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="icon"
+                            variant="secondary"
+                            className="h-8 w-8 rounded-lg shadow-md cursor-pointer disabled:opacity-50"
+                            onClick={() => handleDownload(videoUrl, `scene_${scene.id}.mp4`, scene.id)}
+                            disabled={downloadingIds[scene.id]}
+                          >
+                            {downloadingIds[scene.id] ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
                               <DownloadIcon className="w-4 h-4" />
-                            </Button>
-                          </a>
+                            )}
+                          </Button>
                         </div>
                       </div>
                     ) : isRendering ? (
