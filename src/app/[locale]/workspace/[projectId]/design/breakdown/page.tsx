@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils"
 import { getThreadState } from "@/lib/langgraph"
 import { v4 as uuidv4 } from "uuid"
 import { PRESET_VOICES } from "@/lib/preset-voices"
+import { VoiceSelectorDialog, Voice } from "@/components/voices/voice-selector-dialog"
 
 interface Entity {
   id: string;
@@ -74,7 +75,16 @@ export default function BreakdownPage() {
 
   // Real-time audition preview state
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
+  const [allVoices, setAllVoices] = useState<any[]>([]);
   const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
+
+  React.useEffect(() => {
+    fetch("/api/voices")
+      .then((res) => res.json())
+      .then((data) => setAllVoices(data))
+      .catch((err) => console.error("Failed to load voices:", err));
+  }, []);
 
   const playPreview = (voicePath: string, voiceId: string) => {
     if (audioPlayerRef.current) {
@@ -316,7 +326,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                       key={entity.id}
                       onClick={() => setSelectedEntityId(entity.id)}
                       className={cn(
-                        "relative group overflow-hidden border cursor-pointer transition-all duration-300 p-4 rounded-xl flex flex-col justify-between select-none h-40",
+                        "relative group overflow-hidden border cursor-pointer transition-all duration-300 p-4 rounded-xl select-none",
                         isSelected
                           ? cn("bg-background/80 shadow-md", config.activeBorder, config.activeBg)
                           : "border-border/60 bg-card hover:border-primary/20 hover:bg-muted/30"
@@ -358,14 +368,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                         </div>
                       </div>
 
-                      {/* Bottom Visual Reference Badge */}
-                      {entity.visual_reference && (
-                        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground relative z-10 self-start">
-                          <span className="font-mono px-1.5 py-0.5 rounded bg-muted/60 border border-border/40">
-                            Ref: {entity.visual_reference}
-                          </span>
-                        </div>
-                      )}
+
                     </Card>
                   );
                 })}
@@ -466,8 +469,8 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  className="text-xs font-bold h-6 px-2 w-full text-white border-white/25 hover:bg-white/10"
+                                  variant="ghost"
+                                  className="text-xs font-bold h-6 px-2 w-full text-white border border-white/25 bg-transparent hover:bg-white/10 hover:text-white"
                                   onClick={() => {
                                     const newRef = prompt("Enter Custom Image URL:", activeEntity.visual_reference);
                                     if (newRef !== null) {
@@ -508,112 +511,159 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                       </div>
 
                       {/* Character Voice Reference Selection */}
-                      {activeEntity.type === "character" && (
-                        <div className="space-y-4 shrink-0">
-                          <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                            <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
-                              Voice Casting Studio (声线克隆配音表)
-                            </label>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEntityUpdate(activeEntity.id, { voice_reference: "" })}
-                              className="h-7 px-2.5 text-xs text-destructive hover:bg-destructive/10 border-destructive/20 transition-all font-medium"
-                            >
-                              Clear / Mute
-                            </Button>
-                          </div>
+                      {activeEntity.type === "character" && (() => {
+                        const currentVoice = allVoices.find(v => v.sampleUrl === activeEntity.voice_reference) || PRESET_VOICES.find(v => v.path === activeEntity.voice_reference);
+                        const isCustomVoice = activeEntity.voice_reference && !currentVoice;
+                        const isVoicePlaying = currentVoice && playingVoiceId === currentVoice.id;
 
-                          {/* 12-Voice Preset Audition & Casting Grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[360px] overflow-y-auto pr-1">
-                            {PRESET_VOICES.map((voice) => {
-                              const isSelected = activeEntity.voice_reference === voice.path;
-                              const isPlaying = playingVoiceId === voice.id;
+                        const playVoicePreview = () => {
+                          if (!currentVoice) return;
+                          const path = currentVoice.sampleUrl || currentVoice.path;
+                          const id = currentVoice.id;
+                          
+                          let finalUrl = "";
+                          if (path.startsWith("examples/") || path.startsWith("presets/")) {
+                            finalUrl = `/api/preview-voice?path=${encodeURIComponent(path)}`;
+                          } else {
+                            const filename = path.split("/").pop();
+                            finalUrl = `/api/speech-samples/${filename}`;
+                          }
 
-                              return (
-                                <Card
-                                  key={voice.id}
-                                  onClick={() => handleEntityUpdate(activeEntity.id, { voice_reference: voice.path })}
-                                  className={cn(
-                                    "p-3 cursor-pointer transition-all border text-left relative group",
-                                    isSelected
-                                      ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20 shadow-sm"
-                                      : "border-border/60 hover:border-border hover:bg-muted/30"
-                                  )}
+                          if (audioPlayerRef.current) {
+                            audioPlayerRef.current.pause();
+                            if (playingVoiceId === id) {
+                              setPlayingVoiceId(null);
+                              return;
+                            }
+                          }
+
+                          const audio = new Audio(finalUrl);
+                          audioPlayerRef.current = audio;
+                          setPlayingVoiceId(id);
+                          audio.play().catch(err => {
+                            console.error("Audition playback failed:", err);
+                            setPlayingVoiceId(null);
+                          });
+                          audio.onended = () => {
+                            setPlayingVoiceId(null);
+                          };
+                        };
+
+                        return (
+                          <div className="space-y-4 shrink-0">
+                            <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                              <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
+                                Voice Casting (配音角色声线)
+                              </label>
+                              {activeEntity.voice_reference && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEntityUpdate(activeEntity.id, { voice_reference: "" })}
+                                  className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 border-destructive/20 transition-all font-medium"
                                 >
-                                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                                    <div className="space-y-1">
-                                      <h4 className={cn(
-                                        "text-xs font-bold transition-colors",
-                                        isSelected ? "text-primary" : "text-foreground"
-                                      )}>
-                                        {voice.name}
-                                      </h4>
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          "text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wider rounded border",
-                                          voice.gender === "Male" && "text-blue-500 border-blue-500/20 bg-blue-500/5",
-                                          voice.gender === "Female" && "text-pink-500 border-pink-500/20 bg-pink-500/5",
-                                          voice.gender === "Narrator" && "text-amber-500 border-amber-500/20 bg-amber-500/5",
-                                          voice.gender === "Special" && "text-purple-500 border-purple-500/20 bg-purple-500/5"
+                                  Mute / Clear
+                                </Button>
+                              )}
+                            </div>
+
+                            {/* Active Voice Card */}
+                            <div className="relative">
+                              <Card
+                                onClick={() => setIsVoiceDialogOpen(true)}
+                                className={cn(
+                                  "p-4 cursor-pointer transition-all border text-left relative group select-none shadow-sm",
+                                  activeEntity.voice_reference 
+                                    ? "border-primary/40 bg-primary/[0.02] hover:bg-primary/[0.04]"
+                                    : "border-dashed border-border/80 hover:border-primary/30 hover:bg-muted/10"
+                                )}
+                              >
+                                {activeEntity.voice_reference ? (
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-1.5 flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-xs font-bold text-foreground truncate">
+                                          {currentVoice ? currentVoice.name : "Custom Voice (自定义声线)"}
+                                        </h4>
+                                        {currentVoice && (
+                                          <Badge
+                                            variant="outline"
+                                            className={cn(
+                                              "text-[9px] px-1 py-0 font-semibold uppercase tracking-wider rounded border shrink-0",
+                                              currentVoice.gender?.toLowerCase() === "female" && "text-pink-500 border-pink-500/20 bg-pink-500/5",
+                                              currentVoice.gender?.toLowerCase() === "male" && "text-blue-500 border-blue-500/20 bg-blue-500/5",
+                                              currentVoice.gender?.toLowerCase() === "narrator" && "text-amber-500 border-amber-500/20 bg-amber-500/5",
+                                              currentVoice.gender?.toLowerCase() === "special" && "text-purple-500 border-purple-500/20 bg-purple-500/5"
+                                            )}
+                                          >
+                                            {currentVoice.gender}
+                                          </Badge>
                                         )}
-                                      >
-                                        {voice.gender}
-                                      </Badge>
+                                        {currentVoice?.locale && (
+                                          <Badge variant="outline" className="text-[9px] px-1 py-0 font-semibold uppercase tracking-wider rounded border text-indigo-500 border-indigo-500/20 bg-indigo-500/5 shrink-0">
+                                            {currentVoice.locale}
+                                          </Badge>
+                                        )}
+                                        {isCustomVoice && (
+                                          <Badge variant="outline" className="text-[9px] px-1 py-0 font-semibold uppercase tracking-wider rounded border text-emerald-500 border-emerald-500/20 bg-emerald-500/5 shrink-0">
+                                            Custom
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-muted-foreground leading-normal line-clamp-2">
+                                        {currentVoice ? currentVoice.description : activeEntity.voice_reference}
+                                      </p>
+                                      <div className="text-[10px] text-primary/70 font-semibold flex items-center gap-1 group-hover:text-primary transition-colors">
+                                        <SparklesIcon className="w-3 h-3" />
+                                        <span>Click to Change Voice</span>
+                                      </div>
                                     </div>
 
-                                    {/* Play Audition Preview Button */}
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        playPreview(voice.path, voice.id);
-                                      }}
-                                      className={cn(
-                                        "w-8 h-8 rounded-full border transition-all shrink-0 shadow-sm",
-                                        isPlaying
-                                          ? "bg-primary text-white border-primary animate-pulse"
-                                          : "bg-background/80 hover:bg-primary/10 border-border/80 text-muted-foreground hover:text-primary"
-                                      )}
-                                    >
-                                      {isPlaying ? (
-                                        <PauseIcon className="w-3.5 h-3.5 fill-current" />
-                                      ) : (
-                                        <PlayIcon className="w-3.5 h-3.5 ml-0.5 fill-current" />
-                                      )}
-                                    </Button>
+                                    {currentVoice && (
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          playVoicePreview();
+                                        }}
+                                        className={cn(
+                                          "w-8 h-8 rounded-full border transition-all shrink-0 shadow-sm",
+                                          isVoicePlaying
+                                            ? "bg-primary text-white border-primary animate-pulse"
+                                            : "bg-background/80 hover:bg-primary/10 border-border/80 text-muted-foreground hover:text-primary"
+                                        )}
+                                      >
+                                        {isVoicePlaying ? (
+                                          <PauseIcon className="w-3.5 h-3.5 fill-current" />
+                                        ) : (
+                                          <PlayIcon className="w-3.5 h-3.5 ml-0.5 fill-current" />
+                                        )}
+                                      </Button>
+                                    )}
                                   </div>
-                                  <p className="text-[11px] text-muted-foreground leading-normal line-clamp-2">
-                                    {voice.description}
-                                  </p>
-                                </Card>
-                              );
-                            })}
-                          </div>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center py-5 text-center text-muted-foreground group-hover:text-primary transition-colors">
+                                    <Volume2Icon className="w-5 h-5 mb-1.5 text-muted-foreground/45 group-hover:text-primary/60 transition-colors" />
+                                    <p className="text-xs font-bold">No Voice Casted</p>
+                                    <p className="text-[10px] opacity-75 mt-0.5">Click to choose a character voice</p>
+                                  </div>
+                                )}
+                              </Card>
 
-                          {/* Custom Path/URL Option */}
-                          <div className="space-y-2 pt-1 border-t border-border/40">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
-                                Custom Voice reference (克隆参考路径/URL)
-                              </span>
+                              {/* Reusable VoiceSelectorDialog component */}
+                              <VoiceSelectorDialog
+                                isOpen={isVoiceDialogOpen}
+                                onOpenChange={setIsVoiceDialogOpen}
+                                selectedVoiceUrl={activeEntity.voice_reference || null}
+                                onSelect={(voice) => {
+                                  handleEntityUpdate(activeEntity.id, { voice_reference: voice.sampleUrl });
+                                }}
+                              />
                             </div>
-                            <Input
-                              value={activeEntity.voice_reference && !PRESET_VOICES.some(v => v.path === activeEntity.voice_reference) ? activeEntity.voice_reference : ""}
-                              onChange={(e) => handleEntityUpdate(activeEntity.id, { voice_reference: e.target.value })}
-                              placeholder="Enter local relative path (e.g., examples/voice_01.wav) or remote audio URL"
-                              className="bg-background border-border/80 text-xs focus-visible:ring-primary/20 h-9"
-                            />
-                            {activeEntity.voice_reference && !PRESET_VOICES.some(v => v.path === activeEntity.voice_reference) && (
-                              <p className="text-[10px] text-emerald-500 font-semibold">
-                                ✓ Custom Voice Active: {activeEntity.voice_reference}
-                              </p>
-                            )}
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Visual Identity Profile Textarea */}
                       <div className="space-y-2 flex flex-col flex-1 min-h-[200px]">

@@ -116,10 +116,10 @@ async function callTts(url: string, payload: Record<string, unknown>): Promise<T
 /** 从 TTS 返回的 url 下载 WAV buffer（自动将公网 MinIO 域名替换为局域网 Endpoint 域名以绕过 403 限制） */
 async function fetchAudioBuffer(audioUrl: string, serverBase: string): Promise<Buffer> {
   let full = audioUrl.startsWith("http") ? audioUrl : `${serverBase}${audioUrl}`;
-  
+
   const publicUrl = process.env.STORAGE_S3_PUBLIC_URL;
   const s3Endpoint = process.env.STORAGE_S3_ENDPOINT || "http://127.0.0.1:9000";
-  
+
   if (publicUrl && full.startsWith(publicUrl)) {
     full = full.replace(publicUrl, s3Endpoint);
     console.log(`[Audio API] S3 public URL translated to local endpoint: ${full}`);
@@ -188,6 +188,7 @@ export async function POST(req: Request) {
       interval_silence = 200,
       sceneId = "default",
       character_voices = {} as Record<string, string>,
+      turns: clientTurns = null,
     } = await req.json();
 
     if (!text || !spk_audio_prompt) {
@@ -203,7 +204,9 @@ export async function POST(req: Request) {
     // 基础 TTS 参数（无需每次重复声明）
     const baseTtsPayload = { emo_audio_prompt, emo_alpha, emo_vector, use_emo_text, use_random };
 
-    const turns = parseDialogue(text, character_voices);
+    const turns = clientTurns && clientTurns.length > 0
+      ? clientTurns
+      : parseDialogue(text, character_voices);
     console.log(`[Audio API] ${turns.length} turn(s) parsed`);
 
     let audioBuffer: Buffer;
@@ -213,10 +216,16 @@ export async function POST(req: Request) {
       const { resolved, temp } = await resolveSpeakerPath(spk_audio_prompt);
       tempFiles.push(temp);
 
+      const singleTurn = turns[0];
+      const finalEmoVector = singleTurn?.emo_vector ?? emo_vector;
+      const finalEmoAlpha = singleTurn?.emo_alpha ?? emo_alpha;
+
       const result = await callTts(ttsServerUrl, {
         ...baseTtsPayload,
-        text,
+        text: singleTurn?.text ?? text,
         spk_audio_prompt: resolved,
+        emo_vector: finalEmoVector,
+        emo_alpha: finalEmoAlpha,
         emo_text,
         interval_silence,
       });
@@ -233,7 +242,12 @@ export async function POST(req: Request) {
       const pcmSegments: Buffer[] = [];
       let wavHeader: Buffer | null = null;
 
-      for (const { speaker, text: turnText } of turns) {
+      for (const turn of turns) {
+        const speaker = turn.speaker;
+        const turnText = turn.text;
+        const turnEmoVector = turn.emo_vector ?? emo_vector;
+        const turnEmoAlpha = turn.emo_alpha ?? emo_alpha;
+
         const voiceRef =
           character_voices[speaker] ??
           (speaker === "NARRATOR" ? "examples/voice_04.wav" : spk_audio_prompt);
@@ -247,6 +261,8 @@ export async function POST(req: Request) {
           ...baseTtsPayload,
           text: turnText,
           spk_audio_prompt: resolved,
+          emo_vector: turnEmoVector,
+          emo_alpha: turnEmoAlpha,
           emo_text: use_emo_text ? turnText : null,
           interval_silence: 0,
         });

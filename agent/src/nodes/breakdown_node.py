@@ -1,14 +1,16 @@
-import json
-from typing import Any, Annotated, List
+from typing import List
 from pydantic import BaseModel, Field
 from langchain.tools import tool, ToolRuntime
-from langgraph.prebuilt import InjectedState
 from langgraph.runtime import Runtime
 from src.state import AgentState, Entity
 from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
-from langchain.agents.middleware import after_model
+from langchain.agents.middleware import before_model, after_model
+from langchain_core.messages import SystemMessage
 from src.models import get_model, generate_image
+from typing import Any
+import os
+import json
 
 
 # ==========================================
@@ -98,7 +100,7 @@ def sync_breakdown_interceptor(
                     print(
                         f"[Breakdown Interceptor] Parsed: {len(entities)} entities. scenes will be processed in Storyboard node."
                     )  # Serialize entities safely to list of dicts for global state
-                    
+
                     # Load existing entities from state to prevent partial updates from wiping out other assets
                     existing_entities = []
                     design_state = state.get("design", {})
@@ -108,7 +110,11 @@ def sync_breakdown_interceptor(
                     # Construct lookup by ID for existing entities
                     existing_entities_dict = {}
                     for e in existing_entities:
-                        e_dict = e if isinstance(e, dict) else (e.dict() if hasattr(e, "dict") else dict(e))
+                        e_dict = (
+                            e
+                            if isinstance(e, dict)
+                            else (e.dict() if hasattr(e, "dict") else dict(e))
+                        )
                         eid = e_dict.get("id")
                         if eid:
                             existing_entities_dict[eid] = e_dict
@@ -116,12 +122,26 @@ def sync_breakdown_interceptor(
                     # Map and merge incoming entities
                     incoming_entities = []
                     for e in entities:
-                        e_dict = e if isinstance(e, dict) else (e.dict() if hasattr(e, "dict") else dict(e))
+                        e_dict = (
+                            e
+                            if isinstance(e, dict)
+                            else (e.dict() if hasattr(e, "dict") else dict(e))
+                        )
                         eid = e_dict.get("id")
                         if eid:
                             if eid in existing_entities_dict:
                                 merged = existing_entities_dict[eid].copy()
-                                merged.update(e_dict)
+                                # Merge selectively to avoid overwriting existing assets/media references with None or empty strings
+                                for k, v in e_dict.items():
+                                    if v is not None and v != "":
+                                        merged[k] = v
+                                    else:
+                                        if (
+                                            k not in merged
+                                            or merged[k] is None
+                                            or merged[k] == ""
+                                        ):
+                                            merged[k] = v
                                 existing_entities_dict[eid] = merged
                                 incoming_entities.append(merged)
                             else:
@@ -129,23 +149,36 @@ def sync_breakdown_interceptor(
                                 incoming_entities.append(e_dict)
 
                     # Determine final entities list
-                    if len(entities) < len(existing_entities) and len(existing_entities) > 0:
-                        print(f"[Breakdown Interceptor] Detected partial update ({len(entities)} incoming vs {len(existing_entities)} existing). Merging and preserving other entities.")
+                    if (
+                        len(entities) < len(existing_entities)
+                        and len(existing_entities) > 0
+                    ):
+                        print(
+                            f"[Breakdown Interceptor] Detected partial update ({len(entities)} incoming vs {len(existing_entities)} existing). Merging and preserving other entities."
+                        )
                         final_entities_to_process = []
                         seen_ids = set()
                         # Maintain original list order
                         for e in existing_entities:
-                            e_dict = e if isinstance(e, dict) else (e.dict() if hasattr(e, "dict") else dict(e))
+                            e_dict = (
+                                e
+                                if isinstance(e, dict)
+                                else (e.dict() if hasattr(e, "dict") else dict(e))
+                            )
                             eid = e_dict.get("id")
                             if eid in existing_entities_dict:
-                                final_entities_to_process.append(existing_entities_dict[eid])
+                                final_entities_to_process.append(
+                                    existing_entities_dict[eid]
+                                )
                                 seen_ids.add(eid)
                         # Add any new ones that weren't in existing_entities
                         for eid, e_dict in existing_entities_dict.items():
                             if eid not in seen_ids:
                                 final_entities_to_process.append(e_dict)
                     else:
-                        print(f"[Breakdown Interceptor] Detected full update or fresh extraction. Replacing list with incoming entities.")
+                        print(
+                            f"[Breakdown Interceptor] Detected full update or fresh extraction. Replacing list with incoming entities."
+                        )
                         final_entities_to_process = incoming_entities
 
                     # Automatically generate visual reference portraits in parallel for all extracted entities
@@ -164,9 +197,7 @@ def sync_breakdown_interceptor(
                                 f"[Auto Portrait] 🎨 Generating background portrait for {name} ({e_type})..."
                             )
                             try:
-                                url = generate_image(
-                                    style_prompt, e_type
-                                )
+                                url = generate_image(style_prompt, e_type)
                                 e_dict["visual_reference"] = url
                                 print(
                                     f"[Auto Portrait] ✅ Success: Linked background portrait {url} to {name}"
@@ -184,7 +215,9 @@ def sync_breakdown_interceptor(
                         max_workers=5
                     ) as executor:
                         final_entities = list(
-                            executor.map(process_entity_visual, final_entities_to_process)
+                            executor.map(
+                                process_entity_visual, final_entities_to_process
+                            )
                         )
 
                     result = {
@@ -221,9 +254,7 @@ def sync_breakdown_interceptor(
                     ):
                         entity_type = "location"
 
-                    selected_url = generate_image(
-                        style_prompt, entity_type
-                    )
+                    selected_url = generate_image(style_prompt, entity_type)
 
                     design = state.get("design", {})
                     entities = design.get("entities", [])
@@ -256,98 +287,108 @@ def sync_breakdown_interceptor(
 
 
 # ==========================================
-# 3. Define Breakdown Agent
+# 3. Dynamic System Prompt (reads live state)
 # ==========================================
-model = get_model(parallel_tool_calls=True)
+
+# Statically resolve and load voices at module load time to prevent blocking event loop at runtime
+_VOICES_LIST: list = []
+
+try:
+    _candidates = [
+        os.path.join(os.getcwd(), "speech-samples", "_voices_local.json"),
+        os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "speech-samples",
+            "_voices_local.json",
+        ),
+        os.path.join(os.getcwd(), "..", "speech-samples", "_voices_local.json"),
+    ]
+    _resolved_path = None
+    for _p in _candidates:
+        if os.path.exists(_p):
+            _resolved_path = _p
+            break
+    if _resolved_path:
+        with open(_resolved_path, "r", encoding="utf-8") as _f:
+            _VOICES_LIST = json.load(_f)
+except Exception as _ex:
+    print(f"[breakdown] Failed to eagerly load voices at startup: {_ex}")
 
 
-# New tool to fetch the current script from the state
-@tool
-def get_script(state: Annotated[dict, InjectedState] = None) -> str:
-    """Return the current script stored in design.script."""
-    print(f"[get_script] 🟢 Tool execution started. State type: {type(state)}")
-    try:
-        if state is None:
-            print(
-                "[get_script] ⚠️ Warning: injected state is None. Returning empty script."
-            )
-            return ""
+def _load_voices() -> list:
+    """Return the cached voices list loaded eagerly at module load time."""
+    return _VOICES_LIST
 
-        print(
-            f"[get_script] State keys: {list(state.keys()) if hasattr(state, 'keys') else 'No keys method'}"
+
+# ==========================================
+# 3. Dynamic Prompt Injection (Middleware)
+# ==========================================
+@before_model
+def inject_dynamic_prompt(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
+    """
+    [Dynamic Context Sentinel] Injects the complete combined system prompt (static + dynamic script context)
+    into the conversation messages history prior to calling the LLM.
+    """
+    design = state.get("design", {}) or {}
+    script = design.get("script", "")
+    entities = design.get("entities", [])
+
+    # Format entities
+    entities_lines = ""
+    for idx, ent in enumerate(entities):
+        e_dict = (
+            ent
+            if isinstance(ent, dict)
+            else (ent.dict() if hasattr(ent, "dict") else dict(ent))
         )
+        eid = e_dict.get("id", f"e{idx + 1}")
+        name = e_dict.get("name", "Unnamed")
+        etype = e_dict.get("type", "character")
+        desc = e_dict.get("description", "")
+        entities_lines += (
+            f"- [{etype.upper()}] ID: {eid}, Name: {name}, Description: {desc}\n"
+        )
+    if not entities_lines:
+        entities_lines = "None (No entities extracted yet)"
 
-        design = {}
-        if isinstance(state, dict):
-            design = state.get("design", {})
-        elif hasattr(state, "get"):
-            design = state.get("design", {})
-        else:
-            print(
-                f"[get_script] ⚠️ Warning: state is not a dict or dict-like. state={state}"
-            )
+    # Format voices
+    voices_lines = ""
+    for v in _load_voices():
+        voices_lines += f"- ID: {v.get('id')} | Name: {v.get('name')} ({v.get('gender')}, {v.get('ageGroup', 'Adult')})\n"
+    if not voices_lines:
+        voices_lines = "No voices available in index."
 
-        script = design.get("script", "") if isinstance(design, dict) else ""
-        print(f"[get_script] ✅ Success. Script length: {len(script)}")
-        return script
-    except Exception as e:
-        print(f"[get_script] ❌ Exception occurred in get_script: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return ""
-
-
-@tool
-def get_entities(state: Annotated[dict, InjectedState] = None) -> List[dict]:
-    """Return the list of currently extracted entities from design.entities."""
-    print(f"[get_entities] 🟢 Tool execution started. State type: {type(state)}")
-    try:
-        if state is None:
-            print("[get_entities] ⚠️ Warning: injected state is None. Returning empty list.")
-            return []
-
-        design = {}
-        if isinstance(state, dict):
-            design = state.get("design", {})
-        elif hasattr(state, "get"):
-            design = state.get("design", {})
-
-        entities = design.get("entities", []) if isinstance(design, dict) else []
-        serialized_entities = []
-        for e in entities:
-            if isinstance(e, dict):
-                serialized_entities.append(e)
-            elif hasattr(e, "dict"):
-                serialized_entities.append(e.dict())
-            else:
-                serialized_entities.append(dict(e))
-        print(f"[get_entities] ✅ Success. Found {len(serialized_entities)} entities.")
-        return serialized_entities
-    except Exception as e:
-        print(f"[get_entities] ❌ Exception occurred in get_entities: {e}")
-        return []
-
-
-# Updated system prompt: instruct AI to first obtain the script via get_script and extract entities, and support generating visual portraits and auto-styling
-system_prompt = """
-<role>
+    content = f"""<role>
 You are the 1st Assistant Director (1st AD) and Visual Planner.
 </role>
 
+<screenplay_script>
+{script if script else "None (No screenplay script uploaded yet)"}
+</screenplay_script>
+
+<extracted_entities>
+{entities_lines}
+</extracted_entities>
+
+<available_voices>
+For each character entity you extract or update, you MUST select the most suitable voice timbre from this list. Set the character's `voice_reference` property to the chosen voice's ID (UUID string).
+Do NOT generate a random UUID; you must select a valid ID from this list matching the character's gender, age, and personality:
+{voices_lines}
+</available_voices>
+
 <workflow>
-Step 1: Retrieve the full script using the `get_script` tool.
-Step 2: Perform Entity Extraction (Characters, Props, Locations).
-Step 3: Call `submit_breakdown` directly with your extracted `entities` arguments.
-Step 4: The Storyboard (分镜) node will handle the scene-by-scene planning later. Do NOT attempt to break down or submit scenes here.
+Step 1: Perform Entity Extraction (Characters, Props, Locations) using the screenplay script and existing entities above.
+Step 2: Call `submit_breakdown` directly with your extracted `entities` arguments.
+Step 3: The Storyboard (分镜) node will handle the scene-by-scene planning later. Do NOT attempt to break down or submit scenes here.
 </workflow>
 
 <technical_requirements>
-- TOOL_USAGE: First call `get_script` to obtain script text.
+- TOOL_USAGE: Always use the database context (screenplay script and existing entities) provided above.
 - Call `submit_breakdown` to save initial entity decomposition or update existing entities.
+- VOICE_TIMBRE_SELECTION: For every character entity you extract or update, you MUST select the most suitable voice timbre from the `<available_voices>` list. Match the voice's gender, ageGroup, and personality description with the character's traits, and assign that voice's UUID string to the `voice_reference` property of the `Entity` object. Never make up a voice ID; always select a valid ID from the list.
 - If the user asks to "Auto-Style" or refine/generate a visual profile for a specific entity, follow these steps:
-  1. Call `get_entities` to retrieve the current list of entities.
-  2. Locate the target entity, generate a rich visual description (style parameters, appearance, textures) based on the user's request.
+  1. Locate the target entity from the context above.
+  2. Generate a rich visual description (style parameters, appearance, textures) based on the user's request.
   3. Call `submit_breakdown` with the updated list of entities containing the new description.
   4. Call `generate_entity_portrait` to regenerate/update the portrait image for that entity so it matches the new style perfectly.
 - All concept art portraits for the entities will be automatically generated and linked by the backend upon submission.
@@ -356,13 +397,37 @@ Step 4: The Storyboard (分镜) node will handle the scene-by-scene planning lat
 </technical_requirements>
 """
 
+    # We use a stable ID "dynamic_prompt_context" to allow the add_messages reducer
+    # to update this context in-place.
+    context_msg = SystemMessage(content=content, id="dynamic_prompt_context")
+
+    # 获取当前消息列表的副本
+    current_messages = list(state.get("messages", []))
+
+    # 构建新列表：先过滤旧的，再插入新的到最前面
+    new_messages = [context_msg] + [
+        m
+        for m in current_messages
+        if getattr(m, "id", None) != "dynamic_prompt_context"
+    ]
+
+    # 通过返回字典，让 LangGraph 框架负责将新消息合并回状态
+    return {"messages": new_messages}
+
+
+# ==========================================
+# 4. Export Agent as Node
+# ==========================================
+model = get_model(parallel_tool_calls=True)
+
 breakdown_node = create_agent(
     model=model,
-    tools=[get_script, get_entities, submit_breakdown, generate_entity_portrait],
+    tools=[submit_breakdown, generate_entity_portrait],
     middleware=[
         CopilotKitMiddleware(),
+        inject_dynamic_prompt,
         sync_breakdown_interceptor,
     ],
     state_schema=AgentState,
-    system_prompt=system_prompt,
+    system_prompt="",
 )

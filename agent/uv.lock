@@ -1823,7 +1823,6 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
     { name = "python-dotenv" },
-    { name = "requests" },
     { name = "uvicorn" },
 ]
 
@@ -1849,7 +1848,6 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "psycopg-pool", specifier = ">=3.3.1" },
     { name = "python-dotenv", specifier = ">=1.0.0,<2.0.0" },
-    { name = "requests", specifier = ">=2.33.1" },
     { name = "uvicorn", specifier = ">=0.29.0,<1.0.0" },
 ]
 

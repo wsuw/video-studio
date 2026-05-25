@@ -63,12 +63,21 @@ const EMOTION_LABELS = [
   "Calm",
 ];
 
+interface DialogueTurn {
+  speaker: string;
+  text: string;
+  emotion_preset?: string;
+  emotion_alpha?: number;
+  emotion_vector?: number[];
+}
+
 interface Scene {
   id: string;
   description: string;
   entities: string[];
   status: "pending" | "locked" | "rendered";
   dialogue?: string;
+  dialogue_turns?: DialogueTurn[];
   voice_actor_id?: string; // "narrator" or e.g. "e1"
   audio_url?: string;
   audio_duration?: number;
@@ -81,6 +90,69 @@ interface Entity {
   description: string;
   visual_reference?: string;
   voice_reference?: string;
+}
+
+function parseDialogueText(text: string, characterNames: string[]): DialogueTurn[] {
+  if (!text) return [];
+  
+  const speakers = new Set(["NARRATOR", "SYSTEM", ...characterNames.map(n => n.toUpperCase())]);
+  
+  // Auto-detect "NAME: text" pattern in text
+  for (const m of text.matchAll(/(?:^|\s|\n)([A-Z0-9_\-\u4e00-\u9fa5]{2,})\s*[:：]/g)) {
+    speakers.add(m[1].toUpperCase());
+  }
+
+  const sorted = [...speakers].sort((a, b) => b.length - a.length);
+  const escaped = sorted.map(s => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
+  const re = new RegExp(`(?:^|\\s|\\n)(${escaped.join("|")})\\s*[:：]\\s*`, "i");
+
+  const parts = text.split(re);
+  const turns: DialogueTurn[] = [];
+
+  if (parts[0]?.trim()) {
+    turns.push({ speaker: "NARRATOR", text: parts[0].trim() });
+  }
+  for (let i = 1; i < parts.length; i += 2) {
+    const speaker = parts[i]?.trim().toUpperCase();
+    const dialogue = parts[i + 1]?.trim();
+    if (speaker && dialogue) {
+      turns.push({ speaker, text: dialogue });
+    }
+  }
+  
+  return turns;
+}
+
+function reconcileDialogueTurns(
+  newText: string,
+  existingTurns: DialogueTurn[] | undefined,
+  characterNames: string[]
+): DialogueTurn[] {
+  const parsed = parseDialogueText(newText, characterNames);
+  const reconciled: DialogueTurn[] = [];
+
+  for (let i = 0; i < parsed.length; i++) {
+    const p = parsed[i];
+    const existing = existingTurns?.[i];
+    
+    if (existing && existing.speaker === p.speaker) {
+      reconciled.push({
+        ...p,
+        emotion_preset: existing.emotion_preset,
+        emotion_alpha: existing.emotion_alpha,
+        emotion_vector: existing.emotion_vector,
+      });
+    } else {
+      reconciled.push({
+        ...p,
+        emotion_preset: "calm",
+        emotion_alpha: 0.6,
+        emotion_vector: [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9],
+      });
+    }
+  }
+
+  return reconciled;
 }
 
 interface DialogueTextareaProps {
@@ -204,6 +276,32 @@ export default function VoiceoverStudio() {
 
   const activeScene = scenes.find((s) => s.id === selectedSceneId) || scenes[0];
 
+  const [selectedTurnIndex, setSelectedTurnIndex] = useState<number | null>(null);
+
+  const handleUpdateActiveTurnEmotion = (updates: Partial<DialogueTurn>) => {
+    if (!activeScene || selectedTurnIndex === null) return;
+    const currentTurns = activeScene.dialogue_turns || [];
+    const updatedTurns = currentTurns.map((t, idx) => {
+      if (idx === selectedTurnIndex) {
+        return { ...t, ...updates };
+      }
+      return t;
+    });
+
+    handleUpdateSceneField(activeScene.id, { dialogue_turns: updatedTurns });
+  };
+
+  const handleSelectTurn = (turnIdx: number) => {
+    setSelectedTurnIndex(turnIdx);
+    const turns = activeScene?.dialogue_turns || [];
+    const turn = turns[turnIdx];
+    if (turn) {
+      setEmoPreset(turn.emotion_preset || "calm");
+      setEmoAlpha(turn.emotion_alpha ?? 0.6);
+      setEmoVector(turn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+    }
+  };
+
   // Synchronize local dialogue state when active scene changes
   useEffect(() => {
     // If the active scene changes, save the unsaved localDialogue changes of the PREVIOUS scene to scenes list!
@@ -225,10 +323,29 @@ export default function VoiceoverStudio() {
       setLocalDialogue(val);
       localDialogueRef.current = val;
       prevActiveSceneIdRef.current = activeScene.id;
+
+      const existing = activeScene.dialogue_turns || [];
+      const reconciled = reconcileDialogueTurns(val, existing, characters.map(c => c.name));
+      
+      // Update scene dialogue_turns if they changed or were uninitialized
+      if (!activeScene.dialogue_turns || activeScene.dialogue_turns.length !== reconciled.length) {
+        handleUpdateSceneField(activeScene.id, { dialogue_turns: reconciled });
+      }
+
+      if (reconciled.length > 0) {
+        setSelectedTurnIndex(0);
+        const firstTurn = reconciled[0];
+        setEmoPreset(firstTurn.emotion_preset || "calm");
+        setEmoAlpha(firstTurn.emotion_alpha ?? 0.6);
+        setEmoVector(firstTurn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+      } else {
+        setSelectedTurnIndex(null);
+      }
     } else {
       setLocalDialogue("");
       localDialogueRef.current = "";
       prevActiveSceneIdRef.current = null;
+      setSelectedTurnIndex(null);
     }
   }, [activeScene?.id]);
 
@@ -239,7 +356,12 @@ export default function VoiceoverStudio() {
     if (presetId === "custom") return;
     const preset = EMOTION_PRESETS.find((p) => p.id === presetId);
     if (preset) {
-      setEmoVector([...preset.vector]);
+      const vector = [...preset.vector];
+      setEmoVector(vector);
+      handleUpdateActiveTurnEmotion({
+        emotion_preset: presetId,
+        emotion_vector: vector,
+      });
     }
   };
 
@@ -249,6 +371,10 @@ export default function VoiceoverStudio() {
     const updated = [...emoVector];
     updated[index] = val;
     setEmoVector(updated);
+    handleUpdateActiveTurnEmotion({
+      emotion_preset: "custom",
+      emotion_vector: updated,
+    });
   };
 
   const handleUpdateSceneField = (sceneId: string, fields: Partial<Scene>) => {
@@ -576,17 +702,49 @@ export default function VoiceoverStudio() {
                           <span className="font-mono text-xs font-bold text-muted-foreground">
                             #{scene.id.toUpperCase()}
                           </span>
-                          <Badge
-                            variant="secondary"
-                            className={cn(
-                              "text-xs font-bold uppercase py-0.5 px-2",
-                              speakingChar
-                                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                : "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20"
-                            )}
-                          >
-                            {speakingChar ? speakingChar.name : "Narrator"}
-                          </Badge>
+                          {(() => {
+                            const turns = parseDialogueText(scene.dialogue || "", characters.map(c => c.name));
+                            if (turns.length > 0) {
+                              const uniqueSpeakers = Array.from(new Set(turns.map(t => t.speaker)));
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {uniqueSpeakers.map((spk, idx) => {
+                                    const char = characters.find(c => c.name.toUpperCase() === spk);
+                                    const isNarrator = spk === "NARRATOR" || spk === "SYSTEM";
+                                    return (
+                                      <Badge
+                                        key={idx}
+                                        variant="secondary"
+                                        className={cn(
+                                          "text-[10px] font-bold uppercase py-0 px-1.5 leading-none rounded",
+                                          isNarrator
+                                            ? "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20"
+                                            : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                        )}
+                                      >
+                                        {char ? char.name : spk}
+                                      </Badge>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            }
+                            
+                            // Fallback to default speakingChar
+                            return (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  "text-xs font-bold uppercase py-0.5 px-2",
+                                  speakingChar
+                                    ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                    : "bg-neutral-500/10 text-neutral-400 border border-neutral-500/20"
+                                )}
+                              >
+                                {speakingChar ? speakingChar.name : "Narrator"}
+                              </Badge>
+                            );
+                          })()}
                         </div>
 
                         {/* Audio Status Indicators */}
@@ -619,16 +777,70 @@ export default function VoiceoverStudio() {
                         )}
                       </div>
 
-                      {/* Dialogue script card preview */}
-                      <p className="text-sm leading-relaxed text-foreground/90 font-medium">
-                        {scene.dialogue || (
-                          <span className="text-muted-foreground/40 italic text-xs">-- No Dialogue/Narration set for this scene --</span>
-                        )}
-                      </p>
+                      {/* Normal Scene Description at the top (First!) */}
+                      <div className="text-xs text-muted-foreground bg-muted/10 p-3 rounded-lg border border-border/30 mb-1 leading-relaxed">
+                        <span className="font-bold uppercase tracking-wider block text-[10px] text-muted-foreground/75 mb-1">
+                          🎬 Scene Description (场景描述)
+                        </span>
+                        {scene.description}
+                      </div>
 
-                      <p className="text-xs text-muted-foreground line-clamp-1 border-t border-border/40 pt-2">
-                        Visual: {scene.description}
-                      </p>
+                      {/* Dialogue script card preview */}
+                      <div className="space-y-2.5 pt-1">
+                        {(() => {
+                          const turns = parseDialogueText(scene.dialogue || "", characters.map(c => c.name));
+                          if (turns.length === 0) {
+                            return (
+                              <div className="text-xs text-muted-foreground/45 italic bg-muted/5 p-2.5 rounded-lg border border-dashed border-border/40 text-center select-none">
+                                💡 No Dialogue/Narration lines set for this scene
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="space-y-2">
+                              {turns.map((turn, tIdx) => {
+                                const isNarrator = turn.speaker === "NARRATOR" || turn.speaker === "SYSTEM";
+                                const char = characters.find(c => c.name.toUpperCase() === turn.speaker);
+                                const isTurnSelected = isSelected && selectedTurnIndex === tIdx;
+                                
+                                return (
+                                  <div
+                                    key={tIdx}
+                                    onClick={(e) => {
+                                      if (isSelected) {
+                                        e.stopPropagation(); // Avoid re-triggering selectedSceneId select
+                                        handleSelectTurn(tIdx);
+                                      }
+                                    }}
+                                    className={cn(
+                                      "flex gap-2.5 items-start text-xs p-2 rounded-lg border transition-all duration-300",
+                                      isSelected
+                                        ? "cursor-pointer"
+                                        : "pointer-events-none",
+                                      isTurnSelected
+                                        ? "bg-indigo-500/10 border-indigo-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/10"
+                                        : "bg-muted/15 border-transparent hover:bg-muted/30 hover:border-border/50"
+                                    )}
+                                  >
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "font-bold uppercase px-1.5 py-0.5 rounded text-[9px] shrink-0 min-w-[72px] justify-center text-center leading-none",
+                                        isNarrator ? "bg-neutral-500/10 text-neutral-400 border-neutral-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                      )}
+                                    >
+                                      {char ? char.name : turn.speaker}
+                                    </Badge>
+                                    <div className="flex-1 text-foreground/90 font-medium leading-relaxed font-sans pr-1 break-words">
+                                      {turn.text}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </Card>
                   );
                 })}
@@ -663,8 +875,10 @@ export default function VoiceoverStudio() {
                   {/* Top Scene Overview */}
                   <div className="p-4 rounded-xl border border-border bg-background/60 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold font-mono text-muted-foreground">
-                        SCENE DUBBING #{activeScene.id.toUpperCase()}
+                      <span className="text-xs font-bold font-mono text-indigo-400">
+                        {selectedTurnIndex !== null 
+                          ? `TURN #${selectedTurnIndex + 1} (${activeScene.dialogue_turns?.[selectedTurnIndex]?.speaker || "NARRATOR"})`
+                          : `SCENE DUBBING #${activeScene.id.toUpperCase()}`}
                       </span>
                       {activeScene.audio_duration && (
                         <div className="flex items-center gap-3 text-xs font-bold text-indigo-400">
@@ -699,8 +913,11 @@ export default function VoiceoverStudio() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-muted-foreground">
-                        Dialogue / Narration Lines
+                      <label className="text-sm font-bold text-muted-foreground flex items-center justify-between">
+                        <span>Dialogue / Narration Lines</span>
+                        <span className="text-[10px] text-muted-foreground/60 font-semibold normal-case">
+                          Supports Speaker Syntax (e.g. JAX: Hello)
+                        </span>
                       </label>
                       <DialogueTextarea
                         value={localDialogue}
@@ -712,10 +929,84 @@ export default function VoiceoverStudio() {
                           handleUpdateSceneField(activeScene.id, { dialogue: val });
                         }}
                         placeholder="Write narration or dialogue lines here..."
-                        className="bg-background text-sm min-h-[70px] resize-none border-border/80 focus-visible:ring-indigo-500/20"
+                        className="bg-background text-sm min-h-[80px] resize-none border-border/80 focus-visible:ring-indigo-500/20"
                       />
+                      
+                      {/* Character insertion quick helper */}
+                      <div className="flex items-center flex-wrap gap-1 mt-1.5">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase mr-1">Insert Speaker:</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const currentVal = localDialogueRef.current;
+                            const newVal = currentVal + (currentVal.endsWith("\n") || currentVal === "" ? "" : "\n") + "NARRATOR: ";
+                            setLocalDialogue(newVal);
+                            localDialogueRef.current = newVal;
+                            handleUpdateSceneField(activeScene.id, { dialogue: newVal });
+                          }}
+                          className="h-5 px-1.5 text-[9px] font-bold border-neutral-500/20 text-neutral-400 bg-neutral-500/5 hover:bg-neutral-500/10"
+                        >
+                          🎙️ Narrator
+                        </Button>
+                        {characters.map(char => (
+                          <Button
+                            key={char.id}
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const currentVal = localDialogueRef.current;
+                              const newVal = currentVal + (currentVal.endsWith("\n") || currentVal === "" ? "" : "\n") + `${char.name.toUpperCase()}: `;
+                              setLocalDialogue(newVal);
+                              localDialogueRef.current = newVal;
+                              handleUpdateSceneField(activeScene.id, { dialogue: newVal });
+                            }}
+                            className="h-5 px-1.5 text-[9px] font-bold border-blue-500/20 text-blue-400 bg-blue-500/5 hover:bg-blue-500/10"
+                          >
+                            👤 {char.name}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Real-time Script Flow Preview */}
+                  {(() => {
+                    const turns = parseDialogueText(localDialogue || "", characters.map(c => c.name));
+                    if (turns.length > 1) {
+                      return (
+                        <div className="p-4 rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/[0.01] shrink-0 space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block mb-1">
+                            🎭 Live Screenplay Preview ({turns.length} speakers)
+                          </span>
+                          <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                            {turns.map((turn, tIdx) => {
+                              const isNarrator = turn.speaker === "NARRATOR" || turn.speaker === "SYSTEM";
+                              const char = characters.find(c => c.name.toUpperCase() === turn.speaker);
+                              
+                              return (
+                                <div key={tIdx} className="flex gap-2 items-start text-xs">
+                                  <span className={cn(
+                                    "font-mono font-bold uppercase px-1 py-0.5 rounded text-[8px] shrink-0 min-w-[64px] text-center leading-none",
+                                    isNarrator ? "bg-neutral-500/10 text-neutral-400 border border-neutral-500/10" : "bg-blue-500/10 text-blue-400 border border-blue-500/10"
+                                  )}>
+                                    {char ? char.name : turn.speaker}
+                                  </span>
+                                  <p className="flex-1 text-foreground/80 leading-normal italic text-[11px] truncate">
+                                    "{turn.text}"
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[9px] text-muted-foreground/75 leading-normal mt-1 border-t border-indigo-500/10 pt-1.5">
+                            💡 System detected multi-character script format! Audio stitches automatically.
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Core Emotion controls */}
                   <div className="space-y-5 flex-1 overflow-y-auto pr-1">
@@ -776,6 +1067,7 @@ export default function VoiceoverStudio() {
                         onValueChange={(vals) => {
                           aiRunningRef.current = false;
                           setEmoAlpha(vals[0]);
+                          handleUpdateActiveTurnEmotion({ emotion_alpha: vals[0] });
                         }}
                         className="py-1"
                       />

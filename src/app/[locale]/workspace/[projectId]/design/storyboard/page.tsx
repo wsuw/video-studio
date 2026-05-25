@@ -11,7 +11,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, CompassIcon, VideoIcon, EyeIcon, SaveIcon, Loader2Icon } from "lucide-react"
+import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, CompassIcon, VideoIcon, EyeIcon, SaveIcon, Loader2Icon, UserIcon, PackageIcon, MapPinIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
@@ -353,11 +353,11 @@ export default function StoryboardPage() {
                       <div
                         key={`${element.entity_id}-${idx}`}
                         className={cn(
-                          "absolute border-2 shadow-[0_0_50px_-12px_rgba(0,0,0,0.4)] transition-all duration-500 ease-in-out rounded-2xl flex flex-col justify-between p-2 select-none",
-                          isCharacter && "border-blue-500 bg-blue-500/5 shadow-blue-500/10",
-                          isProp && "border-amber-500 bg-amber-500/5 shadow-amber-500/10",
-                          isLocation && "border-emerald-500 bg-emerald-500/5 shadow-emerald-500/10",
-                          (!isCharacter && !isProp && !isLocation) && "border-primary bg-primary/5 shadow-primary/10"
+                          "absolute border-2 shadow-[0_0_50px_-12px_rgba(0,0,0,0.4)] transition-all duration-500 ease-in-out rounded-2xl flex flex-col justify-between p-2 select-none group/box",
+                          isCharacter && "border-blue-500 bg-blue-500/5 hover:bg-blue-500/10 shadow-blue-500/10",
+                          isProp && "border-amber-500 bg-amber-500/5 hover:bg-amber-500/10 shadow-amber-500/10",
+                          isLocation && "border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 shadow-emerald-500/10",
+                          (!isCharacter && !isProp && !isLocation) && "border-primary bg-primary/5 hover:bg-primary/10 shadow-primary/10"
                         )}
                         style={{
                           left: `${element.bbox[0] * 100}%`,
@@ -389,9 +389,69 @@ export default function StoryboardPage() {
                         )}
 
 
-                        {/* Centered subtle visual focus text */}
-                        <div className="m-auto opacity-20 text-xs font-mono tracking-widest uppercase">
-                          Focus
+                        {/* Centered rich cinematic placeholder graphic based on type */}
+                        <div className="m-auto flex flex-col items-center justify-center gap-2 select-none pointer-events-none">
+                          {isCharacter && (
+                            <>
+                              <div className="relative flex items-center justify-center w-14 h-14">
+                                <div className="absolute inset-0 rounded-full border border-dashed border-blue-500/30" />
+                                <div className="absolute inset-1.5 rounded-full border border-blue-500/20 bg-blue-500/5" />
+                                <UserIcon className="w-6 h-6 text-blue-400/60 relative z-10" />
+                              </div>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-[9px] font-mono font-bold tracking-widest text-blue-400/40 uppercase">
+                                  CHARACTER TARGET
+                                </span>
+                                <span className="text-[8px] font-mono text-blue-500/30">
+                                  [TRK_01 / ACTIVE]
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          {isProp && (
+                            <>
+                              <div className="relative flex items-center justify-center w-14 h-14">
+                                <div className="absolute inset-0 border border-dashed border-amber-500/30 rounded-lg" />
+                                <div className="absolute inset-1.5 border border-amber-500/20 bg-amber-500/5" />
+                                <PackageIcon className="w-6 h-6 text-amber-400/60 relative z-10" />
+                              </div>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-[9px] font-mono font-bold tracking-widest text-amber-400/40 uppercase">
+                                  PROP BOUNDS
+                                </span>
+                                <span className="text-[8px] font-mono text-amber-500/30">
+                                  [OBJ_A / INDEXED]
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          {isLocation && (
+                            <>
+                              <div className="relative flex items-center justify-center w-14 h-14">
+                                <div className="absolute inset-0 rounded-full border border-dashed border-emerald-500/30" />
+                                <div className="absolute inset-2.5 rounded-full border border-emerald-500/25 bg-emerald-500/5" />
+                                <MapPinIcon className="w-6 h-6 text-emerald-400/60 relative z-10" />
+                              </div>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-[9px] font-mono font-bold tracking-widest text-emerald-400/40 uppercase">
+                                  ENVIRONMENT ANCHOR
+                                </span>
+                                <span className="text-[8px] font-mono text-emerald-500/30">
+                                  [LOC_C / STATIC]
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          {!isCharacter && !isProp && !isLocation && (
+                            <>
+                              <div className="w-10 h-10 rounded-full border border-primary/20 bg-primary/5 flex items-center justify-center">
+                                <LayoutGridIcon className="w-5 h-5 text-primary/45" />
+                              </div>
+                              <span className="text-[9px] font-mono font-bold tracking-widest text-primary/40 uppercase">
+                                SUBJECT FRAME
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -585,15 +645,18 @@ export default function StoryboardPage() {
                         {/* Render scaled bounding boxes in square preview */}
                         {layout.map((element, idx) => {
                           const entity = getEntityDetails(element.entity_id);
+                          const isCharacter = entity?.type === "character";
+                          const isProp = entity?.type === "prop";
+                          const isLocation = entity?.type === "location";
                           return (
                             <div
                               key={`${element.entity_id}-thumb-${idx}`}
                               className={cn(
-                                "absolute border rounded-lg",
-                                entity?.type === "character" && "border-blue-500 bg-blue-500/10",
-                                entity?.type === "prop" && "border-amber-500 bg-amber-500/10",
-                                entity?.type === "location" && "border-emerald-500 bg-emerald-500/10",
-                                (!entity) && "border-primary bg-primary/10"
+                                "absolute border rounded-md flex items-center justify-center overflow-hidden",
+                                isCharacter && "border-blue-500 bg-blue-500/20 shadow-[0_0_4px_rgba(59,130,246,0.3)]",
+                                isProp && "border-amber-500 bg-amber-500/20 shadow-[0_0_4px_rgba(245,158,11,0.3)]",
+                                isLocation && "border-emerald-500 bg-emerald-500/20 shadow-[0_0_4px_rgba(16,185,129,0.3)]",
+                                (!isCharacter && !isProp && !isLocation) && "border-primary bg-primary/20 shadow-[0_0_4px_rgba(99,102,241,0.3)]"
                               )}
                               style={{
                                 left: `${element.bbox[0] * 100}%`,
@@ -601,26 +664,32 @@ export default function StoryboardPage() {
                                 width: `${element.bbox[2] * 100}%`,
                                 height: `${element.bbox[3] * 100}%`,
                               }}
-                            ></div>
+                            >
+                              {isCharacter && <UserIcon className="w-[60%] h-[60%] max-w-[12px] max-h-[12px] text-blue-400/70" />}
+                              {isProp && <PackageIcon className="w-[60%] h-[60%] max-w-[12px] max-h-[12px] text-amber-400/70" />}
+                              {isLocation && <MapPinIcon className="w-[60%] h-[60%] max-w-[12px] max-h-[12px] text-emerald-400/70" />}
+                            </div>
                           );
                         })}
                       </div>
 
                       {/* Right: Detailed Metadata Stack */}
                       <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch pr-3">
-                        <div>
-                          <div className="flex items-center justify-between gap-1 mb-1">
-                            <div className="flex items-center gap-1.5">
+                        <div className="space-y-1.5">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
                               <span className="text-xs font-mono font-bold text-muted-foreground group-hover:text-primary transition-colors">
                                 #{scene.id.toUpperCase()}
                               </span>
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors origin-left">
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors">
                                 {scene.lens || "50mm"}
                               </span>
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors origin-left">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors">
                                 {scene.shot_type || "medium"}
                               </span>
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors origin-left">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border bg-muted/60 text-muted-foreground group-hover:border-primary/20 group-hover:text-primary capitalize transition-colors">
                                 {scene.motion || "static"}
                               </span>
                             </div>
