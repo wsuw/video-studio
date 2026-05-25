@@ -38,7 +38,7 @@ import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useParams, useRouter } from "next/navigation"
 import { useAgent } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
-import { getThreadState } from "@/lib/langgraph"
+import { getThreadState, updateThreadState } from "@/lib/langgraph"
 
 interface LayoutElement {
   entity_id: string;
@@ -59,6 +59,7 @@ interface Scene {
   audio_duration?: number;
   dialogue?: string;
   voice_actor_id?: string;
+  video_url?: string;
 }
 
 // Premium stock video placeholders for mock mode
@@ -94,7 +95,7 @@ export default function VideoExecutionPage() {
   const { agent } = useAgent({ agentId: "default" });
 
   // Helper to dynamically auto-heal local hostnames or relative paths to public domain
-  const getCleanUrl = (url: string) => {
+  const getCleanUrl = (url: string | undefined) => {
     if (!url) return url;
     if (url.startsWith("/")) {
       return `https://i2v.aianime.space${url}`;
@@ -121,7 +122,7 @@ export default function VideoExecutionPage() {
   const [videoOutputs, setVideoOutputs] = useState<Record<string, string>>({});
 
   // Advanced inference engine controls
-  const [renderMode, setRenderMode] = useState<'mock' | 'real_ltx2'>('real_ltx2');
+  const [renderMode, setRenderMode] = useState<'mock' | 'real_gpu'>('real_gpu');
   const [guidanceScale, setGuidanceScale] = useState<number>(4.0);
   const [numInferenceSteps, setNumInferenceSteps] = useState<number>(40);
   const [numFrames, setNumFrames] = useState<number>(121);
@@ -193,16 +194,37 @@ export default function VideoExecutionPage() {
   const isAudioSynced = !!(activeScene && activeScene.audio_duration && activeScene.audio_duration > 0);
   const lockedFrameCount = isAudioSynced && activeScene && activeScene.audio_duration ? Math.round(activeScene.audio_duration * frameRate) : null;
 
-  const handleUpdateSceneStatus = (sceneId: string, status: "pending" | "locked" | "rendered") => {
+  const handleUpdateSceneStatus = async (sceneId: string, status: "pending" | "locked" | "rendered", videoUrl?: string) => {
     if (!agent) return;
-    const updatedScenes = scenes.map(s => s.id === sceneId ? { ...s, status } : s);
+    const updatedScenes = scenes.map((s: any) => {
+      if (s.id === sceneId) {
+        return {
+          ...s,
+          status,
+          video_url: videoUrl !== undefined ? videoUrl : (s.video_url || videoOutputs[sceneId])
+        };
+      }
+      return s;
+    });
+
+    const updatedDesign = {
+      ...design,
+      scenes: updatedScenes
+    };
+
     agent.setState({
       ...agent.state,
-      design: {
-        ...design,
-        scenes: updatedScenes
-      }
+      design: updatedDesign
     });
+
+    try {
+      await updateThreadState(projectId, {
+        design: updatedDesign
+      });
+      console.log(`[LangGraph] Successfully persisted video scene status for ${sceneId}`);
+    } catch (err) {
+      console.error("[LangGraph] Failed to persist video scene status:", err);
+    }
   };
 
   // Dispatch Video Render
@@ -221,7 +243,7 @@ export default function VideoExecutionPage() {
     if (renderMode === "mock") {
       setRenderingStates(prev => ({
         ...prev,
-        [sceneId]: { progress: 5, log: "Initializing LTX-2 pipeline..." }
+        [sceneId]: { progress: 5, log: "Initializing video synthesis pipeline..." }
       }));
 
       const stages = [
@@ -243,7 +265,7 @@ export default function VideoExecutionPage() {
           const matchedVideo = styleVideos[Math.floor(Math.random() * styleVideos.length)];
 
           setVideoOutputs(prev => ({ ...prev, [sceneId]: matchedVideo }));
-          handleUpdateSceneStatus(sceneId, "rendered");
+          handleUpdateSceneStatus(sceneId, "rendered", matchedVideo);
 
           setRenderingStates(prev => {
             const next = { ...prev };
@@ -267,23 +289,23 @@ export default function VideoExecutionPage() {
       return;
     }
 
-    // Real LTX-2 video generation
-    if (renderMode === "real_ltx2") {
+    // Real GPU video generation
+    if (renderMode === "real_gpu") {
       setRenderingStates(prev => ({
         ...prev,
-        [sceneId]: { progress: 10, log: "Contacting LTX-2 GPU Server..." }
+        [sceneId]: { progress: 10, log: "Contacting GPU model server..." }
       }));
 
       toast({
         title: "⚡ Video Generation Initiated",
-        description: `Executing real-time LTX-2 diffusion on CUDA (${finalNumFrames} frames).`,
+        description: `Executing real-time video diffusion on CUDA (${finalNumFrames} frames).`,
       });
 
       // Periodic progress ticker
       let currentProgress = 15;
       const progressInterval = setInterval(() => {
         currentProgress = Math.min(95, currentProgress + Math.floor(Math.random() * 4) + 1);
-        let logText = "Running LTX-2 DiT inference steps...";
+        let logText = "Running video diffusion inference steps...";
         if (currentProgress > 30) logText = "Calculating temporal latent trajectories...";
         if (currentProgress > 60) logText = "Decoding frame lattices through VAE...";
         if (currentProgress > 80) logText = "Running vocoder for cinematic audio synthesis...";
@@ -327,7 +349,7 @@ export default function VideoExecutionPage() {
 
         // Save generated video URL
         setVideoOutputs(prev => ({ ...prev, [sceneId]: data.url }));
-        handleUpdateSceneStatus(sceneId, "rendered");
+        handleUpdateSceneStatus(sceneId, "rendered", data.url);
 
         setRenderingStates(prev => {
           const next = { ...prev };
@@ -342,7 +364,7 @@ export default function VideoExecutionPage() {
 
       } catch (error: any) {
         clearInterval(progressInterval);
-        console.error("[Render] LTX-2 render error:", error);
+        console.error("[Render] Video synthesis render error:", error);
         setRenderingStates(prev => {
           const next = { ...prev };
           delete next[sceneId];
@@ -351,7 +373,7 @@ export default function VideoExecutionPage() {
         toast({
           variant: "destructive",
           title: "❌ Video Generation Failed",
-          description: error.message || "Failed to complete LTX-2 run.",
+          description: error.message || "Failed to complete video synthesis run.",
         });
       }
     }
@@ -438,8 +460,8 @@ export default function VideoExecutionPage() {
                 <VideoIcon className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight">LTX-2 Video Synthesis</h1>
-                <p className="text-xs text-muted-foreground">Synthesize high-fidelity cinematic video frames with sound dynamically utilizing Lightricks LTX-2</p>
+                <h1 className="text-lg font-bold tracking-tight">Cinematic Video Synthesis</h1>
+                <p className="text-xs text-muted-foreground">Synthesize high-fidelity cinematic video frames dynamically utilizing advanced AI Diffusion models</p>
               </div>
             </div>
           </div>
@@ -449,7 +471,7 @@ export default function VideoExecutionPage() {
             {scenes.map((scene) => {
               const isRendering = !!renderingStates[scene.id];
               const renderState = renderingStates[scene.id];
-              const videoUrl = getCleanUrl(videoOutputs[scene.id]);
+              const videoUrl = getCleanUrl(videoOutputs[scene.id] || scene.video_url);
               const isRendered = scene.status === "rendered" && !!videoUrl;
               const isActive = activeSceneId === scene.id;
 
@@ -528,7 +550,7 @@ export default function VideoExecutionPage() {
                           className="h-8 text-xs font-bold hover:bg-primary hover:text-primary-foreground border-primary/30 hover:border-primary transition-all duration-300"
                         >
                           <PlayIcon className="w-3.5 h-3.5 mr-1" />
-                          Generate Video (LTX-2)
+                          Generate Video
                         </Button>
                       )}
                     </div>
@@ -597,7 +619,7 @@ export default function VideoExecutionPage() {
           </div>
         </div>
 
-        {/* Right Side: Global Art Spec & LTX-2 Tuning Settings (35% width) */}
+        {/* Right Side: Global Art Spec & Tuning Settings (35% width) */}
         <div className="w-[35%] flex flex-col bg-muted/10 overflow-y-auto p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-2 border-b border-border/40">
             <LayersIcon className="w-4 h-4 text-muted-foreground" />
@@ -616,7 +638,7 @@ export default function VideoExecutionPage() {
             </div>
             <div className="flex justify-between items-center text-xs pb-3 border-b border-border/40">
               <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Target Pipeline:</span>
-              <span className="font-mono font-bold text-foreground">Lightricks LTX-2</span>
+              <span className="font-mono font-bold text-foreground">AI Video Engine</span>
             </div>
             <div className="space-y-2">
               <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider block">Custom Atmosphere Style:</span>
@@ -634,7 +656,7 @@ export default function VideoExecutionPage() {
             <div className="flex items-center gap-2 pb-2 border-b border-border/40">
               <SparklesIcon className="w-4 h-4 text-muted-foreground" />
               <h2 className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground">
-                LTX-2 DiT Parameters
+                Video Diffusion Parameters
               </h2>
             </div>
 
@@ -655,15 +677,15 @@ export default function VideoExecutionPage() {
                     Mock Preview
                   </button>
                   <button
-                    onClick={() => setRenderMode('real_ltx2')}
+                    onClick={() => setRenderMode('real_gpu')}
                     className={cn(
                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
-                      renderMode === 'real_ltx2'
+                      renderMode === 'real_gpu'
                         ? "bg-background text-primary shadow-sm border border-primary/20"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    LTX-2 CUDA
+                    CUDA Synthesis
                   </button>
                 </div>
               </div>
@@ -800,7 +822,7 @@ export default function VideoExecutionPage() {
               <div className="flex justify-between items-center text-xs pt-2 border-t border-border/40">
                 <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Output Resolution:</span>
                 <span className="font-mono text-[10px] font-semibold text-foreground">
-                  LTX-2 Standard (768x512)
+                  Standard HD (768x512)
                 </span>
               </div>
             </div>
