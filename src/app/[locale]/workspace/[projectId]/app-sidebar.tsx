@@ -88,16 +88,16 @@ const data = {
         />
       ),
     },
+  ],
+  generation: [
     {
-      title: "Voiceover",
-      url: "/design/voiceover",
+      name: "Voiceover",
+      url: "/generation/voiceover",
       icon: (
         <AudioLinesIcon
         />
       ),
     },
-  ],
-  generation: [
     {
       name: "Keyframe Gen",
       url: "/generation/keyframes",
@@ -179,14 +179,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: `/${locale}/workspace/${projectId}/design/storyboard`,
       icon: <LayoutTemplateIcon />,
     },
-    {
-      title: t("workspace.voiceover", "Voiceover"),
-      url: `/${locale}/workspace/${projectId}/design/voiceover`,
-      icon: <AudioLinesIcon />,
-    },
   ]
 
   const generationItems = [
+    {
+      name: t("workspace.voiceover", "Voiceover"),
+      url: `/${locale}/workspace/${projectId}/generation/voiceover`,
+      icon: <AudioLinesIcon />,
+    },
     {
       name: t("workspace.keyframes", "Keyframe Gen"),
       url: `/${locale}/workspace/${projectId}/generation/keyframes`,

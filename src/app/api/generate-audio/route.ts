@@ -7,6 +7,10 @@ import { v4 as uuidv4 } from "uuid";
 interface SpeakerTurn {
   speaker: string;
   text: string;
+  emo_preset?: string;
+  emo_alpha?: number;
+  emo_vector?: number[];
+  emotion_text?: string;
 }
 
 interface TtsApiResult {
@@ -247,6 +251,7 @@ export async function POST(req: Request) {
         const turnText = turn.text;
         const turnEmoVector = turn.emo_vector ?? emo_vector;
         const turnEmoAlpha = turn.emo_alpha ?? emo_alpha;
+        const turnEmoText = turn.emotion_text || (use_emo_text ? turnText : null);
 
         const voiceRef =
           character_voices[speaker] ??
@@ -263,7 +268,7 @@ export async function POST(req: Request) {
           spk_audio_prompt: resolved,
           emo_vector: turnEmoVector,
           emo_alpha: turnEmoAlpha,
-          emo_text: use_emo_text ? turnText : null,
+          emo_text: turnEmoText,
           interval_silence: 0,
         });
 

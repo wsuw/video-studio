@@ -30,14 +30,14 @@ export interface Voice {
 interface VoiceSelectorDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedVoiceUrl: string | null;
+  selectedVoiceId: string | null;
   onSelect: (voice: Voice) => void;
 }
 
 export function VoiceSelectorDialog({
   isOpen,
   onOpenChange,
-  selectedVoiceUrl,
+  selectedVoiceId,
   onSelect
 }: VoiceSelectorDialogProps) {
   const [voices, setVoices] = useState<Voice[]>([]);
@@ -344,7 +344,7 @@ export function VoiceSelectorDialog({
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {displayedVoices.map((voice) => {
-                  const isSelected = selectedVoiceUrl === voice.sampleUrl;
+                  const isSelected = selectedVoiceId === voice.id;
                   const isPlaying = playingId === voice.id;
 
                   return (

@@ -6,11 +6,14 @@ import {
 import { LangGraphAgent } from "@copilotkit/runtime/langgraph";
 import { handle } from "hono/vercel";
 
+console.log("[DEBUG] process.env.AGENT_URL:", process.env.AGENT_URL);
+console.log("[DEBUG] process.env.LANGGRAPH_DEPLOYMENT_URL:", process.env.LANGGRAPH_DEPLOYMENT_URL);
+
 const defaultAgent = new LangGraphAgent({
   deploymentUrl:
     process.env.AGENT_URL ||
     process.env.LANGGRAPH_DEPLOYMENT_URL ||
-    "http://localhost:8123",
+    "http://192.168.1.4:8123",
   graphId: "agent",
   langsmithApiKey: process.env.LANGSMITH_API_KEY || "",
 });

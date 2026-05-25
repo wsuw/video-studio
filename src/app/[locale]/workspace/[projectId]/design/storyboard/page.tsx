@@ -11,7 +11,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, CompassIcon, VideoIcon, EyeIcon, SaveIcon, Loader2Icon, UserIcon, PackageIcon, MapPinIcon } from "lucide-react"
+import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, CompassIcon, VideoIcon, EyeIcon, SaveIcon, Loader2Icon, UserIcon, PackageIcon, MapPinIcon, ArrowRightIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
@@ -267,10 +267,11 @@ export default function StoryboardPage() {
           <Button
             variant="default"
             size="sm"
-            onClick={() => router.push(`/workspace/${projectId}/design/voiceover`)}
-            className="h-9 px-4 font-semibold shadow-sm"
+            onClick={() => router.push(`/workspace/${projectId}/generation/voiceover`)}
+            className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
           >
-            Next: Voiceover Studio
+            <span className="text-xs font-semibold">Next: Voiceover Studio</span>
+            <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
 
           {!isChatOpen && (

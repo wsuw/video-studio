@@ -33,6 +33,8 @@ import {
   FilmIcon,
   CheckCircle2Icon,
   SaveIcon,
+  PlusIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout";
 import React, { useState, useEffect, useRef } from "react";
@@ -41,6 +43,8 @@ import { useRouter, useParams } from "next/navigation";
 import { useAgent } from "@copilotkit/react-core/v2";
 import { cn } from "@/lib/utils";
 import { getThreadState, updateThreadState } from "@/lib/langgraph";
+import { PRESET_VOICES } from "@/lib/preset-voices";
+import { VoiceSelectorDialog } from "@/components/voices/voice-selector-dialog";
 
 // Presets mapping to 8-dimensional emotion vectors:
 // [happy, angry, sad, afraid, disgusted, melancholic, surprised, calm]
@@ -69,6 +73,8 @@ interface DialogueTurn {
   emotion_preset?: string;
   emotion_alpha?: number;
   emotion_vector?: number[];
+  emotion_text?: string;
+  use_emotion_text?: boolean;
 }
 
 interface Scene {
@@ -92,34 +98,70 @@ interface Entity {
   voice_reference?: string;
 }
 
+const formatTurnToString = (t: DialogueTurn) => {
+  if (t.emotion_text) {
+    return `${t.speaker} (${t.emotion_text}): ${t.text}`;
+  }
+  return `${t.speaker}: ${t.text}`;
+};
+
 function parseDialogueText(text: string, characterNames: string[]): DialogueTurn[] {
   if (!text) return [];
   
   const speakers = new Set(["NARRATOR", "SYSTEM", ...characterNames.map(n => n.toUpperCase())]);
   
-  // Auto-detect "NAME: text" pattern in text
-  for (const m of text.matchAll(/(?:^|\s|\n)([A-Z0-9_\-\u4e00-\u9fa5]{2,})\s*[:：]/g)) {
+  // Auto-detect "NAME: text" or "NAME (modifier): text"
+  for (const m of text.matchAll(/(?:^|\s|\n)([A-Z0-9_\-\u4e00-\u9fa5]{2,})(?:\s*\([^)]*\))?\s*[:：]/g)) {
     speakers.add(m[1].toUpperCase());
   }
 
   const sorted = [...speakers].sort((a, b) => b.length - a.length);
   const escaped = sorted.map(s => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
-  const re = new RegExp(`(?:^|\\s|\\n)(${escaped.join("|")})\\s*[:：]\\s*`, "i");
-
-  const parts = text.split(re);
-  const turns: DialogueTurn[] = [];
-
-  if (parts[0]?.trim()) {
-    turns.push({ speaker: "NARRATOR", text: parts[0].trim() });
-  }
-  for (let i = 1; i < parts.length; i += 2) {
-    const speaker = parts[i]?.trim().toUpperCase();
-    const dialogue = parts[i + 1]?.trim();
-    if (speaker && dialogue) {
-      turns.push({ speaker, text: dialogue });
-    }
-  }
   
+  // Regex to match: Speaker name, optional whitespace, optional parentheses, optional whitespace, colon
+  const re = new RegExp(`(?:^|\\s|\\n)(${escaped.join("|")})\\s*(?:\\(([^)]*)\\))?\\s*[:：]\\s*`, "gi");
+
+  const turns: DialogueTurn[] = [];
+  let lastIndex = 0;
+  let currentSpeaker = "NARRATOR";
+  let currentEmotionText = "";
+
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    const matchIndex = match.index;
+    const matchLength = match[0].length;
+    
+    // The dialogue text is between the end of the last match and the start of the current match
+    const textBetween = text.slice(lastIndex, matchIndex).trim();
+    if (textBetween || (turns.length === 0 && lastIndex === 0 && textBetween)) {
+      turns.push({
+        speaker: currentSpeaker,
+        text: textBetween,
+        emotion_preset: currentSpeaker === "NARRATOR" ? "calm" : "custom",
+        emotion_alpha: 0.6,
+        emotion_vector: [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9],
+        ...(currentEmotionText ? { emotion_preset: "custom", use_emotion_text: true, emotion_text: currentEmotionText } : {})
+      });
+    }
+
+    currentSpeaker = match[1].toUpperCase();
+    currentEmotionText = match[2] ? match[2].trim() : "";
+    lastIndex = matchIndex + matchLength;
+  }
+
+  // Add the final turn
+  const remainingText = text.slice(lastIndex).trim();
+  if (remainingText) {
+    turns.push({
+      speaker: currentSpeaker,
+      text: remainingText,
+      emotion_preset: currentSpeaker === "NARRATOR" ? "calm" : "custom",
+      emotion_alpha: 0.6,
+      emotion_vector: [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9],
+      ...(currentEmotionText ? { emotion_preset: "custom", use_emotion_text: true, emotion_text: currentEmotionText } : {})
+    });
+  }
+
   return turns;
 }
 
@@ -137,18 +179,13 @@ function reconcileDialogueTurns(
     
     if (existing && existing.speaker === p.speaker) {
       reconciled.push({
-        ...p,
-        emotion_preset: existing.emotion_preset,
-        emotion_alpha: existing.emotion_alpha,
-        emotion_vector: existing.emotion_vector,
+        ...existing,
+        text: p.text,
+        // Override or merge if parser extracted a new one
+        ...(p.emotion_text ? { emotion_preset: "custom", use_emotion_text: true, emotion_text: p.emotion_text } : {})
       });
     } else {
-      reconciled.push({
-        ...p,
-        emotion_preset: "calm",
-        emotion_alpha: 0.6,
-        emotion_vector: [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9],
-      });
+      reconciled.push(p);
     }
   }
 
@@ -204,7 +241,6 @@ export default function VoiceoverStudio() {
   const [script, setScript] = useState<string>("");
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
-  // High-fidelity active synthesis configuration state
   const [emoPreset, setEmoPreset] = useState<string>("calm");
   const [emoVector, setEmoVector] = useState<number[]>([0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
   const [emoAlpha, setEmoAlpha] = useState<number>(0.6);
@@ -214,6 +250,28 @@ export default function VoiceoverStudio() {
   const [activeAudioUrl, setActiveAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isBatchSynthesizing, setIsBatchSynthesizing] = useState<boolean>(false);
+
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
+  const [allVoices, setAllVoices] = useState<any[]>([]);
+  const [narratorVoice, setNarratorVoice] = useState<string>("voice_04");
+  const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const design = {
+    narrator_voice: narratorVoice,
+    entities,
+    scenes,
+    script,
+    ...(agent?.state?.design || {})
+  };
+
+  useEffect(() => {
+    fetch("/api/voices")
+      .then((res) => res.json())
+      .then((data) => setAllVoices(data))
+      .catch((err) => console.error("Failed to load voices:", err));
+  }, []);
 
   // Butter-smooth text area input local state
   const [localDialogue, setLocalDialogue] = useState<string>("");
@@ -236,6 +294,7 @@ export default function VoiceoverStudio() {
           setScenes(loadedScenes);
           setEntities(loadedEntities);
           setScript(design.script || "");
+          setNarratorVoice(design.narrator_voice || "voice_04");
 
           agent.setState({
             ...agent.state,
@@ -264,6 +323,12 @@ export default function VoiceoverStudio() {
     }
   }, [agent?.state?.design?.entities]);
 
+  useEffect(() => {
+    if (initializedRef.current && agent?.state?.design?.narrator_voice) {
+      setNarratorVoice(agent.state.design.narrator_voice);
+    }
+  }, [agent?.state?.design?.narrator_voice]);
+
   // Filter character entities for voice actor mapping
   const characters = entities.filter((e) => e.type === "character");
 
@@ -288,66 +353,159 @@ export default function VoiceoverStudio() {
       return t;
     });
 
-    handleUpdateSceneField(activeScene.id, { dialogue_turns: updatedTurns });
+    const newDialogueStr = updatedTurns.map(formatTurnToString).join("\n\n");
+    handleUpdateSceneField(activeScene.id, {
+      dialogue: newDialogueStr,
+      dialogue_turns: updatedTurns,
+    });
   };
 
   const handleSelectTurn = (turnIdx: number) => {
     setSelectedTurnIndex(turnIdx);
-    const turns = activeScene?.dialogue_turns || [];
-    const turn = turns[turnIdx];
-    if (turn) {
-      setEmoPreset(turn.emotion_preset || "calm");
-      setEmoAlpha(turn.emotion_alpha ?? 0.6);
-      setEmoVector(turn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+  };
+
+  const handleUpdateTurnText = (turnIdx: number, newText: string) => {
+    if (!activeScene) return;
+    const currentTurns = activeScene.dialogue_turns || [];
+    const updatedTurns = currentTurns.map((t, idx) => {
+      if (idx === turnIdx) {
+        return { ...t, text: newText };
+      }
+      return t;
+    });
+
+    const newDialogueStr = updatedTurns.map(formatTurnToString).join("\n\n");
+    handleUpdateSceneField(activeScene.id, {
+      dialogue: newDialogueStr,
+      dialogue_turns: updatedTurns,
+    });
+  };
+
+  const handleUpdateTurnSpeaker = (turnIdx: number, newSpeaker: string) => {
+    if (!activeScene) return;
+    const currentTurns = activeScene.dialogue_turns || [];
+    const updatedTurns = currentTurns.map((t, idx) => {
+      if (idx === turnIdx) {
+        return { ...t, speaker: newSpeaker.toUpperCase() };
+      }
+      return t;
+    });
+
+    const newDialogueStr = updatedTurns.map(formatTurnToString).join("\n\n");
+    handleUpdateSceneField(activeScene.id, {
+      dialogue: newDialogueStr,
+      dialogue_turns: updatedTurns,
+    });
+  };
+
+  const handleAddTurn = () => {
+    if (!activeScene) return;
+    const currentTurns = activeScene.dialogue_turns || [];
+    const newTurn: DialogueTurn = {
+      speaker: "NARRATOR",
+      text: "New dialogue line...",
+      emotion_preset: "calm",
+      emotion_alpha: 0.6,
+      emotion_vector: [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9],
+    };
+    const updatedTurns = [...currentTurns, newTurn];
+    const newDialogueStr = updatedTurns.map(formatTurnToString).join("\n\n");
+
+    handleUpdateSceneField(activeScene.id, {
+      dialogue: newDialogueStr,
+      dialogue_turns: updatedTurns,
+    });
+
+    // Select the new turn
+    setSelectedTurnIndex(updatedTurns.length - 1);
+    setEmoPreset("calm");
+    setEmoAlpha(0.6);
+    setEmoVector([0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+    setUseEmoText(false);
+    setEmoText("");
+    setLocalDialogue(newTurn.text);
+    localDialogueRef.current = newTurn.text;
+  };
+
+  const handleDeleteTurn = (turnIdx: number) => {
+    if (!activeScene) return;
+    const currentTurns = activeScene.dialogue_turns || [];
+    if (currentTurns.length === 0) return;
+
+    const updatedTurns = currentTurns.filter((_, idx) => idx !== turnIdx);
+    const newDialogueStr = updatedTurns.map(formatTurnToString).join("\n\n");
+
+    handleUpdateSceneField(activeScene.id, {
+      dialogue: newDialogueStr,
+      dialogue_turns: updatedTurns,
+    });
+
+    if (updatedTurns.length > 0) {
+      const nextIdx = Math.max(0, turnIdx - 1);
+      setSelectedTurnIndex(nextIdx);
+      const nextTurn = updatedTurns[nextIdx];
+      setEmoPreset(nextTurn.emotion_preset || "calm");
+      setEmoAlpha(nextTurn.emotion_alpha ?? 0.6);
+      setEmoVector(nextTurn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+      setUseEmoText(!!nextTurn.use_emotion_text || !!nextTurn.emotion_text);
+      setEmoText(nextTurn.emotion_text || "");
+      setLocalDialogue(nextTurn.text);
+      localDialogueRef.current = nextTurn.text;
+    } else {
+      setSelectedTurnIndex(null);
+      setLocalDialogue("");
+      localDialogueRef.current = "";
     }
   };
 
-  // Synchronize local dialogue state when active scene changes
+  // 1. Initial parse/reconciliation when active scene changes
   useEffect(() => {
-    // If the active scene changes, save the unsaved localDialogue changes of the PREVIOUS scene to scenes list!
-    if (prevActiveSceneIdRef.current && prevActiveSceneIdRef.current !== activeScene?.id) {
-      const prevId = prevActiveSceneIdRef.current;
-      const finalVal = localDialogueRef.current;
-      setScenes((prevScenes) =>
-        prevScenes.map((s) => {
-          if (s.id === prevId) {
-            return { ...s, dialogue: finalVal };
-          }
-          return s;
-        })
-      );
-    }
-
     if (activeScene) {
       const val = activeScene.dialogue || "";
-      setLocalDialogue(val);
-      localDialogueRef.current = val;
-      prevActiveSceneIdRef.current = activeScene.id;
-
       const existing = activeScene.dialogue_turns || [];
       const reconciled = reconcileDialogueTurns(val, existing, characters.map(c => c.name));
-      
+
       // Update scene dialogue_turns if they changed or were uninitialized
       if (!activeScene.dialogue_turns || activeScene.dialogue_turns.length !== reconciled.length) {
         handleUpdateSceneField(activeScene.id, { dialogue_turns: reconciled });
       }
 
       if (reconciled.length > 0) {
-        setSelectedTurnIndex(0);
-        const firstTurn = reconciled[0];
-        setEmoPreset(firstTurn.emotion_preset || "calm");
-        setEmoAlpha(firstTurn.emotion_alpha ?? 0.6);
-        setEmoVector(firstTurn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+        if (selectedTurnIndex === null || selectedTurnIndex >= reconciled.length) {
+          setSelectedTurnIndex(0);
+          const firstTurn = reconciled[0];
+          setEmoPreset(firstTurn.emotion_preset || "calm");
+          setEmoAlpha(firstTurn.emotion_alpha ?? 0.6);
+          setEmoVector(firstTurn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+          setUseEmoText(!!firstTurn.use_emotion_text || !!firstTurn.emotion_text);
+          setEmoText(firstTurn.emotion_text || "");
+        }
       } else {
         setSelectedTurnIndex(null);
       }
     } else {
-      setLocalDialogue("");
-      localDialogueRef.current = "";
-      prevActiveSceneIdRef.current = null;
       setSelectedTurnIndex(null);
     }
   }, [activeScene?.id]);
+
+  // 2. Synchronize local editing dialogue text and emotions with selected turn
+  useEffect(() => {
+    if (activeScene && selectedTurnIndex !== null && activeScene.dialogue_turns?.[selectedTurnIndex]) {
+      const turn = activeScene.dialogue_turns[selectedTurnIndex];
+      const turnText = turn.text || "";
+      setLocalDialogue(turnText);
+      localDialogueRef.current = turnText;
+
+      setEmoPreset(turn.emotion_preset || "calm");
+      setEmoAlpha(turn.emotion_alpha ?? 0.6);
+      setEmoVector(turn.emotion_vector || [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]);
+      setUseEmoText(!!turn.use_emotion_text || !!turn.emotion_text);
+      setEmoText(turn.emotion_text || "");
+    } else {
+      setLocalDialogue("");
+      localDialogueRef.current = "";
+    }
+  }, [activeScene?.id, selectedTurnIndex]);
 
   // Load preset vectors
   const handleApplyPreset = (presetId: string) => {
@@ -407,16 +565,31 @@ export default function VoiceoverStudio() {
     setIsSaving(true);
     try {
       console.log("[Voiceover] Manually persisting dialogue and voice settings...");
-      const finalDialogue = localDialogueRef.current;
+      
+      let finalDialogue = "";
+      if (selectedTurnIndex !== null && activeScene?.dialogue_turns) {
+        const updatedTurns = activeScene.dialogue_turns.map((t, idx) => {
+          if (idx === selectedTurnIndex) {
+            return { ...t, text: localDialogueRef.current };
+          }
+          return t;
+        });
+        finalDialogue = updatedTurns.map(formatTurnToString).join("\n\n");
+      } else {
+        finalDialogue = localDialogueRef.current;
+      }
+
       // Make sure we include the current localDialogue in the active scene!
       const currentScenes = scenes.map((s) => {
         if (selectedSceneId && s.id === selectedSceneId) {
-          return { ...s, dialogue: finalDialogue };
+          const reconciled = reconcileDialogueTurns(finalDialogue, s.dialogue_turns, characters.map(c => c.name));
+          return { ...s, dialogue: finalDialogue, dialogue_turns: reconciled };
         }
         return s;
       });
 
       const updatedDesign = {
+        ...design,
         script,
         entities,
         scenes: currentScenes,
@@ -454,33 +627,183 @@ export default function VoiceoverStudio() {
     agent.runAgent();
   };
 
+  // Batch synthesize vocal recordings for all scenes
+  const handleBatchSynthesizeAll = async () => {
+    if (scenes.length === 0) return;
+    aiRunningRef.current = false;
+    setIsBatchSynthesizing(true);
+
+    // Resolve narrator voice ID
+    const narratorVoiceRef = design.narrator_voice || "voice_04";
+    const narratorVoiceObj = PRESET_VOICES.find(v => v.id === narratorVoiceRef) || allVoices.find(v => v.id === narratorVoiceRef);
+    const narratorPath = narratorVoiceObj ? (narratorVoiceObj.path || narratorVoiceObj.sampleUrl) : "examples/voice_04.wav";
+
+    // Build dynamic speaker voice map
+    const characterVoices: Record<string, string> = {};
+    characterVoices["NARRATOR"] = narratorPath;
+    characterVoices["SYSTEM"] = narratorPath;
+    characters.forEach((c) => {
+      if (c.voice_reference) {
+        const charVoiceObj = PRESET_VOICES.find(v => v.id === c.voice_reference) || allVoices.find(v => v.id === c.voice_reference);
+        characterVoices[c.name.toUpperCase()] = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : c.voice_reference;
+      }
+    });
+
+    let updatedScenes = [...scenes];
+
+    try {
+      for (const scene of scenes) {
+        // Find dialogue turns text
+        const dialogueTurns = scene.dialogue_turns || reconcileDialogueTurns(scene.dialogue || "", [], characters.map(c => c.name));
+        const dialogueText = dialogueTurns.map(formatTurnToString).join("\n\n").trim();
+
+        if (!dialogueText) continue; // Skip scenes with no dialogue
+
+        const clientTurns = dialogueTurns.map(t => ({
+          speaker: t.speaker,
+          text: t.text,
+          emo_alpha: t.emotion_alpha,
+          emo_vector: t.emotion_vector,
+          emotion_text: t.emotion_text,
+        }));
+
+        const res = await fetch("/api/generate-audio", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: dialogueText,
+            spk_audio_prompt: narratorPath, // Fallback prompt
+            emo_alpha: 0.6,
+            emo_vector: null,
+            use_emo_text: false,
+            emo_text: null,
+            sceneId: scene.id,
+            character_voices: characterVoices,
+            turns: clientTurns,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "success" && data.url) {
+            updatedScenes = updatedScenes.map((s) => {
+              if (s.id === scene.id) {
+                return {
+                  ...s,
+                  audio_url: data.url,
+                  audio_duration: data.duration,
+                  dialogue_turns: dialogueTurns
+                };
+              }
+              return s;
+            });
+            // Update state in real-time as each scene finishes
+            setScenes(updatedScenes);
+          }
+        }
+      }
+
+      // Save all updated scenes back to backend thread
+      const updatedDesign = {
+        ...design,
+        script,
+        entities,
+        scenes: updatedScenes,
+      };
+
+      await updateThreadState(projectId, {
+        design: updatedDesign,
+      });
+
+      if (agent) {
+        agent.setState({
+          ...agent.state,
+          design: updatedDesign,
+        });
+      }
+
+      alert("Batch synthesis completed for all scenes!");
+    } catch (err) {
+      console.error("Batch synthesis failed:", err);
+      alert("An error occurred during batch synthesis.");
+    } finally {
+      setIsBatchSynthesizing(false);
+    }
+  };
+
   // Perform TTS Dubbing Call
   const handleSynthesizeAudio = async () => {
     if (!activeScene) return;
     aiRunningRef.current = false;
 
-    const dialogueText = localDialogueRef.current.trim();
+    let dialogueText = "";
+    if (selectedTurnIndex !== null && activeScene.dialogue_turns) {
+      const updatedTurns = activeScene.dialogue_turns.map((t, idx) => {
+        if (idx === selectedTurnIndex) {
+          return { ...t, text: localDialogueRef.current };
+        }
+        return t;
+      });
+      dialogueText = updatedTurns.map(formatTurnToString).join("\n\n");
+    } else {
+      dialogueText = localDialogueRef.current;
+    }
+    dialogueText = dialogueText.trim();
+
     if (!dialogueText) {
       alert("Please enter dialogue script text first.");
       return;
     }
 
+    // Resolve narrator voice ID
+    const narratorVoiceRef = design.narrator_voice || "voice_04";
+    const narratorVoiceObj = PRESET_VOICES.find(v => v.id === narratorVoiceRef) || allVoices.find(v => v.id === narratorVoiceRef);
+    const narratorPath = narratorVoiceObj ? (narratorVoiceObj.path || narratorVoiceObj.sampleUrl) : "examples/voice_04.wav";
+
     // Resolve speaker audio reference path
-    let speakerRefPath = "examples/voice_04.wav"; // Deep Narrator default
+    let speakerRefPath = narratorPath;
     if (activeScene.voice_actor_id && activeScene.voice_actor_id !== "narrator") {
       const char = characters.find((c) => c.id === activeScene.voice_actor_id);
       if (char?.voice_reference) {
-        speakerRefPath = char.voice_reference;
+        const charVoiceObj = PRESET_VOICES.find(v => v.id === char.voice_reference) || allVoices.find(v => v.id === char.voice_reference);
+        speakerRefPath = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : char.voice_reference;
       }
     }
 
     // Build dynamic speaker voice map for multi-character dialogue parsing and stitching
     const characterVoices: Record<string, string> = {};
+    characterVoices["NARRATOR"] = narratorPath;
+    characterVoices["SYSTEM"] = narratorPath;
+    
     characters.forEach((c) => {
       if (c.voice_reference) {
-        characterVoices[c.name.toUpperCase()] = c.voice_reference;
+        const charVoiceObj = PRESET_VOICES.find(v => v.id === c.voice_reference) || allVoices.find(v => v.id === c.voice_reference);
+        characterVoices[c.name.toUpperCase()] = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : c.voice_reference;
       }
     });
+
+    const clientTurns = activeScene.dialogue_turns
+      ? activeScene.dialogue_turns.map((t, idx) => {
+          if (selectedTurnIndex !== null && idx === selectedTurnIndex) {
+            return {
+              speaker: t.speaker,
+              text: localDialogueRef.current,
+              emo_alpha: emoAlpha,
+              emo_vector: emoPreset === "custom" || emoPreset ? emoVector : null,
+              emotion_text: useEmoText ? emoText : t.emotion_text,
+            };
+          }
+          return {
+            speaker: t.speaker,
+            text: t.text,
+            emo_alpha: t.emotion_alpha,
+            emo_vector: t.emotion_vector,
+            emotion_text: t.emotion_text,
+          };
+        })
+      : [];
 
     setIsSynthesizing(true);
 
@@ -499,6 +822,7 @@ export default function VoiceoverStudio() {
           emo_text: useEmoText ? emoText || dialogueText : null,
           sceneId: activeScene.id,
           character_voices: characterVoices,
+          turns: clientTurns,
         }),
       });
 
@@ -509,12 +833,11 @@ export default function VoiceoverStudio() {
 
       const data = await res.json();
       if (data.status === "success" && data.url) {
-        const finalDialogue = localDialogueRef.current;
         const updatedScenes = scenes.map((s) => {
           if (s.id === activeScene.id) {
             return {
               ...s,
-              dialogue: finalDialogue,
+              dialogue: dialogueText,
               audio_url: data.url,
               audio_duration: data.duration,
             };
@@ -574,6 +897,189 @@ export default function VoiceoverStudio() {
     }
   };
 
+  const renderVoiceCastCard = (currentSpeaker: string) => {
+    const isNarrator = currentSpeaker === "NARRATOR" || currentSpeaker === "SYSTEM";
+    const char = characters.find(c => c.name.toUpperCase() === currentSpeaker.toUpperCase());
+
+    let currentVoiceRef = "";
+    let displayName = currentSpeaker;
+    if (isNarrator) {
+      currentVoiceRef = design.narrator_voice || "voice_04";
+      displayName = "Narrator (旁白)";
+    } else if (char) {
+      currentVoiceRef = char.voice_reference || "";
+      displayName = char.name;
+    } else {
+      return (
+        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-500">
+          ⚠️ Speaker "{currentSpeaker}" is not created in Character Breakdown. Please add them first in Breakdown page.
+        </div>
+      );
+    }
+
+    const currentVoice = allVoices.find(v => v.id === currentVoiceRef || v.sampleUrl === currentVoiceRef) 
+      || PRESET_VOICES.find(v => v.id === currentVoiceRef || v.path === currentVoiceRef);
+    const isCustomVoice = currentVoiceRef && !currentVoice;
+    const isVoicePlaying = currentVoice && playingVoiceId === currentVoice.id;
+
+    const playVoicePreview = () => {
+      if (!currentVoice) return;
+      const path = currentVoice.sampleUrl || currentVoice.path;
+      const id = currentVoice.id;
+      
+      let finalUrl = "";
+      if (path.startsWith("examples/") || path.startsWith("presets/")) {
+        finalUrl = `/api/preview-voice?path=${encodeURIComponent(path)}`;
+      } else {
+        const filename = path.split("/").pop();
+        finalUrl = `/api/speech-samples/${filename}`;
+      }
+
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        if (playingVoiceId === id) {
+          setPlayingVoiceId(null);
+          return;
+        }
+      }
+
+      const audio = new Audio(finalUrl);
+      audioPlayerRef.current = audio;
+      setPlayingVoiceId(id);
+      audio.play().catch(err => {
+        console.error("Audition playback failed:", err);
+        setPlayingVoiceId(null);
+      });
+      audio.onended = () => {
+        setPlayingVoiceId(null);
+      };
+    };
+
+    const handleSelectVoice = async (voice: any) => {
+      if (isNarrator) {
+        setNarratorVoice(voice.id);
+        const updatedDesign = {
+          ...design,
+          narrator_voice: voice.id
+        };
+        if (agent) {
+          agent.setState({
+            ...agent.state,
+            design: updatedDesign
+          });
+        }
+        try {
+          await updateThreadState(projectId, { design: updatedDesign });
+        } catch (err) {
+          console.error("Failed to auto-save narrator voice:", err);
+        }
+      } else if (char) {
+        const updatedEntities = entities.map(e => {
+          if (e.id === char.id) {
+            return { ...e, voice_reference: voice.id };
+          }
+          return e;
+        });
+        setEntities(updatedEntities);
+        const updatedDesign = {
+          ...design,
+          entities: updatedEntities
+        };
+        if (agent) {
+          agent.setState({
+            ...agent.state,
+            design: updatedDesign
+          });
+        }
+        try {
+          await updateThreadState(projectId, { design: updatedDesign });
+        } catch (err) {
+          console.error("Failed to auto-save character voice:", err);
+        }
+      }
+    };
+
+    return (
+      <div className="space-y-2 pt-1 border-t border-border/40">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-400 block">
+            🎙️ {displayName} Voice Cast (配音声线)
+          </label>
+        </div>
+        <Card
+          onClick={() => setIsVoiceDialogOpen(true)}
+          className={cn(
+            "p-3 cursor-pointer transition-all border text-left relative group select-none shadow-sm hover:bg-muted/10",
+            currentVoiceRef 
+              ? "border-primary/40 bg-primary/[0.01]"
+              : "border-dashed border-border/80 hover:border-primary/30"
+          )}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-1 flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h4 className="text-xs font-bold text-foreground truncate">
+                  {currentVoice ? currentVoice.name : (isCustomVoice ? "Custom Voice" : "No Voice Casted")}
+                </h4>
+                {currentVoice && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-[9px] px-1.5 py-0 font-semibold uppercase tracking-wider rounded border shrink-0",
+                      currentVoice.gender?.toLowerCase() === "female" && "text-pink-500 border-pink-500/20 bg-pink-500/5",
+                      currentVoice.gender?.toLowerCase() === "male" && "text-blue-500 border-blue-500/20 bg-blue-500/5",
+                      currentVoice.gender?.toLowerCase() === "narrator" && "text-amber-500 border-amber-500/20 bg-amber-500/5",
+                      currentVoice.gender?.toLowerCase() === "special" && "text-purple-500 border-purple-500/20 bg-purple-500/5"
+                    )}
+                  >
+                    {currentVoice.gender}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-normal line-clamp-1">
+                {currentVoice ? currentVoice.description : "Click here to choose a voice for this speaker."}
+              </p>
+              <div className="text-[9px] text-primary/70 font-semibold flex items-center gap-1 group-hover:text-primary transition-colors">
+                <SparklesIcon className="w-2.5 h-2.5" />
+                <span>Click to Change Voice</span>
+              </div>
+            </div>
+
+            {currentVoice && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  playVoicePreview();
+                }}
+                className={cn(
+                  "w-8 h-8 rounded-full border transition-all shrink-0 shadow-sm",
+                  isVoicePlaying
+                    ? "bg-primary text-white border-primary animate-pulse"
+                    : "bg-background/80 hover:bg-primary/10 border-border/80 text-muted-foreground hover:text-primary"
+                )}
+              >
+                {isVoicePlaying ? (
+                  <PauseIcon className="w-3.5 h-3.5 fill-current" />
+                ) : (
+                  <PlayIcon className="w-3.5 h-3.5 ml-0.5 fill-current" />
+                )}
+              </Button>
+            )}
+          </div>
+        </Card>
+
+        <VoiceSelectorDialog
+          isOpen={isVoiceDialogOpen}
+          onOpenChange={setIsVoiceDialogOpen}
+          selectedVoiceId={currentVoiceRef || null}
+          onSelect={handleSelectVoice}
+        />
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full bg-background text-foreground">
       {/* Hidden Audio element for auditioning */}
@@ -600,6 +1106,12 @@ export default function VoiceoverStudio() {
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
+              <BreadcrumbItem className="hidden md:block">
+                <BreadcrumbLink href="#" className="text-muted-foreground hover:text-foreground">
+                  Generation
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
                 <BreadcrumbPage className="font-medium">Voiceover Studio</BreadcrumbPage>
               </BreadcrumbItem>
@@ -616,6 +1128,23 @@ export default function VoiceoverStudio() {
           >
             <SparklesIcon className="w-3.5 h-3.5 mr-2" />
             AI Auto-Extract Dialogues
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBatchSynthesizeAll}
+            disabled={isBatchSynthesizing}
+            className="h-9 px-3 border-dashed hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all group shadow-sm"
+          >
+            {isBatchSynthesizing ? (
+              <Loader2Icon className="w-3.5 h-3.5 mr-2 animate-spin text-muted-foreground" />
+            ) : (
+              <Wand2Icon className="w-3.5 h-3.5 mr-2 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
+            )}
+            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+              {isBatchSynthesizing ? "Synthesizing All..." : "Batch Synthesize All"}
+            </span>
           </Button>
 
           <Button
@@ -639,10 +1168,10 @@ export default function VoiceoverStudio() {
             variant="default"
             size="sm"
             onClick={() => router.push(`/workspace/${projectId}/generation/keyframes`)}
-            className="h-9 px-4 font-semibold shadow-sm"
+            className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
           >
-            Next: Keyframe Gen
-            <ArrowRightIcon className="w-4 h-4 ml-2" />
+            <span className="text-xs font-semibold">Next: Keyframe Gen</span>
+            <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
 
           {!isChatOpen && (
@@ -867,146 +1396,111 @@ export default function VoiceoverStudio() {
                       <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
                         <Loader2Icon className="w-6 h-6 text-indigo-500 animate-spin" />
                       </div>
-                      <p className="text-sm font-bold tracking-wider text-foreground">Rendering voiceover with IndexTTS2...</p>
+                      <p className="text-sm font-bold tracking-wider text-foreground">Generating voiceover audio...</p>
                       <p className="text-xs text-muted-foreground">Cloning reference soundwave & blending emotion vectors</p>
                     </div>
                   )}
 
-                  {/* Top Scene Overview */}
-                  <div className="p-4 rounded-xl border border-border bg-background/60 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold font-mono text-indigo-400">
-                        {selectedTurnIndex !== null 
-                          ? `TURN #${selectedTurnIndex + 1} (${activeScene.dialogue_turns?.[selectedTurnIndex]?.speaker || "NARRATOR"})`
-                          : `SCENE DUBBING #${activeScene.id.toUpperCase()}`}
-                      </span>
-                      {activeScene.audio_duration && (
-                        <div className="flex items-center gap-3 text-xs font-bold text-indigo-400">
-                          <span className="flex items-center gap-1">
-                            <ClockIcon className="w-3.5 h-3.5" />
-                            {activeScene.audio_duration}s
-                          </span>
-                          <span className="flex items-center gap-1 text-emerald-400">
-                            <FilmIcon className="w-3.5 h-3.5" />
-                            {Math.round(activeScene.audio_duration * 24.0)} Frames
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                     <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-muted-foreground">
-                        Voice Actor (Speaking Character)
-                      </label>
-                      <select
-                         value={activeScene.voice_actor_id || "narrator"}
-                         onChange={(e) => handleUpdateSceneField(activeScene.id, { voice_actor_id: e.target.value })}
-                         className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus-visible:outline-none focus:border-indigo-500/40 shadow-sm"
-                      >
-                        <option value="narrator">Default Narrator (Deep Baritone)</option>
-                        {characters.map((char) => (
-                          <option key={char.id} value={char.id}>
-                            {char.name} ({char.voice_reference ? "Casted" : "No Cast - Default Fallback"})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-bold text-muted-foreground flex items-center justify-between">
-                        <span>Dialogue / Narration Lines</span>
-                        <span className="text-[10px] text-muted-foreground/60 font-semibold normal-case">
-                          Supports Speaker Syntax (e.g. JAX: Hello)
+                  {/* Top Scene Overview & Info Banner */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold font-mono text-indigo-400">
+                      {selectedTurnIndex !== null 
+                        ? `TURN #${selectedTurnIndex + 1} (${activeScene.dialogue_turns?.[selectedTurnIndex]?.speaker || "NARRATOR"})`
+                        : `SCENE DUBBING #${activeScene.id.toUpperCase()}`}
+                    </span>
+                    {activeScene.audio_duration && (
+                      <div className="flex items-center gap-3 text-xs font-bold text-indigo-400">
+                        <span className="flex items-center gap-1">
+                          <ClockIcon className="w-3.5 h-3.5" />
+                          {activeScene.audio_duration}s
                         </span>
-                      </label>
-                      <DialogueTextarea
-                        value={localDialogue}
-                        onChange={(val) => {
-                          localDialogueRef.current = val;
-                        }}
-                        onBlur={(val) => {
-                          setLocalDialogue(val);
-                          handleUpdateSceneField(activeScene.id, { dialogue: val });
-                        }}
-                        placeholder="Write narration or dialogue lines here..."
-                        className="bg-background text-sm min-h-[80px] resize-none border-border/80 focus-visible:ring-indigo-500/20"
-                      />
-                      
-                      {/* Character insertion quick helper */}
-                      <div className="flex items-center flex-wrap gap-1 mt-1.5">
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase mr-1">Insert Speaker:</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const currentVal = localDialogueRef.current;
-                            const newVal = currentVal + (currentVal.endsWith("\n") || currentVal === "" ? "" : "\n") + "NARRATOR: ";
-                            setLocalDialogue(newVal);
-                            localDialogueRef.current = newVal;
-                            handleUpdateSceneField(activeScene.id, { dialogue: newVal });
-                          }}
-                          className="h-5 px-1.5 text-[9px] font-bold border-neutral-500/20 text-neutral-400 bg-neutral-500/5 hover:bg-neutral-500/10"
-                        >
-                          🎙️ Narrator
-                        </Button>
-                        {characters.map(char => (
-                          <Button
-                            key={char.id}
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const currentVal = localDialogueRef.current;
-                              const newVal = currentVal + (currentVal.endsWith("\n") || currentVal === "" ? "" : "\n") + `${char.name.toUpperCase()}: `;
-                              setLocalDialogue(newVal);
-                              localDialogueRef.current = newVal;
-                              handleUpdateSceneField(activeScene.id, { dialogue: newVal });
-                            }}
-                            className="h-5 px-1.5 text-[9px] font-bold border-blue-500/20 text-blue-400 bg-blue-500/5 hover:bg-blue-500/10"
-                          >
-                            👤 {char.name}
-                          </Button>
-                        ))}
+                        <span className="flex items-center gap-1 text-emerald-400">
+                          <FilmIcon className="w-3.5 h-3.5" />
+                          {Math.round(activeScene.audio_duration * 24.0)} Frames
+                        </span>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Real-time Script Flow Preview */}
-                  {(() => {
-                    const turns = parseDialogueText(localDialogue || "", characters.map(c => c.name));
-                    if (turns.length > 1) {
-                      return (
-                        <div className="p-4 rounded-xl border border-dashed border-indigo-500/20 bg-indigo-500/[0.01] shrink-0 space-y-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block mb-1">
-                            🎭 Live Screenplay Preview ({turns.length} speakers)
-                          </span>
-                          <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-                            {turns.map((turn, tIdx) => {
-                              const isNarrator = turn.speaker === "NARRATOR" || turn.speaker === "SYSTEM";
-                              const char = characters.find(c => c.name.toUpperCase() === turn.speaker);
-                              
-                              return (
-                                <div key={tIdx} className="flex gap-2 items-start text-xs">
-                                  <span className={cn(
-                                    "font-mono font-bold uppercase px-1 py-0.5 rounded text-[8px] shrink-0 min-w-[64px] text-center leading-none",
-                                    isNarrator ? "bg-neutral-500/10 text-neutral-400 border border-neutral-500/10" : "bg-blue-500/10 text-blue-400 border border-blue-500/10"
-                                  )}>
-                                    {char ? char.name : turn.speaker}
-                                  </span>
-                                  <p className="flex-1 text-foreground/80 leading-normal italic text-[11px] truncate">
-                                    "{turn.text}"
-                                  </p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <p className="text-[9px] text-muted-foreground/75 leading-normal mt-1 border-t border-indigo-500/10 pt-1.5">
-                            💡 System detected multi-character script format! Audio stitches automatically.
-                          </p>
+                  {/* Edit Card Container */}
+                  <div className="p-4 rounded-xl border border-border bg-background/60 flex flex-col gap-4">
+                    {selectedTurnIndex !== null && activeScene.dialogue_turns?.[selectedTurnIndex] ? (
+                      <div className="space-y-4">
+                        {/* Speaker Selector Dropdown */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-400 block">
+                            👤 Speaking Character (说话角色)
+                          </label>
+                          <select
+                            value={activeScene.dialogue_turns[selectedTurnIndex].speaker || "NARRATOR"}
+                            onChange={(e) => handleUpdateTurnSpeaker(selectedTurnIndex, e.target.value)}
+                            className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus-visible:outline-none focus:border-indigo-500/40 shadow-sm"
+                          >
+                            <option value="NARRATOR">Narrator (旁白)</option>
+                            {characters.map((char) => (
+                              <option key={char.id} value={char.name.toUpperCase()}>
+                                {char.name}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      );
-                    }
-                    return null;
-                  })()}
+
+                        {/* Render the voice cast card for this speaker */}
+                        {renderVoiceCastCard(activeScene.dialogue_turns[selectedTurnIndex].speaker)}
+
+                        {/* Edit Selected Turn Text */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-400 block">
+                            🗣️ Dialogue Line Text (台词内容)
+                          </label>
+                          <DialogueTextarea
+                            value={localDialogue}
+                            onChange={(val) => {
+                              localDialogueRef.current = val;
+                            }}
+                            onBlur={(val) => {
+                              setLocalDialogue(val);
+                              handleUpdateTurnText(selectedTurnIndex, val);
+                            }}
+                            placeholder="Enter dialogue/narration line text..."
+                            className="bg-background text-sm min-h-[80px] resize-none border-border/80 focus-visible:ring-indigo-500/20"
+                          />
+                        </div>
+
+                        {/* Turn action buttons */}
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTurn(selectedTurnIndex)}
+                            className="h-8 px-2.5 text-xs font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 border-rose-500/20"
+                          >
+                            <Trash2Icon className="w-3.5 h-3.5 mr-1.5" />
+                            Delete Turn
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAddTurn}
+                            className="h-8 px-2.5 text-xs font-semibold"
+                          >
+                            <PlusIcon className="w-3.5 h-3.5 mr-1.5" />
+                            Add Turn
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-xs text-muted-foreground/60 py-8">
+                        No dialogue turns found for this scene.
+                        <div className="mt-3">
+                          <Button variant="outline" size="sm" onClick={handleAddTurn} className="h-8 text-xs font-semibold">
+                            <PlusIcon className="w-3.5 h-3.5 mr-1.5" />
+                            Add First Turn
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Core Emotion controls */}
                   <div className="space-y-5 flex-1 overflow-y-auto pr-1">

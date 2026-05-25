@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const maxDuration = 900; // 15 minutes execution limit
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -47,7 +49,31 @@ export async function POST(req: Request) {
     console.log(`[API Proxy] Flux server generation success:`, data);
     
     // The backend returns the complete URL directly in data.url
-    const url = data.url;
+    let url = data.url;
+
+    // Rewrite any relative or local hostnames to use the correct public domain
+    if (url) {
+      try {
+        if (url.startsWith("/")) {
+          const origin = new URL(fluxServerUrl).origin;
+          url = `${origin}${url}`;
+        } else {
+          const urlObj = new URL(url);
+          if (
+            urlObj.hostname === "localhost" ||
+            urlObj.hostname === "127.0.0.1" ||
+            urlObj.hostname === "0.0.0.0"
+          ) {
+            const serverOrigin = new URL(fluxServerUrl).origin;
+            url = `${serverOrigin}${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
+          }
+        }
+      } catch (e) {
+        console.warn("[API Proxy] Failed to rewrite keyframe URL:", e);
+      }
+    }
+
+    console.log(`[API Proxy] Returning corrected keyframe URL:`, url);
 
     return NextResponse.json({
       status: "success",

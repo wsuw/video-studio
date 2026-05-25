@@ -170,8 +170,6 @@ export default function Page() {
     // 2. Real async network sync to LangGraph server running on port 8123 in the background!
     const syncAndRedirect = async () => {
       try {
-        const LANGGRAPH_API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL || "http://localhost:8123"
-
         // A. First, create the thread with custom metadata (user_id, name, prompt, ratio, style, voice)
         const threadData = await createThread({
           name: finalProjectName,

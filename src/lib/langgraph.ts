@@ -2,7 +2,7 @@
  * LangGraph Server API 客户端工具库
  */
 
-const LANGGRAPH_API_URL = process.env.NEXT_PUBLIC_LANGGRAPH_API_URL || "http://localhost:8123";
+const LANGGRAPH_API_URL = "/api/langgraph";
 
 export const FIXED_USER_ID = "default-user-id";
 

@@ -199,10 +199,10 @@ export default function StylePage() {
                 variant="default"
                 size="sm"
                 onClick={() => router.push(`/workspace/${projectId}/design/storyboard`)}
-                className="text-xs font-semibold h-9"
+                className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
               >
-                Next: Storyboard
-                <ArrowRightIcon className="w-4 h-4 ml-1.5" />
+                <span className="text-xs font-semibold">Next: Storyboard</span>
+                <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
           </div>
@@ -392,10 +392,10 @@ export default function StylePage() {
               variant="default"
               size="lg"
               onClick={() => router.push(`/workspace/${projectId}/design/storyboard`)}
-              className="text-xs font-bold px-6 shadow-md"
+              className="flex items-center gap-2 h-11 px-6 bg-primary hover:bg-primary/90 shadow-md transition-all group"
             >
-              Confirm Styles & Launch Storyboard Flow
-              <ArrowRightIcon className="w-4.5 h-4.5 ml-2 shrink-0" />
+              <span className="text-xs font-bold">Confirm Styles & Launch Storyboard Flow</span>
+              <ArrowRightIcon className="h-4.5 w-4.5 group-hover:translate-x-1 transition-transform shrink-0" />
             </Button>
           </div>
 

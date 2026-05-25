@@ -26,7 +26,8 @@ import {
   FolderSyncIcon,
   PlayIcon,
   PauseIcon,
-  Volume2Icon
+  Volume2Icon,
+  ArrowRightIcon
 } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
@@ -242,9 +243,10 @@ After generating the visual profile, please ALSO call the generate_entity_portra
             variant="default"
             size="sm"
             onClick={() => router.push(`/workspace/${projectId}/design/style`)}
-            className="h-9 px-4 font-semibold shadow-sm"
+            className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
           >
-            Next: Style Setup
+            <span className="text-xs font-semibold">Next: Style Setup</span>
+            <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
 
           {!isChatOpen && (
@@ -512,7 +514,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
 
                       {/* Character Voice Reference Selection */}
                       {activeEntity.type === "character" && (() => {
-                        const currentVoice = allVoices.find(v => v.sampleUrl === activeEntity.voice_reference) || PRESET_VOICES.find(v => v.path === activeEntity.voice_reference);
+                        const currentVoice = allVoices.find(v => v.id === activeEntity.voice_reference || v.sampleUrl === activeEntity.voice_reference) || PRESET_VOICES.find(v => v.id === activeEntity.voice_reference || v.path === activeEntity.voice_reference);
                         const isCustomVoice = activeEntity.voice_reference && !currentVoice;
                         const isVoicePlaying = currentVoice && playingVoiceId === currentVoice.id;
 
@@ -655,9 +657,9 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                               <VoiceSelectorDialog
                                 isOpen={isVoiceDialogOpen}
                                 onOpenChange={setIsVoiceDialogOpen}
-                                selectedVoiceUrl={activeEntity.voice_reference || null}
+                                selectedVoiceId={activeEntity.voice_reference || null}
                                 onSelect={(voice) => {
-                                  handleEntityUpdate(activeEntity.id, { voice_reference: voice.sampleUrl });
+                                  handleEntityUpdate(activeEntity.id, { voice_reference: voice.id });
                                 }}
                               />
                             </div>

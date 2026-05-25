@@ -418,7 +418,6 @@ export default function ProjectsPage() {
                                 variant="ghost"
                                 onClick={(e) => handleDelete(project.id, project.name, project.isDefault, e)}
                                 className="size-7 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors z-20"
-                                tooltip="Delete Project"
                               >
                                 <Trash2 className="size-3.5" />
                                 <span className="sr-only">Delete</span>

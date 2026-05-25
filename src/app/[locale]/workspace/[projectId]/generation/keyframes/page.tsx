@@ -30,7 +30,8 @@ import {
   Undo2Icon,
   LayersIcon,
   DicesIcon,
-  CheckIcon
+  CheckIcon,
+  ArrowRightIcon
 } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
@@ -55,6 +56,7 @@ interface Scene {
   lens?: string;
   shot_type?: string;
   motion?: string;
+  master_url?: string;
 }
 
 // Preset Multi-Variant Gacha candidates mapping to selected styles & scene numerical suffixes
@@ -135,12 +137,50 @@ export default function QueuePage() {
 
   const { agent } = useAgent({ agentId: "default" });
 
+  // Helper to dynamically auto-heal local hostnames or relative paths to public domain
+  const getCleanUrl = (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("/")) {
+      return `https://t2i.aianime.space${url}`;
+    }
+    try {
+      const urlObj = new URL(url);
+      if (
+        urlObj.hostname === "localhost" ||
+        urlObj.hostname === "127.0.0.1" ||
+        urlObj.hostname === "0.0.0.0"
+      ) {
+        return `https://t2i.aianime.space${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
+      }
+    } catch (e) {}
+    return url;
+  };
+
+  // Helper to dynamically calculate 720p resolution boundaries based on project's aspect ratio
+  const getAspectRatioResolution = () => {
+    const ratio = design.aspect_ratio || "16:9";
+    if (ratio === "9:16") {
+      return { width: 720, height: 1280 };
+    }
+    if (ratio === "1:1") {
+      return { width: 720, height: 720 };
+    }
+    return { width: 1280, height: 720 }; // default 16:9 720p
+  };
+
   // States
   const [loadedDesign, setLoadedDesign] = useState<any>(null);
   const [renderingStates, setRenderingStates] = useState<Record<string, { progress: number; log: string }>>({});
 
   // Custom Gacha Choice state: sceneId -> chosenMasterImageUrl
-  const [masterOutputs, setMasterOutputs] = useState<Record<string, string>>({});
+  const [masterOutputs, setMasterOutputs] = useState<Record<string, string>>(() => {
+    // initialize from localStorage if available
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('keyframeMasterOutputs');
+      return stored ? JSON.parse(stored) : {};
+    }
+    return {};
+  });
 
   // Controls variant selection drawer: sceneId -> boolean (active selection mode)
   const [gachaMode, setGachaMode] = useState<Record<string, boolean>>({});
@@ -151,7 +191,7 @@ export default function QueuePage() {
   // Advanced inference engine controls
   const [renderMode, setRenderMode] = useState<'mock' | 'real_single' | 'real_gacha'>('real_single');
   const [guidanceScale, setGuidanceScale] = useState<number>(1.0);
-  const [numInferenceSteps, setNumInferenceSteps] = useState<number>(4);
+  const [numInferenceSteps, setNumInferenceSteps] = useState<number>(8);
   const [baseSeed, setBaseSeed] = useState<number>(0);
   const [stylePrompt, setStylePrompt] = useState<string>("");
 
@@ -179,15 +219,29 @@ export default function QueuePage() {
 
   // Pull states from Agent or fallback
   const design = agent?.state?.design || loadedDesign || {};
-  const scenes: Scene[] = design.scenes || [];
+  const [scenes, setScenes] = React.useState<Scene[]>(design?.scenes || []);
+  // Sync scenes when design changes
+  React.useEffect(() => {
+    setScenes(design?.scenes || []);
+  }, [design?.scenes]);
   const entities = design.entities || [];
   const globalArtStyle = design.art_style || "cyberpunk";
   const globalColorPalette = design.color_palette || "bladerunner";
   const globalStylePrompt = design.style_prompt || "";
 
-  const handleUpdateSceneStatus = (sceneId: string, status: "pending" | "locked" | "rendered") => {
+  const handleUpdateSceneStatus = (sceneId: string, status: "pending" | "locked" | "rendered", masterUrl?: string) => {
     if (!agent) return;
-    const updatedScenes = scenes.map(s => s.id === sceneId ? { ...s, status } : s);
+    const currentScenes = design.scenes || [];
+    const updatedScenes = currentScenes.map((s: any) => {
+      if (s.id === sceneId) {
+        return {
+          ...s,
+          status,
+          master_url: masterUrl !== undefined ? masterUrl : (s.master_url || masterOutputs[sceneId])
+        };
+      }
+      return s;
+    });
     agent.setState({
       ...agent.state,
       design: {
@@ -224,7 +278,7 @@ export default function QueuePage() {
     return styleVariants[key] || GACHA_VARIANTS.cyberpunk.s1;
   };
 
-  // Dispatch Render Gacha (Simulate or run real Flux-Klein GPU inference)
+  // Dispatch Render Gacha (Simulate or run real GPU inference)
   const handleStartRender = async (sceneId: string) => {
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
@@ -280,14 +334,14 @@ export default function QueuePage() {
 
       toast({
         title: "⚡ Generation Initiated",
-        description: "Executing real-time Flux.2 Klein diffusion on CUDA.",
+        description: "Executing real-time diffusion models on CUDA.",
       });
 
       // Periodic progress ticker during long HTTP request
       let currentProgress = 15;
       const progressInterval = setInterval(() => {
         currentProgress = Math.min(95, currentProgress + Math.floor(Math.random() * 8) + 2);
-        let logText = "Running Flux.2 Klein diffusion steps...";
+        let logText = "Running diffusion model inference...";
         if (currentProgress > 45) logText = "Synthesizing optical composition boundary nodes...";
         if (currentProgress > 75) logText = "Offloading model pipeline to system CPU...";
         if (currentProgress > 90) logText = "Writing finished static image frame...";
@@ -302,6 +356,7 @@ export default function QueuePage() {
       }, 650);
 
       try {
+        const { width, height } = getAspectRatioResolution();
         const response = await fetch("/api/generate-keyframe", {
           method: "POST",
           headers: {
@@ -313,6 +368,8 @@ export default function QueuePage() {
             num_inference_steps: numInferenceSteps,
             seed: baseSeed || Math.floor(Math.random() * 1000000),
             sceneId: scene.id,
+            width,
+            height,
           }),
         });
 
@@ -326,8 +383,14 @@ export default function QueuePage() {
         const data = await response.json();
 
         // Single frame generated successfully! Save directly to master frame
+        // Save master URL to state and persist in localStorage
         setMasterOutputs(prev => ({ ...prev, [sceneId]: data.url }));
-        handleUpdateSceneStatus(sceneId, "rendered");
+        setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, master_url: data.url, status: 'rendered' } : s));
+        // also store in localStorage for quick reload
+        const stored = JSON.parse(localStorage.getItem('keyframeMasterOutputs') || '{}');
+        stored[sceneId] = data.url;
+        localStorage.setItem('keyframeMasterOutputs', JSON.stringify(stored));
+        handleUpdateSceneStatus(sceneId, "rendered", data.url);
 
         setRenderingStates(prev => {
           const next = { ...prev };
@@ -383,6 +446,7 @@ export default function QueuePage() {
             }
           }));
 
+          const { width, height } = getAspectRatioResolution();
           const response = await fetch("/api/generate-keyframe", {
             method: "POST",
             headers: {
@@ -394,6 +458,8 @@ export default function QueuePage() {
               num_inference_steps: numInferenceSteps,
               seed: currentSeed,
               sceneId: `${scene.id}_v${i}`,
+              width,
+              height,
             }),
           });
 
@@ -428,15 +494,31 @@ export default function QueuePage() {
 
       } catch (error: any) {
         console.error("[Render] Gacha render error:", error);
+        
+        // Even if the overall process failed, if some variants succeeded, show them!
+        if (generatedUrls.length > 0) {
+          setRealGachaVariants(prev => ({
+            ...prev,
+            [sceneId]: generatedUrls
+          }));
+          setGachaMode(prev => ({ ...prev, [sceneId]: true }));
+          toast({
+            variant: "warning",
+            title: "⚠️ Gacha Partially Complete",
+            description: `Batch encountered a timeout or error, but successfully generated ${generatedUrls.length}/4 variants. You can choose from these!`,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "❌ Gacha Failed",
+            description: error.message || "Failed to complete multi-variant run.",
+          });
+        }
+
         setRenderingStates(prev => {
           const next = { ...prev };
           delete next[sceneId];
           return next;
-        });
-        toast({
-          variant: "destructive",
-          title: "❌ Gacha Failed",
-          description: error.message || "Failed to complete multi-variant run.",
         });
       }
     }
@@ -444,9 +526,14 @@ export default function QueuePage() {
 
   // Lock selected variant as the master frame
   const handleSelectMaster = (sceneId: string, url: string) => {
-    setMasterOutputs(prev => ({ ...prev, [sceneId]: url }));
+        // After real single render, persist master URL similarly
+        setMasterOutputs(prev => ({ ...prev, [sceneId]: url }));
+        setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, master_url: url, status: 'rendered' } : s));
+        const stored = JSON.parse(localStorage.getItem('keyframeMasterOutputs') || '{}');
+        stored[sceneId] = url;
+        localStorage.setItem('keyframeMasterOutputs', JSON.stringify(stored));
     setGachaMode(prev => ({ ...prev, [sceneId]: false }));
-    handleUpdateSceneStatus(sceneId, "rendered");
+    handleUpdateSceneStatus(sceneId, "rendered", url);
   };
 
   // Re-roll to open Gacha selection again
@@ -507,9 +594,10 @@ export default function QueuePage() {
             variant="default"
             size="sm"
             onClick={() => router.push(`/workspace/${projectId}/generation/video`)}
-            className="h-9 px-4 font-semibold shadow-sm"
+            className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
           >
-            Next: Video Gen
+            <span className="text-xs font-semibold">Next: Video Gen</span>
+            <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
 
           {!isChatOpen && (
@@ -550,9 +638,10 @@ export default function QueuePage() {
               const renderState = renderingStates[scene.id];
 
               const variants = getGachaOptions(scene.id);
-              const masterUrl = masterOutputs[scene.id] || variants[0];
+              const masterUrl = masterOutputs[scene.id] || scene.master_url || variants[0];
               const isGachaSelecting = !!gachaMode[scene.id];
-              const isRendered = scene.status === "rendered" && !isGachaSelecting;
+              const isRendered = (scene.status === "rendered" || scene.status === "locked") && !isGachaSelecting;
+              const isLocked = scene.status === "locked";
 
               return (
                 <div
@@ -561,7 +650,8 @@ export default function QueuePage() {
                     "p-5 rounded-2xl border bg-card transition-all duration-300 flex flex-col gap-4 relative overflow-hidden",
                     isRendering && "border-primary bg-primary/[0.01]",
                     isGachaSelecting && "border-amber-500/30 bg-amber-500/[0.01]",
-                    isRendered && "border-emerald-500/20 bg-emerald-500/[0.01]"
+                    isRendered && "border-emerald-500/20 bg-emerald-500/[0.01]",
+                    isLocked && "border-indigo-500/25 bg-indigo-500/[0.005]"
                   )}
                 >
                   {/* Top Line Details */}
@@ -581,7 +671,12 @@ export default function QueuePage() {
                     </div>
 
                     <div className="shrink-0">
-                      {isRendered ? (
+                      {isLocked ? (
+                        <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
+                          <CheckCircle2Icon className="w-3 h-3" />
+                          Master Confirmed (Locked)
+                        </Badge>
+                      ) : isRendered ? (
                         <div className="flex items-center gap-2">
                           <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
                             <CheckCircle2Icon className="w-3 h-3" />
@@ -615,7 +710,7 @@ export default function QueuePage() {
                           className="h-8 text-xs font-bold hover:bg-primary hover:text-primary-foreground border-primary/30 hover:border-primary transition-all duration-300"
                         >
                           <PlayIcon className="w-3.5 h-3.5 mr-1" />
-                          {renderMode === 'real_single' ? 'Generate Frame (Flux)' : 'Generate Variants (4x Gacha)'}
+                          {renderMode === 'real_single' ? 'Generate Frame' : 'Generate Variants (4x Gacha)'}
                         </Button>
                       )}
                     </div>
@@ -665,31 +760,59 @@ export default function QueuePage() {
                       {isRendered ? (
                         <div className="relative w-full h-full group/img">
                           <img
-                            src={masterUrl}
-                            alt={`Master Scene ${scene.id}`}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
-                          />
-                          {/* Quality Control overlay */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleUpdateSceneStatus(scene.id, "locked")}
-                              className="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold gap-1"
-                            >
-                              <CheckCircle2Icon className="w-3.5 h-3.5" />
-                              Lock Frame
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleUpdateSceneStatus(scene.id, "pending")}
-                              className="text-xs font-bold gap-1"
-                            >
-                              <Undo2Icon className="w-3.5 h-3.5" />
-                              Send to Redesign
-                            </Button>
-                          </div>
+                              src={getCleanUrl(masterUrl)}
+                              alt={`Master Scene ${scene.id}`}
+                              referrerPolicy="no-referrer"
+                              width={800}
+                              height={450}
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
+                            />
+                          {scene.status === "locked" ? (
+                            <>
+                              {/* Locked Badge (Glassmorphic) */}
+                              <div className="absolute top-3 right-3 bg-emerald-950/80 backdrop-blur-md border border-emerald-500/30 px-2.5 py-1 rounded-lg text-emerald-400 text-[10px] font-bold tracking-wider flex items-center gap-1.5 shadow-md">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+                                </span>
+                                LOCKED MASTER
+                              </div>
+
+                              {/* Unlock action on hover */}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleUpdateSceneStatus(scene.id, "rendered")}
+                                  className="border-amber-500/50 hover:bg-amber-500 hover:text-black text-amber-500 text-xs font-bold gap-1 shadow-lg bg-background/20 backdrop-blur-xs"
+                                >
+                                  <Undo2Icon className="w-3.5 h-3.5" />
+                                  Unlock & Edit
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            /* Quality Control overlay */
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleUpdateSceneStatus(scene.id, "locked", masterUrl)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold gap-1"
+                              >
+                                <CheckCircle2Icon className="w-3.5 h-3.5" />
+                                Lock Frame
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleUpdateSceneStatus(scene.id, "pending", masterUrl)}
+                                className="text-xs font-bold gap-1"
+                              >
+                                <Undo2Icon className="w-3.5 h-3.5" />
+                                Send to Redesign
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ) : isGachaSelecting ? (
                         /* Gacha 2x2 Selection Grid */
@@ -701,7 +824,7 @@ export default function QueuePage() {
                               className="group/variant relative w-full h-full rounded-lg overflow-hidden border border-border/80 hover:border-amber-500/70 hover:shadow-lg cursor-pointer transition-all duration-300"
                             >
                               <img
-                                src={url}
+                                src={getCleanUrl(url)}
                                 alt={`Variant ${variantIdx + 1}`}
                                 className="w-full h-full object-cover group-hover/variant:scale-105 transition-transform duration-500"
                               />
@@ -807,35 +930,35 @@ export default function QueuePage() {
                   <button
                     onClick={() => setRenderMode('mock')}
                     className={cn(
-                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
                       renderMode === 'mock'
                         ? "bg-background text-foreground shadow-sm border border-border/40"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    Mock Gacha
+                    Mock Preview
                   </button>
                   <button
                     onClick={() => setRenderMode('real_single')}
                     className={cn(
-                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
                       renderMode === 'real_single'
                         ? "bg-background text-primary shadow-sm border border-primary/20"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    Flux Single
+                    CUDA Single
                   </button>
                   <button
                     onClick={() => setRenderMode('real_gacha')}
                     className={cn(
-                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
                       renderMode === 'real_gacha'
                         ? "bg-background text-amber-500 shadow-sm border border-amber-500/20"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    Flux Gacha
+                    CUDA Gacha
                   </button>
                 </div>
               </div>
@@ -904,7 +1027,7 @@ export default function QueuePage() {
               <div className="flex justify-between items-center text-xs pt-2 border-t border-border/40">
                 <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Target Resolution:</span>
                 <span className="font-mono text-[10px] font-semibold text-foreground">
-                  Flux HD (1024x1024)
+                  {design.aspect_ratio === "9:16" ? "720p Vertical (720x1280)" : design.aspect_ratio === "1:1" ? "720p Square (720x720)" : "720p HD (1280x720)"}
                 </span>
               </div>
             </div>

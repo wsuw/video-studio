@@ -29,7 +29,8 @@ import {
   LayersIcon,
   VideoIcon,
   DownloadIcon,
-  Loader2
+  Loader2,
+  ArrowRightIcon
 } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
@@ -91,6 +92,25 @@ export default function VideoExecutionPage() {
   usePhaseSync("generate");
 
   const { agent } = useAgent({ agentId: "default" });
+
+  // Helper to dynamically auto-heal local hostnames or relative paths to public domain
+  const getCleanUrl = (url: string) => {
+    if (!url) return url;
+    if (url.startsWith("/")) {
+      return `https://i2v.aianime.space${url}`;
+    }
+    try {
+      const urlObj = new URL(url);
+      if (
+        urlObj.hostname === "localhost" ||
+        urlObj.hostname === "127.0.0.1" ||
+        urlObj.hostname === "0.0.0.0"
+      ) {
+        return `https://i2v.aianime.space${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
+      }
+    } catch (e) {}
+    return url;
+  };
 
   // States
   const [loadedDesign, setLoadedDesign] = useState<any>(null);
@@ -388,9 +408,10 @@ export default function VideoExecutionPage() {
             variant="default"
             size="sm"
             onClick={() => router.push(`/workspace/${projectId}/redesign/review`)}
-            className="h-9 px-4 font-semibold shadow-sm"
+            className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
           >
-            Next: HITL Review
+            <span className="text-xs font-semibold">Next: HITL Review</span>
+            <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
 
           {!isChatOpen && (
@@ -428,7 +449,7 @@ export default function VideoExecutionPage() {
             {scenes.map((scene) => {
               const isRendering = !!renderingStates[scene.id];
               const renderState = renderingStates[scene.id];
-              const videoUrl = videoOutputs[scene.id];
+              const videoUrl = getCleanUrl(videoOutputs[scene.id]);
               const isRendered = scene.status === "rendered" && !!videoUrl;
               const isActive = activeSceneId === scene.id;
 
@@ -468,9 +489,9 @@ export default function VideoExecutionPage() {
                         </p>
                       )}
                       {scene.audio_url && (
-                        <div className="mt-3 flex items-center gap-2 bg-muted/40 p-2 rounded-lg border border-border/40 max-w-xs" onClick={(e) => e.stopPropagation()}>
-                          <audio src={scene.audio_url} className="h-6 w-full max-w-[200px]" controls />
-                          <span className="text-[9px] font-mono text-muted-foreground font-semibold">
+                        <div className="mt-3 flex items-center gap-2.5 bg-muted/40 p-1.5 px-3 rounded-lg border border-border/40 w-fit" onClick={(e) => e.stopPropagation()}>
+                          <audio src={scene.audio_url} className="h-6 w-[250px]" controls />
+                          <span className="text-[10px] font-mono text-muted-foreground font-semibold shrink-0">
                             {scene.audio_duration?.toFixed(1)}s
                           </span>
                         </div>
