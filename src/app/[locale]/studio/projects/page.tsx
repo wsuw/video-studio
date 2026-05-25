@@ -6,6 +6,7 @@ import Link from "next/link"
 import { AppSidebar } from "@/app/[locale]/studio/app-sidebar"
 import { SiteHeader } from "@/app/[locale]/studio/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { useTranslation } from "@/components/i18n/translation-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -103,6 +104,7 @@ const ratioMetadata: Record<string, { label: string; icon: any }> = {
 }
 
 export default function ProjectsPage() {
+  const { t } = useTranslation()
   const router = useRouter()
   const [projects, setProjects] = React.useState<any[]>([])
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -231,7 +233,7 @@ export default function ProjectsPage() {
     >
       <AppSidebar variant="inset" />
       <SidebarInset className="relative">
-        <SiteHeader />
+        <SiteHeader title={t("studio.projects", "Projects")} />
         <Toaster position="top-right" closeButton richColors />
 
         {/* Main Content Area */}

@@ -35,7 +35,7 @@ const data = {
     },
     {
       title: "Voice Library",
-      url: "/voices",
+      url: "/studio/voices",
       icon: (
         <Volume2
         />
@@ -89,7 +89,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
     {
       title: t("studio.voices", "Voice Library"),
-      url: `/${locale}/voices`,
+      url: `/${locale}/studio/voices`,
       icon: <Volume2 />,
     },
     {

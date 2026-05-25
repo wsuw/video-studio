@@ -10,19 +10,25 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from indextts.infer_v2 import IndexTTS2
 
 # 加载 .env 配置
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
+load_dotenv(
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+)
 
 # ==========================================
 # 内联存储客户端（支持本地 / MinIO S3）
 # ==========================================
 
+
 class StorageClient:
     def generate_unique_path(self, extension: str) -> str:
         raise NotImplementedError
+
     def upload_file(self, local_path: str, request=None) -> str:
         raise NotImplementedError
+
 
 class LocalStorageClient(StorageClient):
     def generate_unique_path(self, extension: str) -> str:
@@ -42,14 +48,16 @@ class LocalStorageClient(StorageClient):
             return f"{base_url.rstrip('/')}/outputs/{filename}"
         return f"/outputs/{filename}"
 
+
 class S3StorageClient(StorageClient):
     def __init__(self):
         import boto3
         from botocore.config import Config
-        self.endpoint   = os.getenv("STORAGE_S3_ENDPOINT",   "http://127.0.0.1:9000")
+
+        self.endpoint = os.getenv("STORAGE_S3_ENDPOINT", "http://127.0.0.1:9000")
         self.access_key = os.getenv("STORAGE_S3_ACCESS_KEY", "minioadmin")
         self.secret_key = os.getenv("STORAGE_S3_SECRET_KEY", "minioadmin")
-        self.bucket_name = os.getenv("STORAGE_S3_BUCKET",   "video-studio")
+        self.bucket_name = os.getenv("STORAGE_S3_BUCKET", "video-studio")
         self.public_url = os.getenv("STORAGE_S3_PUBLIC_URL")
         self.s3 = boto3.client(
             "s3",
@@ -73,11 +81,17 @@ class S3StorageClient(StorageClient):
             content_type = "application/octet-stream"
         with open(local_path, "rb") as f:
             self.s3.put_object(
-                Bucket=self.bucket_name, Key=filename,
-                Body=f, ContentType=content_type,
+                Bucket=self.bucket_name,
+                Key=filename,
+                Body=f,
+                ContentType=content_type,
             )
-        base_url = self.public_url if self.public_url else self.endpoint
-        return f"{base_url.rstrip('/')}/{self.bucket_name}/{filename}"
+        # 优先使用 STORAGE_S3_PUBLIC_URL 拼接供前端直接访问的公网 URL
+        public_url = (
+            os.getenv("STORAGE_S3_PUBLIC_URL") or self.public_url or self.endpoint
+        )
+        return f"{public_url.rstrip('/')}/{self.bucket_name}/{filename}"
+
 
 def get_storage_client() -> StorageClient:
     backend = os.getenv("STORAGE_BACKEND", "local").lower()
@@ -85,9 +99,8 @@ def get_storage_client() -> StorageClient:
         return S3StorageClient()
     return LocalStorageClient()
 
-# ==========================================
 
-from indextts.infer_v2 import IndexTTS2
+# ==========================================
 
 # 配置日志
 logging.basicConfig(
@@ -108,6 +121,7 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 # 脚本和父目录的绝对路径（用于路径解析）
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PARENT_DIR = os.path.dirname(_SCRIPT_DIR)
+
 
 def resolve_audio_path(audio_path: str) -> Optional[str]:
     """按优先级依次尝试定位音频文件：
@@ -232,6 +246,9 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
     filename = f"gen_{uuid.uuid4().hex}.wav"
     output_path = os.path.join(output_dir, filename)
 
+    storage_client = get_storage_client()
+    is_remote = not isinstance(storage_client, LocalStorageClient)
+
     try:
         logger.info("Executing model inference...")
         # 统一调用 tts.infer，传入所有的相关参数
@@ -259,9 +276,10 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
 
         # 5. 计算音频时长（秒）
         import wave
+
         duration = 0.0
         try:
-            with wave.open(output_path, 'rb') as wav_file:
+            with wave.open(output_path, "rb") as wav_file:
                 frames = wav_file.getnframes()
                 rate = wav_file.getframerate()
                 if rate > 0:
@@ -270,13 +288,8 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
             logger.error(f"Failed to calculate WAV duration: {e}")
 
         # 上传到 MinIO / 本地存储，返回公开 URL
-        storage_client = get_storage_client()
         url = storage_client.upload_file(output_path, request=fastapi_req)
         logger.info(f"Audio uploaded, URL: {url}")
-
-        # 使用远程存储时删除本地临时文件
-        if isinstance(storage_client, S3StorageClient) and os.path.exists(output_path):
-            os.remove(output_path)
 
         return {
             "status": "success",
@@ -285,9 +298,21 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
             "duration": round(duration, 3),
         }
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
         logger.error(f"Error during IndexTTS2 synthesis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"TTS Synthesis Failed: {str(e)}")
+    finally:
+        # 使用远程存储时删除本地临时文件，并在 finally 中确保即使出错也得到清理
+        if is_remote and os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+                logger.info(f"Cleaned up temporary local file: {output_path}")
+            except Exception as ex:
+                logger.error(
+                    f"Failed to delete temporary local file {output_path}: {ex}"
+                )
 
 
 @app.get("/health")

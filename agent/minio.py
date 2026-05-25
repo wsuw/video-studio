@@ -89,10 +89,10 @@ class S3StorageClient(StorageClient):
                 ContentType=content_type
             )
             
-        # Return direct public access URL from MinIO (using public_url if available)
-        base_url = self.public_url if self.public_url else self.endpoint
-        endpoint_clean = base_url.rstrip("/")
-        return f"{endpoint_clean}/{self.bucket_name}/{filename}"
+        # 优先使用 STORAGE_S3_PUBLIC_URL 拼接供前端直接访问的公网 URL
+        public_url = os.getenv("STORAGE_S3_PUBLIC_URL") or self.public_url or self.endpoint
+        return f"{public_url.rstrip('/')}/{self.bucket_name}/{filename}"
+
 
 def get_storage_client() -> StorageClient:
     backend = os.getenv("STORAGE_BACKEND", "local").lower()
