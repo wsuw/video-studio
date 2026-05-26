@@ -26,8 +26,11 @@ import {
   Loader2,
   CheckCircle2,
   Bookmark,
-  Check
+  Check,
+  Play,
+  Pause
 } from "lucide-react"
+
 
 // Creative Templates / Presets for Right Side Gallery
 const creativeTemplates = [
@@ -102,25 +105,91 @@ const promptPresets = [
 
 // Visual Style Profiles
 const styleProfiles = [
-  { id: "cinematic", name: "Cinematic / Realistic", icon: Film, desc: "Anamorphic lens, rich shadows, high production value" },
-  { id: "cyberpunk", name: "Cyberpunk / Neon", icon: Flame, desc: "Saturated neon colors, techno-futures, foggy night-scapes" },
-  { id: "minimalist", name: "Minimalist Explainer", icon: Compass, desc: "Simple clean illustrations, corporate-friendly vector look" },
-  { id: "pixel", name: "16-Bit Pixel Art", icon: Sparkles, desc: "Retro-gaming style, vibrant palettes, nostalgic atmosphere" }
+  { 
+    id: "cinematic", 
+    name: "Cinematic / Realistic", 
+    icon: Film, 
+    desc: "Anamorphic lens, rich shadows, high production value",
+    detail: "Cinematic / Realistic: Features dramatic film-grade lighting contrast, anamorphic widescreen compositions, and rich shadow details. Perfect for narrative projects, documentaries, premium advertising campaigns, and realistic scenes."
+  },
+  { 
+    id: "cyberpunk", 
+    name: "Cyberpunk / Neon", 
+    icon: Flame, 
+    desc: "Saturated neon colors, techno-futures, foggy night-scapes",
+    detail: "Cyberpunk / Neon: Saturated neon palettes, high-contrast techno-landscapes, and foggy night atmospheres. Ideal for sci-fi storylines, street-fashion concepts, and forward-looking trend videos."
+  },
+  { 
+    id: "minimalist", 
+    name: "Minimalist Explainer", 
+    icon: Compass, 
+    desc: "Simple clean illustrations, corporate-friendly vector look",
+    detail: "Minimalist Explainer: Modern flat vector illustrations with clean lines and smooth animations. Highly recommended for product demos, explaining complex concepts, business pitches, and online tutorials."
+  },
+  { 
+    id: "pixel", 
+    name: "16-Bit Pixel Art", 
+    icon: Sparkles, 
+    desc: "Retro-gaming style, vibrant palettes, nostalgic atmosphere",
+    detail: "16-Bit Pixel Art: Charming 80s/90s console gaming aesthetic with vibrant retro color tables. Perfect for indie game promos, creative chiptune visualizers, or nostalgic style short teasers."
+  }
 ]
 
 // Aspect Ratio Options
 const aspectRatios = [
-  { id: "16:9", label: "Landscape (16:9)", icon: Tv, desc: "YouTube, TV, Presentations" },
-  { id: "9:16", label: "Vertical (9:16)", icon: Smartphone, desc: "TikTok, Reels, Shorts" },
-  { id: "1:1", label: "Square (1:1)", icon: Square, desc: "Instagram, LinkedIn feeds" }
+  { 
+    id: "16:9", 
+    label: "Landscape (16:9)", 
+    icon: Tv, 
+    desc: "YouTube, TV, Presentations",
+    detail: "Landscape: The universal widescreen standard. Ideal for full-screen playback on desktop monitors, TVs, and projector screens. Widely used for brand videos, corporate pitches, and standard YouTube content." 
+  },
+  { 
+    id: "9:16", 
+    label: "Vertical (9:16)", 
+    icon: Smartphone, 
+    desc: "TikTok, Reels, Shorts",
+    detail: "Vertical: The mobile-first fullscreen format. Highly optimized for vertical scrolling feeds on social media platforms such as TikTok, Instagram Reels, YouTube Shorts, and Snapchat stories." 
+  },
+  { 
+    id: "1:1", 
+    label: "Square (1:1)", 
+    icon: Square, 
+    desc: "Instagram, LinkedIn feeds",
+    detail: "Square: The classic feed layout. Provides a balanced footprint in Instagram posts and LinkedIn updates, ensuring high visibility without needing the device to be rotated." 
+  }
 ]
 
 // Voiceover Tones
 const voiceTones = [
-  { id: "deep", label: "Deep Cinematic Narrator", accent: "Rich & Dramatic" },
-  { id: "friendly", label: "Friendly Corporate Explainer", accent: "Warm & Clear" },
-  { id: "tech", label: "High-Energy Tech Reviewer", accent: "Fast & Enthusiastic" },
-  { id: "none", label: "No Voiceover (BGM only)", accent: "Instrumental Focus" }
+  {
+    id: "deep",
+    label: "Deep Cinematic Narrator",
+    accent: "Rich & Dramatic",
+    description: "A bold, resonant male voice with magnetic tone and dramatic gravitas. Excellent for epic stories, cinematic movie trailers, and deep atmospheric documentaries.",
+    sample: "en-US_Male_Adult_Adam_Multilingual.wav"
+  },
+  {
+    id: "friendly",
+    label: "Friendly Corporate Explainer",
+    accent: "Warm & Clear",
+    description: "A warm, clear, and reassuring female voice with natural cadence and clear pronunciation. Recommended for software product walkthroughs, e-learning courses, and brand explainers.",
+    sample: "en-US_Female_Adult_Emma_Multilingual.wav"
+  },
+  {
+    id: "tech",
+    label: "High-Energy Tech Reviewer",
+    accent: "Fast & Enthusiastic",
+    description: "A bright, youthful male voice with fast-paced rhythm and enthusiastic delivery. Perfect for gadget reviews, game streaming clips, event promos, and energetic vlogs.",
+    sample: "en-US_Male_YoungAdult_Brian_Multilingual.wav"
+  },
+  {
+    id: "none",
+    label: "No Voiceover (BGM only)",
+    accent: "Instrumental Focus",
+    description: "Disables spoken narrations entirely, leaving only the background music and sound effects. Ideal for fast-cut transition vlogs, purely visual compilations, and mood reels.",
+    sample: ""
+  }
 ]
 
 export default function Page() {
@@ -130,6 +199,46 @@ export default function Page() {
   const [selectedStyle, setSelectedStyle] = React.useState("cinematic")
   const [selectedRatio, setSelectedRatio] = React.useState("16:9")
   const [selectedVoice, setSelectedVoice] = React.useState("deep")
+
+  const [playingVoice, setPlayingVoice] = React.useState<string | null>(null)
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+
+  const handlePlaySample = (voiceId: string, sampleFile: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (playingVoice === voiceId) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+      setPlayingVoice(null)
+      return
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+
+    const audio = new Audio(`/api/speech-samples/${sampleFile}`)
+    audioRef.current = audio
+    setPlayingVoice(voiceId)
+
+    audio.play().catch((err) => {
+      console.error("Failed to play audio sample:", err)
+      setPlayingVoice(null)
+    })
+
+    audio.onended = () => {
+      setPlayingVoice(null)
+    }
+  }
+
+  React.useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+    }
+  }, [])
 
   // Track currently applied template ID
   const [activeTemplateId, setActiveTemplateId] = React.useState<string | null>(null)
@@ -186,7 +295,9 @@ export default function Page() {
 
         await updateThreadState(newProjectId, {
           design: {
-            script: initialScript
+            script: initialScript,
+            aspect_ratio: selectedRatio,
+            art_style: selectedStyle
           }
         })
         console.log("Successfully created and seeded LangGraph thread:", newProjectId)
@@ -360,8 +471,8 @@ export default function Page() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     {/* Visual Style Selector */}
-                    <Card className="border border-slate-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md shadow-sm">
-                      <CardContent className="p-6 space-y-4">
+                    <Card className="border border-slate-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md shadow-sm flex flex-col justify-between">
+                      <CardContent className="p-6 space-y-4 flex-1">
                         <Label className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
                           Visual Style Profile
                         </Label>
@@ -395,11 +506,20 @@ export default function Page() {
                           })}
                         </div>
                       </CardContent>
+                      <div className="px-6 pb-6 pt-0 border-t border-slate-100 dark:border-zinc-800/60 mt-auto">
+                        <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800/60 text-xs text-slate-600 dark:text-zinc-400 leading-relaxed flex gap-2">
+                          <span className="text-primary shrink-0">💡</span>
+                          <div>
+                            <strong>{styleProfiles.find(s => s.id === selectedStyle)?.name}：</strong>
+                            {styleProfiles.find(s => s.id === selectedStyle)?.detail}
+                          </div>
+                        </div>
+                      </div>
                     </Card>
 
                     {/* Aspect Ratio Selector */}
-                    <Card className="border border-slate-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md shadow-sm">
-                      <CardContent className="p-6 space-y-4">
+                    <Card className="border border-slate-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-900/60 backdrop-blur-md shadow-sm flex flex-col justify-between">
+                      <CardContent className="p-6 space-y-4 flex-1">
                         <Label className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
                           Aspect Ratio
                         </Label>
@@ -433,6 +553,15 @@ export default function Page() {
                           })}
                         </div>
                       </CardContent>
+                      <div className="px-6 pb-6 pt-0 border-t border-slate-100 dark:border-zinc-800/60 mt-auto">
+                        <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800/60 text-xs text-slate-600 dark:text-zinc-400 leading-relaxed flex gap-2">
+                          <span className="text-primary shrink-0">💡</span>
+                          <div>
+                            <strong>{aspectRatios.find(r => r.id === selectedRatio)?.label}：</strong>
+                            {aspectRatios.find(r => r.id === selectedRatio)?.detail}
+                          </div>
+                        </div>
+                      </div>
                     </Card>
 
                   </div>
@@ -447,27 +576,63 @@ export default function Page() {
                         {voiceTones.map((voice) => {
                           const isSelected = selectedVoice === voice.id
                           return (
-                            <button
+                            <div
                               key={voice.id}
-                              type="button"
+                              role="button"
+                              tabIndex={0}
                               onClick={() => {
                                 setSelectedVoice(voice.id)
                                 setActiveTemplateId(null)
                               }}
-                              className={`flex flex-col items-center justify-center p-4 rounded-xl border text-center transition-all ${isSelected
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  setSelectedVoice(voice.id)
+                                  setActiveTemplateId(null)
+                                }
+                              }}
+                              className={`relative flex flex-col items-center justify-center p-4 rounded-xl border text-center transition-all cursor-pointer select-none ${isSelected
                                 ? "bg-primary/5 border-primary shadow-sm dark:bg-primary/10"
                                 : "bg-white/40 dark:bg-zinc-950/20 border-slate-200 dark:border-zinc-800/60 hover:bg-slate-50/80 dark:hover:bg-zinc-800/30"
                                 }`}
                             >
+                              {/* Audio preview button */}
+                              {voice.sample && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handlePlaySample(voice.id, voice.sample, e)}
+                                  className={`absolute top-2 right-2 p-1.5 rounded-full border transition-all ${
+                                    playingVoice === voice.id
+                                      ? "bg-primary text-white border-primary shadow-md scale-110"
+                                      : "bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:scale-105"
+                                  }`}
+                                  title={playingVoice === voice.id ? "暂停试听" : "试听音色"}
+                                >
+                                  {playingVoice === voice.id ? (
+                                    <Pause className="size-3 animate-pulse" />
+                                  ) : (
+                                    <Play className="size-3" />
+                                  )}
+                                </button>
+                              )}
+
                               <div className={`p-2.5 rounded-full border mb-2 ${isSelected ? "bg-primary text-white border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
                                 }`}>
                                 <User className="size-4" />
                               </div>
                               <div className="text-xs font-bold text-slate-900 dark:text-white mb-0.5">{voice.label}</div>
                               <div className="text-[10px] font-mono text-muted-foreground">{voice.accent}</div>
-                            </button>
+                            </div>
                           )
                         })}
+                      </div>
+
+                      {/* Dynamic detailed explanation box */}
+                      <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800/60 text-xs text-slate-600 dark:text-zinc-400 leading-relaxed flex gap-2">
+                        <span className="text-primary shrink-0">💡</span>
+                        <div>
+                          <strong>{voiceTones.find(v => v.id === selectedVoice)?.label}：</strong>
+                          {voiceTones.find(v => v.id === selectedVoice)?.description}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

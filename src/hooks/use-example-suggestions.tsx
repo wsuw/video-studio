@@ -18,20 +18,8 @@ export const useExampleSuggestions = () => {
   useConfigureSuggestions({
     suggestions: [
       {
-        title: "Cyberpunk Scriptwriting",
-        message: "Create a cyberpunk short film script about 'Memory Trading'. Include scenes with neon-lit streets and dark basements. Sync to the editor when finished.",
-      },
-      {
-        title: "Cinematic Style Polish",
-        message: "I want to film a nostalgic video. Please polish my current script to match the 'Wong Kar-wai' style, adding details about lighting and slow-motion shots.",
-      },
-      {
-        title: "Action Scene Optimization",
-        message: "Refine this fight scene by adding professional descriptions of camera movements, such as the Dolly Zoom and long takes.",
-      },
-      {
-        title: "Shot Layout Planning",
-        message: "The script is great. Now, help me break down these scenes into specific shots and plan the framing and composition for each.",
+        title: "Generate Detailed Screenplay",
+        message: "Write a complete, detailed production-ready screenplay based on the current creative concept, style, ratio, and voice. Adhere strictly to industry-standard screenplay specifications: include standard scene headings (formatted as '## SCENE [Number]: [INT/EXT]. [LOCATION] - [TIME_OF_DAY]'), descriptive action lines mapping out lighting, sound design, and character blocking, and character dialogues with speaker names in bold. Finally, render it directly in the editor using the renderScriptInEditor tool.",
       },
       // 以下案例为 Copilotkit 示例，可以按需使用
       // {

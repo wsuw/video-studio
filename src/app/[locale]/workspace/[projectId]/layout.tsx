@@ -23,7 +23,6 @@ import { useParams } from "next/navigation";
 
 function CopilotHooks() {
   useGenerativeUIExamples();
-  useExampleSuggestions();
   return null;
 }
 

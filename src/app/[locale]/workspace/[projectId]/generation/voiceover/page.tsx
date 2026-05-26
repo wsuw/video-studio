@@ -40,7 +40,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout";
 import React, { useState, useEffect, useRef } from "react";
 import { usePhaseSync } from "@/hooks/use-phase-sync";
 import { useRouter, useParams } from "next/navigation";
-import { useAgent } from "@copilotkit/react-core/v2";
+import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2";
 import { cn } from "@/lib/utils";
 import { getThreadState, updateThreadState } from "@/lib/langgraph";
 import { PRESET_VOICES } from "@/lib/preset-voices";
@@ -232,6 +232,16 @@ export default function VoiceoverStudio() {
 
   // 1. Sync Phase to Copilot State
   usePhaseSync("voiceover");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Auto-Extract Dialogues",
+        message: "Please analyze our screenplays and dialogues, map dialogues/narrations onto each structured scene, and assign the appropriate speaking characters.",
+      }
+    ],
+    available: "always"
+  });
 
   const { agent } = useAgent({ agentId: "default" });
 

@@ -15,10 +15,21 @@ import { MessageSquareIcon, CheckCircle2Icon, XCircleIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
+import { useConfigureSuggestions } from "@copilotkit/react-core/v2"
 
 export default function ReviewPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
   usePhaseSync("redesign");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Review Render Progress",
+        message: "Generate a production summary highlighting completed assets, pending renders, and quality check reports.",
+      }
+    ],
+    available: "always"
+  });
 
   return (
     <>

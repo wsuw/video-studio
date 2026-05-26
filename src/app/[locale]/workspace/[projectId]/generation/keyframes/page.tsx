@@ -37,7 +37,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useParams, useRouter } from "next/navigation"
-import { useAgent } from "@copilotkit/react-core/v2"
+import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
 import { getThreadState, updateThreadState } from "@/lib/langgraph"
 
@@ -134,6 +134,16 @@ export default function QueuePage() {
 
   // Sync to LangGraph thread
   usePhaseSync("generate");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Batch Generate Keyframes",
+        message: "Please automatically design and trigger keyframe image generation for all scenes that do not currently have keyframes.",
+      }
+    ],
+    available: "always"
+  });
 
   const { agent } = useAgent({ agentId: "default" });
 

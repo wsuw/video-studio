@@ -33,7 +33,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useRouter, useParams } from "next/navigation"
-import { useAgent } from "@copilotkit/react-core/v2"
+import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -66,6 +66,20 @@ export default function BreakdownPage() {
 
   // Sync to breakdown phase
   usePhaseSync("breakdown");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Decompose Screenplay",
+        message: "Please analyze the screenplay and extract all character, prop, and location entities.",
+      },
+      {
+        title: "Style Extracted Assets",
+        message: "Please generate a highly detailed visual prompt profile (style parameters, appearance, and textures) for the extracted assets, and call the generate_entity_portrait tool to render their master portraits.",
+      }
+    ],
+    available: "always"
+  });
 
   const { agent } = useAgent({ agentId: "default" });
 

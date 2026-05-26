@@ -36,7 +36,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useParams, useRouter } from "next/navigation"
-import { useAgent } from "@copilotkit/react-core/v2"
+import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
 import { getThreadState, updateThreadState } from "@/lib/langgraph"
 
@@ -92,6 +92,16 @@ export default function VideoExecutionPage() {
 
   // Sync to LangGraph thread
   usePhaseSync("generate");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Synthesize Scene Videos",
+        message: "Please initiate video rendering pipeline using our configured keyframes, styles, motions, and audio tracks for all scenes.",
+      }
+    ],
+    available: "always"
+  });
 
   const { agent } = useAgent({ agentId: "default" });
 

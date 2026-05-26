@@ -15,7 +15,7 @@ import { MessageSquareIcon, LayoutGridIcon, CameraIcon, InfoIcon, Wand2Icon, Com
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
-import { useAgent } from "@copilotkit/react-core/v2"
+import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { useRouter, useParams } from "next/navigation"
@@ -68,6 +68,16 @@ export default function StoryboardPage() {
   const params = useParams();
   const projectId = params.projectId as string;
   usePhaseSync("storyboard");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Auto-Storyboard Scenes",
+        message: "Please plan the visual storyboard for the script, assigning layout bounding boxes and mapping our extracted entities to each scene.",
+      }
+    ],
+    available: "always"
+  });
 
   const { agent } = useAgent({ agentId: "default" });
 

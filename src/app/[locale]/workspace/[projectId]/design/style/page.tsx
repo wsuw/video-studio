@@ -24,7 +24,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useRouter, useParams } from "next/navigation"
-import { useAgent } from "@copilotkit/react-core/v2"
+import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
 import { getThreadState } from "@/lib/langgraph"
 
@@ -58,9 +58,10 @@ const PRESET_ART_STYLES = [
 
 // Aspect Ratio configurations with visual frame ratios
 const ASPECT_RATIOS = [
-  { id: "2.39", label: "2.39:1 Anamorphic", sub: "Cinema Widescreen", ratioClass: "h-6 w-14" },
-  { id: "16.9", label: "16:9 Cinematic", sub: "Standard Landscape", ratioClass: "h-8 w-14" },
-  { id: "9.16", label: "9:16 Vertical", sub: "Mobile / TikTok", ratioClass: "h-12 w-7" }
+  { id: "2.39:1", label: "2.39:1 Anamorphic", sub: "Cinema Widescreen", ratioClass: "h-6 w-14" },
+  { id: "16:9", label: "16:9 Cinematic", sub: "Standard Landscape", ratioClass: "h-8 w-14" },
+  { id: "9:16", label: "9:16 Vertical", sub: "Mobile / TikTok", ratioClass: "h-12 w-7" },
+  { id: "1:1", label: "1:1 Square", sub: "Social Feed", ratioClass: "h-10 w-10" }
 ];
 
 // Cinematic color palettes
@@ -79,6 +80,20 @@ export default function StylePage() {
 
   // Sync to design state
   usePhaseSync("design");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Recommend Color Palette",
+        message: "Analyze our current script concept and recommend a custom color palette profile.",
+      },
+      {
+        title: "Enhance Style Prompts",
+        message: "Based on our current creative concept, write an optimized style prompt and a list of negative prompts for high-fidelity rendering.",
+      }
+    ],
+    available: "always"
+  });
 
   const { agent } = useAgent({ agentId: "default" });
 
@@ -108,7 +123,7 @@ export default function StylePage() {
   const design = agent?.state?.design || loadedDesign || {};
   const globalArtStyle = design.art_style || "cyberpunk";
   const customStylePrompt = design.style_prompt || "";
-  const aspect_ratio = design.aspect_ratio || "16.9";
+  const aspect_ratio = design.aspect_ratio || "16:9";
   const color_palette = design.color_palette || "bladerunner";
   const negative_prompt = design.negative_prompt || "blurry, low quality, distorted, extra limbs, bad proportions";
 
@@ -263,7 +278,7 @@ export default function StylePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {ASPECT_RATIOS.map((ratio) => {
                 const isSelected = aspect_ratio === ratio.id;
                 return (
@@ -284,7 +299,7 @@ export default function StylePage() {
                         ratio.ratioClass,
                         isSelected && "border-primary/40 bg-primary/5 text-primary/80"
                       )}>
-                        {ratio.id === "2.39" ? "2.39" : ratio.id === "16.9" ? "16:9" : "9:16"}
+                        {ratio.id}
                       </div>
                     </div>
                     <div>

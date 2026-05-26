@@ -14,9 +14,23 @@ import { Button } from "@/components/ui/button"
 import { MessageSquareIcon, DownloadIcon, SmartphoneIcon, MonitorIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
+import { useConfigureSuggestions } from "@copilotkit/react-core/v2"
+import { usePhaseSync } from "@/hooks/use-phase-sync"
 
 export default function ExportPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+
+  usePhaseSync("distribution");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Export Finished Video",
+        message: "Package the compiled timeline tracks, perform final audio mixdowns, and export the finished high-resolution movie.",
+      }
+    ],
+    available: "always"
+  });
 
   return (
     <>

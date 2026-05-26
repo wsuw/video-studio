@@ -14,9 +14,23 @@ import { Button } from "@/components/ui/button"
 import { MessageSquareIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
+import { useConfigureSuggestions } from "@copilotkit/react-core/v2"
+import { usePhaseSync } from "@/hooks/use-phase-sync"
 
 export default function TimelinePage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+
+  usePhaseSync("distribution");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Align Video Tracks",
+        message: "Compile and sequence all rendered scene clips on the timeline. Align them with their generated voiceovers and background music tracks.",
+      }
+    ],
+    available: "always"
+  });
 
   return (
     <>

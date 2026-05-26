@@ -14,9 +14,23 @@ import { Button } from "@/components/ui/button"
 import { MessageSquareIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
+import { useConfigureSuggestions } from "@copilotkit/react-core/v2"
+import { usePhaseSync } from "@/hooks/use-phase-sync"
 
 export default function CorrectionPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+
+  usePhaseSync("redesign");
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Check Screenplay Consistency",
+        message: "Review our screenplay scenes, characters, and props to identify any logical continuity gaps or visual discrepancies.",
+      }
+    ],
+    available: "always"
+  });
 
   return (
     <>

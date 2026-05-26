@@ -26,7 +26,7 @@ import "@blocknote/xl-ai/style.css";
 import { useEffect, useCallback } from "react";
 import { z } from "zod";
 import { DefaultChatTransport } from "ai";
-import { useFrontendTool } from "@copilotkit/react-core/v2";
+import { useFrontendTool, useConfigureSuggestions } from "@copilotkit/react-core/v2";
 import { useParams } from "next/navigation";
 import { updateThreadState, getThreadState } from "@/lib/langgraph";
 
@@ -48,6 +48,16 @@ const getSlashMenuItemsWithAI = (editor: BlockNoteEditor<any, any, any>) => [
 
 export default function EditorContent() {
   const { projectId } = useParams();
+
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "Generate Detailed Screenplay",
+        message: "Write a complete, detailed production-ready screenplay based on the current creative concept, style, ratio, and voice. Adhere strictly to industry-standard screenplay specifications: include standard scene headings (formatted as '## SCENE [Number]: [INT/EXT]. [LOCATION] - [TIME_OF_DAY]'), descriptive action lines mapping out lighting, sound design, and character blocking, and character dialogues with speaker names in bold. Finally, render it directly in the editor using the renderScriptInEditor tool.",
+      }
+    ],
+    available: "always"
+  });
 
   // 1. 初始化编辑器 (完整配置)
   const editor = useCreateBlockNote({
