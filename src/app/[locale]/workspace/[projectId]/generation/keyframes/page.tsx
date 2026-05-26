@@ -39,7 +39,7 @@ import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useParams, useRouter } from "next/navigation"
 import { useAgent } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
-import { getThreadState } from "@/lib/langgraph"
+import { getThreadState, updateThreadState } from "@/lib/langgraph"
 
 interface LayoutElement {
   entity_id: string;
@@ -229,10 +229,9 @@ export default function QueuePage() {
   const globalColorPalette = design.color_palette || "bladerunner";
   const globalStylePrompt = design.style_prompt || "";
 
-  const handleUpdateSceneStatus = (sceneId: string, status: "pending" | "locked" | "rendered", masterUrl?: string) => {
+  const handleUpdateSceneStatus = async (sceneId: string, status: "pending" | "locked" | "rendered", masterUrl?: string) => {
     if (!agent) return;
-    const currentScenes = design.scenes || [];
-    const updatedScenes = currentScenes.map((s: any) => {
+    const updatedScenes = scenes.map((s: any) => {
       if (s.id === sceneId) {
         return {
           ...s,
@@ -242,13 +241,25 @@ export default function QueuePage() {
       }
       return s;
     });
+
+    const updatedDesign = {
+      ...design,
+      scenes: updatedScenes
+    };
+
     agent.setState({
       ...agent.state,
-      design: {
-        ...design,
-        scenes: updatedScenes
-      }
+      design: updatedDesign
     });
+
+    try {
+      await updateThreadState(projectId, {
+        design: updatedDesign
+      });
+      console.log(`[LangGraph] Successfully persisted keyframe scene status for ${sceneId}`);
+    } catch (err) {
+      console.error("[LangGraph] Failed to persist keyframe scene status:", err);
+    }
   };
 
   const getEntityDetails = (entityId: string) => {
@@ -503,7 +514,7 @@ export default function QueuePage() {
           }));
           setGachaMode(prev => ({ ...prev, [sceneId]: true }));
           toast({
-            variant: "warning",
+            variant: "default",
             title: "⚠️ Gacha Partially Complete",
             description: `Batch encountered a timeout or error, but successfully generated ${generatedUrls.length}/4 variants. You can choose from these!`,
           });

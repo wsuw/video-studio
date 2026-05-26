@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 // ── 类型定义 ──────────────────────────────────────────────
 interface SpeakerTurn {
@@ -282,19 +283,53 @@ export async function POST(req: Request) {
       audioBuffer = stitchWav(pcmSegments, wavHeader, interval_silence);
     }
 
-    // ── 保存最终 WAV 并返回结果 ────────────────────────────
+    // ── 上传到 MinIO / S3 并返回结果 ────────────────────────────
     const filename = `scene_${sceneId}_${Date.now()}.wav`;
-    const outPath = path.join(outputsDir, filename);
-    fs.writeFileSync(outPath, audioBuffer);
-
     const duration = getWavDuration(audioBuffer);
-    console.log(`[Audio API] Done → ${filename} (${duration}s)`);
 
-    return NextResponse.json({
-      status: "success",
-      url: `/audio/outputs/${filename}`,
-      duration,
-    });
+    try {
+      const s3Client = new S3Client({
+        endpoint: process.env.STORAGE_S3_ENDPOINT || "http://127.0.0.1:9000",
+        credentials: {
+          accessKeyId: process.env.STORAGE_S3_ACCESS_KEY || "minioadmin",
+          secretAccessKey: process.env.STORAGE_S3_SECRET_KEY || "minioadmin",
+        },
+        region: "us-east-1",
+        forcePathStyle: true,
+      });
+
+      const s3Bucket = process.env.STORAGE_S3_BUCKET || "video-studio";
+
+      console.log(`[Audio API] Uploading stitched audio to MinIO bucket "${s3Bucket}" as "${filename}"...`);
+      await s3Client.send(new PutObjectCommand({
+        Bucket: s3Bucket,
+        Key: filename,
+        Body: audioBuffer,
+        ContentType: "audio/wav",
+      }));
+
+      const publicUrl = process.env.STORAGE_S3_PUBLIC_URL || process.env.STORAGE_S3_ENDPOINT || "http://127.0.0.1:9000";
+      const fileUrl = `${publicUrl.replace(/\/$/, "")}/${s3Bucket}/${filename}`;
+      console.log(`[Audio API] Stitched audio uploaded successfully to MinIO. Public URL: ${fileUrl}`);
+
+      return NextResponse.json({
+        status: "success",
+        url: fileUrl,
+        duration,
+      });
+    } catch (s3Error: any) {
+      console.error("[Audio API] Failed to upload stitched audio to MinIO, falling back to local storage:", s3Error);
+
+      const outPath = path.join(outputsDir, filename);
+      fs.writeFileSync(outPath, audioBuffer);
+      console.log(`[Audio API] Local fallback written: ${filename}`);
+
+      return NextResponse.json({
+        status: "success",
+        url: `/audio/outputs/${filename}`,
+        duration,
+      });
+    }
   } catch (err: any) {
     console.error("[Audio API] Error:", err);
     return NextResponse.json(
