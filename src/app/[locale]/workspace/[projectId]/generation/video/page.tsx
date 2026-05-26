@@ -202,13 +202,44 @@ export default function VideoExecutionPage() {
           if (design.style_prompt) {
             setStylePrompt(design.style_prompt);
           }
+          if (agent && (!agent.state?.design?.scenes?.length)) {
+            agent.setState({
+              ...agent.state,
+              design,
+            });
+          }
         }
       })
       .catch((err) => console.warn("[Video] Load design state error:", err));
-  }, [projectId]);
+  }, [projectId, agent]);
+
+  // Sync loadedDesign to Agent state when agent becomes available
+  useEffect(() => {
+    if (agent && loadedDesign) {
+      const agentScenes = agent.state?.design?.scenes;
+      const loadedScenes = loadedDesign?.scenes;
+      
+      const needsSync = !agentScenes || 
+        agentScenes.length !== (loadedScenes?.length || 0) ||
+        loadedScenes?.some((s: any, idx: number) => s.video_url !== agentScenes[idx]?.video_url || s.status !== agentScenes[idx]?.status);
+
+      if (needsSync) {
+        agent.setState({
+          ...agent.state,
+          design: {
+            ...agent.state?.design,
+            ...loadedDesign,
+            scenes: loadedScenes
+          }
+        });
+      }
+    }
+  }, [agent, loadedDesign]);
 
   // Pull states from Agent or fallback
-  const design = agent?.state?.design || loadedDesign || {};
+  const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0) 
+    ? agent.state.design 
+    : (loadedDesign || {});
   const scenes: Scene[] = design.scenes || [];
   const globalArtStyle = design.art_style || "cyberpunk";
 
@@ -224,7 +255,6 @@ export default function VideoExecutionPage() {
   const lockedFrameCount = isAudioSynced && activeScene && activeScene.audio_duration ? Math.round(activeScene.audio_duration * frameRate) : null;
 
   const handleUpdateSceneStatus = async (sceneId: string, status: "pending" | "locked" | "rendered", videoUrl?: string) => {
-    if (!agent) return;
     const updatedScenes = scenes.map((s: any) => {
       if (s.id === sceneId) {
         return {
@@ -241,10 +271,14 @@ export default function VideoExecutionPage() {
       scenes: updatedScenes
     };
 
-    agent.setState({
-      ...agent.state,
-      design: updatedDesign
-    });
+    if (agent) {
+      agent.setState({
+        ...agent.state,
+        design: updatedDesign
+      });
+    }
+
+    setLoadedDesign(updatedDesign);
 
     try {
       await updateThreadState(projectId, {
@@ -489,8 +523,8 @@ export default function VideoExecutionPage() {
 
       {/* Main Central Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Side: Active Render List (65% width) */}
-        <div className="w-[65%] flex flex-col p-6 overflow-y-auto border-r border-border/40 space-y-6">
+        {/* Left Side: Active Render List (flex-1) */}
+        <div className="flex-1 flex flex-col p-6 overflow-y-auto border-r border-border/40 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -694,8 +728,8 @@ export default function VideoExecutionPage() {
           </div>
         </div>
 
-        {/* Right Side: Global Art Spec & Tuning Settings (35% width) */}
-        <div className="w-[35%] flex flex-col bg-muted/10 overflow-y-auto p-6 space-y-6">
+        {/* Right Side: Global Art Spec & Tuning Settings (350px width) */}
+        <div className="w-[350px] shrink-0 flex flex-col bg-muted/10 overflow-y-auto p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-2 border-b border-border/40">
             <LayersIcon className="w-4 h-4 text-muted-foreground" />
             <h2 className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground">

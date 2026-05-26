@@ -615,7 +615,7 @@ export default function StoryboardPage() {
         </div>
 
         {/* Sidebar Scene List - Top to Bottom Vertical Cards */}
-        <div className="w-80 border-l border-border bg-background flex flex-col overflow-hidden">
+        <div className="w-[350px] shrink-0 border-l border-border bg-background flex flex-col overflow-hidden">
           <div className="p-6 border-b border-border">
             <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground mb-1">Storyboard Flow</h2>
             <p className="text-xs text-muted-foreground/80">Sequential scene breakdown</p>

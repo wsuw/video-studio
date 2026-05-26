@@ -30,16 +30,28 @@ export const WorkspaceContext = React.createContext<{
   isChatOpen: boolean;
   setIsChatOpen: (open: boolean) => void;
 }>({
-  isChatOpen: true,
+  isChatOpen: false,
   setIsChatOpen: () => { },
 });
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [isChatOpen, setIsChatOpen] = React.useState(true);
+  const [isChatOpen, setIsChatOpen] = React.useState(false);
   const params = useParams();
   const projectId = params?.projectId as string;
+
+  React.useEffect(() => {
+    const stored = localStorage.getItem("isChatOpen");
+    if (stored !== null) {
+      setIsChatOpen(stored === "true");
+    }
+  }, []);
+
+  const handleSetChatOpen = React.useCallback((open: boolean) => {
+    setIsChatOpen(open);
+    localStorage.setItem("isChatOpen", open ? "true" : "false");
+  }, []);
 
   return (
     <ThemeProvider>
@@ -52,7 +64,7 @@ export default function RootLayout({
         useSingleEndpoint={false}
         showDevConsole={true}
       >
-        <WorkspaceContext.Provider value={{ isChatOpen, setIsChatOpen }}>
+        <WorkspaceContext.Provider value={{ isChatOpen, setIsChatOpen: handleSetChatOpen }}>
           <SidebarProvider className="h-screen overflow-hidden">
             <AppSidebar />
             <SidebarInset className="flex flex-col h-full overflow-hidden relative">

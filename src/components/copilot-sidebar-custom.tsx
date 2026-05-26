@@ -14,6 +14,14 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout";
 
 export function CopilotSidebarCustom() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  const [hasMounted, setHasMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasMounted(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <Sidebar
@@ -21,14 +29,15 @@ export function CopilotSidebarCustom() {
       variant="sidebar"
       collapsible="none"
       className={cn(
-        "border-l border-border transition-[width,margin] duration-300 ease-in-out",
+        "border-l border-border",
+        hasMounted && "transition-[width,margin] duration-300 ease-in-out",
         !isChatOpen && "w-0 border-none"
       )}
       style={{
-        "--sidebar-width": isChatOpen ? "500px" : "0px",
+        "--sidebar-width": isChatOpen ? "420px" : "0px",
       } as React.CSSProperties}
     >
-      <div className="w-[500px] flex flex-col h-full shrink-0 overflow-hidden">
+      <div className="w-[420px] flex flex-col h-full shrink-0 overflow-hidden">
         <SidebarHeader className="h-16 border-b border-border flex flex-row items-center justify-between px-2 shrink-0 bg-background/80 backdrop-blur-md sticky top-0 z-10 overflow-hidden">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -46,12 +55,18 @@ export function CopilotSidebarCustom() {
         <SidebarContent className="p-0 flex flex-col flex-1 min-h-0 overflow-hidden bg-background">
           <div className="flex-1 min-h-0 w-full relative">
             <CopilotChat
-              labels={{
-                welcomeMessageText: "Welcome to Video Studio! I'm your creative assistant.",
-              }}
               attachments={{ enabled: true }}
               className="h-full w-full border-none"
               style={{ "--cpk-container-3xl": "95%" } as React.CSSProperties}
+              welcomeScreen={({ input, suggestionView }) => (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <h2>Welcome to the assistant</h2>
+                  {suggestionView}
+                  {input}
+                </div>
+              )}
+              messageView="p-4"
+
             />
           </div>
         </SidebarContent>
