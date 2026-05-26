@@ -4,6 +4,7 @@ import uuid
 import shutil
 import logging
 import mimetypes
+import urllib.request
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from dotenv import load_dotenv
@@ -22,9 +23,10 @@ logging.basicConfig(
 logger = logging.getLogger("Wan2GP-Microservice")
 
 # 🚀 3. 强行将 Wan2GP 的真实路径注入进来，以导入其底层 API
-WAN2GP_DIR = r"D:/AntigravityProject/Wan2GP"
-if WAN2GP_DIR not in sys.path:
-    sys.path.insert(0, WAN2GP_DIR)
+WAN2GP_DIR = os.getenv("WAN2GP_DIR", r"D:/AntigravityProject/Wan2GP")
+abs_wan2gp_dir = os.path.abspath(WAN2GP_DIR)
+if abs_wan2gp_dir not in sys.path:
+    sys.path.insert(0, abs_wan2gp_dir)
 
 from shared.api import init, GenerationResult
 
@@ -135,13 +137,33 @@ def get_storage_client() -> StorageClient:
 # ==========================================
 
 def resolve_audio_path(audio_path: str) -> Optional[str]:
-    """按优先级定位参考音频文件所在的位置"""
+    """按优先级定位参考音频文件所在的位置，支持本地相对路径与远程 HTTP(S) URL"""
     if not audio_path:
         return None
+
+    # 如果是 URL，下载到本地 outputs/temp/ 目录
+    if audio_path.startswith("http://") or audio_path.startswith("https://"):
+        try:
+            os.makedirs(os.path.join("outputs", "temp"), exist_ok=True)
+            temp_filename = f"ref_{uuid.uuid4()}.wav"
+            temp_path = os.path.join("outputs", "temp", temp_filename)
+            logger.info(f"Downloading remote reference audio: {audio_path} -> {temp_path}")
+            
+            with urllib.request.urlopen(audio_path, timeout=30) as response:
+                with open(temp_path, "wb") as f:
+                    f.write(response.read())
+            
+            return os.path.abspath(temp_path)
+        except Exception as e:
+            logger.error(f"Failed to download remote audio reference {audio_path}: {e}")
+            return None
+
     candidates = [
         audio_path,
         os.path.join(_SCRIPT_DIR, audio_path),
         os.path.join(os.getcwd(), audio_path),
+        os.path.join(_SCRIPT_DIR, "index-tts", audio_path),
+        os.path.join(os.getcwd(), "index-tts", audio_path),
     ]
     for c in candidates:
         if os.path.exists(c):
@@ -337,6 +359,7 @@ async def generate_media(req: GenerateRequest, fastapi_req: Request):
 
 
 @app.post("/tts")
+@app.post("/synthesize")
 async def tts_synthesize(req: TTSRequest, fastapi_req: Request):
     """
     🎤 专属高级声音克隆与多模态情感语音合成端点 (TTS)
@@ -346,53 +369,58 @@ async def tts_synthesize(req: TTSRequest, fastapi_req: Request):
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
 
-    # 1. 定位音色克隆样本
-    spk_path = resolve_audio_path(req.spk_audio_prompt)
-    if not spk_path:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Speaker audio prompt file not found: {req.spk_audio_prompt}",
-        )
-
-    # 2. 定位情绪参考样本
-    emo_audio_path = None
-    if req.emo_audio_prompt:
-        emo_audio_path = resolve_audio_path(req.emo_audio_prompt)
-        if not emo_audio_path:
+    temp_files_to_clean = []
+    try:
+        # 1. 定位音色克隆样本
+        spk_path = resolve_audio_path(req.spk_audio_prompt)
+        if not spk_path:
             raise HTTPException(
                 status_code=400,
-                detail=f"Emotion audio prompt file not found: {req.emo_audio_prompt}",
+                detail=f"Speaker audio prompt file not found: {req.spk_audio_prompt}",
+            )
+        if spk_path and ("outputs/temp" in spk_path.replace("\\", "/")):
+            temp_files_to_clean.append(spk_path)
+
+        # 2. 定位情绪参考样本
+        emo_audio_path = None
+        if req.emo_audio_prompt:
+            emo_audio_path = resolve_audio_path(req.emo_audio_prompt)
+            if not emo_audio_path:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Emotion audio prompt file not found: {req.emo_audio_prompt}",
+                )
+            if emo_audio_path and ("outputs/temp" in emo_audio_path.replace("\\", "/")):
+                temp_files_to_clean.append(emo_audio_path)
+
+        # 3. 情绪引导向量维数校验
+        if req.emo_vector is not None and len(req.emo_vector) != 8:
+            raise HTTPException(
+                status_code=400,
+                detail="emo_vector must contain exactly 8 float elements [happy, angry, sad, afraid, disgusted, melancholic, surprised, calm].",
             )
 
-    # 3. 情绪引导向量维数校验
-    if req.emo_vector is not None and len(req.emo_vector) != 8:
-        raise HTTPException(
-            status_code=400,
-            detail="emo_vector must contain exactly 8 float elements [happy, angry, sad, afraid, disgusted, melancholic, surprised, calm].",
-        )
+        # 4. 构建 Wan2GP 任务 settings，重组微调配置参数
+        settings = {
+            "model_type": "index_tts2",
+            "prompt": req.text,
+            "audio_guide": spk_path,
+            "audio_guide2": emo_audio_path,
+            "audio_prompt_type": "AB" if req.emo_audio_prompt else "A",
+            "alt_prompt": req.emo_text if req.emo_text else "",
+            "temperature": 0.8,
+            "top_p": 0.8,
+            "top_k": 30,
+            "custom_settings": {
+                "emo_alpha": req.emo_alpha,
+                "emo_vector": req.emo_vector,
+                "use_emo_text": req.use_emo_text,
+                "emo_text": req.emo_text,
+                "use_random": req.use_random,
+                "interval_silence": req.interval_silence,
+            },
+        }
 
-    # 4. 构建 Wan2GP 任务 settings，重组微调配置参数
-    settings = {
-        "model_type": "index_tts2",
-        "prompt": req.text,
-        "audio_guide": spk_path,
-        "audio_guide2": emo_audio_path,
-        "audio_prompt_type": "AB" if req.emo_audio_prompt else "A",
-        "alt_prompt": req.emo_text if req.emo_text else "",
-        "temperature": 0.8,
-        "top_p": 0.8,
-        "top_k": 30,
-        "custom_settings": {
-            "emo_alpha": req.emo_alpha,
-            "emo_vector": req.emo_vector,
-            "use_emo_text": req.use_emo_text,
-            "emo_text": req.emo_text,
-            "use_random": req.use_random,
-            "interval_silence": req.interval_silence,
-        },
-    }
-
-    try:
         logger.info("Submitting TTS task to session...")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
@@ -451,6 +479,15 @@ async def tts_synthesize(req: TTSRequest, fastapi_req: Request):
     except Exception as e:
         logger.error(f"Error during IndexTTS2 synthesis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"TTS Synthesis Failed: {str(e)}")
+    finally:
+        # 清理临时下载的参考音频文件
+        for temp_file in temp_files_to_clean:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    logger.info(f"Cleaned up temporary downloaded reference file: {temp_file}")
+                except Exception as ex:
+                    logger.error(f"Failed to delete temp reference file {temp_file}: {ex}")
 
 
 @app.get("/health")

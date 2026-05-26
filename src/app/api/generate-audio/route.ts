@@ -82,23 +82,10 @@ function stitchWav(segments: Buffer[], header: Buffer, silenceMs: number): Buffe
 
 // ── 音色参考解析 ───────────────────────────────────────────
 
-/** 将音色 URL 下载到本地临时文件，或解析本地相对路径为绝对路径 */
+/** 将音色 URL 或相对路径直接传递给 Python 后端进行下载和定位，免去 Next.js 端冗余下载 */
 async function resolveSpeakerPath(
   ref: string
 ): Promise<{ resolved: string; temp: string | null }> {
-  if (ref.startsWith("http://") || ref.startsWith("https://")) {
-    const dir = path.join(process.cwd(), "public", "audio", "temp");
-    fs.mkdirSync(dir, { recursive: true });
-    const tempPath = path.join(dir, `spk_${uuidv4()}.wav`);
-    const res = await fetch(ref);
-    if (!res.ok) throw new Error(`Failed to download speaker ref: ${res.statusText}`);
-    fs.writeFileSync(tempPath, Buffer.from(await res.arrayBuffer()));
-    return { resolved: path.resolve(tempPath), temp: tempPath };
-  }
-  if (!path.isAbsolute(ref)) {
-    const abs = path.resolve(process.cwd(), "index-tts", ref);
-    if (fs.existsSync(abs)) return { resolved: abs, temp: null };
-  }
   return { resolved: ref, temp: null };
 }
 
@@ -200,7 +187,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "text and spk_audio_prompt are required" }, { status: 400 });
     }
 
-    const ttsServerUrl = process.env.INDEX_TTS_API_URL || "http://127.0.0.1:8000/synthesize";
+    const ttsServerUrl = process.env.INDEX_TTS_API_URL || "http://127.0.0.1:8126/tts";
     const ttsServerBase = new URL(ttsServerUrl).origin;
 
     const outputsDir = path.join(process.cwd(), "public", "audio", "outputs");
