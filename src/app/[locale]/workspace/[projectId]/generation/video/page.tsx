@@ -60,6 +60,7 @@ interface Scene {
   dialogue?: string;
   voice_actor_id?: string;
   video_url?: string;
+  master_url?: string;
 }
 
 // Premium stock video placeholders for mock mode
@@ -94,8 +95,26 @@ export default function VideoExecutionPage() {
 
   const { agent } = useAgent({ agentId: "default" });
 
-  // Helper to dynamically auto-heal local hostnames or relative paths to public domain
-  const getCleanUrl = (url: string | undefined) => {
+  // Helpers to dynamically auto-heal local hostnames or relative paths to public domain
+  const getCleanImageUrl = (url: string | undefined) => {
+    if (!url) return url;
+    if (url.startsWith("/")) {
+      return `https://t2i.aianime.space${url}`;
+    }
+    try {
+      const urlObj = new URL(url);
+      if (
+        urlObj.hostname === "localhost" ||
+        urlObj.hostname === "127.0.0.1" ||
+        urlObj.hostname === "0.0.0.0"
+      ) {
+        return `https://t2i.aianime.space${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
+      }
+    } catch (e) {}
+    return url;
+  };
+
+  const getCleanVideoUrl = (url: string | undefined) => {
     if (!url) return url;
     if (url.startsWith("/")) {
       return `https://i2v.aianime.space${url}`;
@@ -124,7 +143,7 @@ export default function VideoExecutionPage() {
   // Advanced inference engine controls
   const [renderMode, setRenderMode] = useState<'mock' | 'real_gpu'>('real_gpu');
   const [guidanceScale, setGuidanceScale] = useState<number>(4.0);
-  const [numInferenceSteps, setNumInferenceSteps] = useState<number>(40);
+  const [numInferenceSteps, setNumInferenceSteps] = useState<number>(8);
   const [numFrames, setNumFrames] = useState<number>(121);
   const [frameRate, setFrameRate] = useState<number>(24.0);
   const [baseSeed, setBaseSeed] = useState<number>(0);
@@ -231,6 +250,14 @@ export default function VideoExecutionPage() {
   const handleStartRender = async (sceneId: string) => {
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
+
+    // Immediately reset the status to pending and clear old video output locally/in DB
+    setVideoOutputs(prev => {
+      const next = { ...prev };
+      delete next[sceneId];
+      return next;
+    });
+    handleUpdateSceneStatus(sceneId, "pending", "");
 
     const isSceneAudioSynced = !!(scene.audio_duration && scene.audio_duration > 0);
     const finalNumFrames = isSceneAudioSynced && scene.audio_duration
@@ -471,7 +498,8 @@ export default function VideoExecutionPage() {
             {scenes.map((scene) => {
               const isRendering = !!renderingStates[scene.id];
               const renderState = renderingStates[scene.id];
-              const videoUrl = getCleanUrl(videoOutputs[scene.id] || scene.video_url);
+              const videoUrl = getCleanVideoUrl(videoOutputs[scene.id] || scene.video_url);
+              const imageUrl = getCleanImageUrl(scene.master_url);
               const isRendered = scene.status === "rendered" && !!videoUrl;
               const isActive = activeSceneId === scene.id;
 
@@ -521,10 +549,15 @@ export default function VideoExecutionPage() {
                     </div>
 
                     <div className="shrink-0">
-                      {isRendered ? (
+                      {isRendering ? (
+                        <span className="text-[10px] font-bold text-primary animate-pulse flex items-center gap-1">
+                          <CpuIcon className="w-3.5 h-3.5 animate-spin" />
+                          Synthesizing Video...
+                        </span>
+                      ) : isRendered ? (
                         <div className="flex items-center gap-2">
                           <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
-                            <CheckCircle2Icon className="w-3 h-3" />
+                            <CheckCircle2Icon className="w-3.5 h-3.5" />
                             Render Complete
                           </Badge>
                           <Button
@@ -537,11 +570,6 @@ export default function VideoExecutionPage() {
                             Re-generate
                           </Button>
                         </div>
-                      ) : isRendering ? (
-                        <span className="text-[10px] font-bold text-primary animate-pulse flex items-center gap-1">
-                          <CpuIcon className="w-3.5 h-3.5 animate-spin" />
-                          Synthesizing Video...
-                        </span>
                       ) : (
                         <Button
                           variant="outline"
@@ -564,6 +592,7 @@ export default function VideoExecutionPage() {
                           src={videoUrl}
                           controls
                           loop
+                          poster={imageUrl}
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={(e) => e.stopPropagation()}>
@@ -583,13 +612,49 @@ export default function VideoExecutionPage() {
                         </div>
                       </div>
                     ) : isRendering ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-background/80 backdrop-blur-sm space-y-4">
-                        <CpuIcon className="w-9 h-9 text-primary animate-spin" />
-                        <div className="w-2/3 text-center space-y-2">
-                          <span className="text-[10px] font-mono tracking-wider text-muted-foreground truncate block">
-                            {renderState?.log}
-                          </span>
-                          <Progress value={renderState?.progress || 0} className="h-1.5 w-full bg-muted" />
+                      <div className="relative w-full h-full">
+                        {imageUrl && (
+                          <img
+                            src={imageUrl}
+                            alt="Keyframe Preview"
+                            className="absolute inset-0 w-full h-full object-cover blur-sm brightness-[0.3]"
+                          />
+                        )}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-background/40 backdrop-blur-sm space-y-4">
+                          <CpuIcon className="w-9 h-9 text-primary animate-spin" />
+                          <div className="w-2/3 text-center space-y-2">
+                            <span className="text-[10px] font-mono tracking-wider text-muted-foreground truncate block">
+                              {renderState?.log}
+                            </span>
+                            <Progress value={renderState?.progress || 0} className="h-1.5 w-full bg-muted" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : imageUrl ? (
+                      <div className="relative w-full h-full group">
+                        <img
+                          src={imageUrl}
+                          alt="Scene Keyframe"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        
+                        <div className="absolute top-3 left-3">
+                          <Badge className="bg-primary/20 text-primary border-primary/30 backdrop-blur-md text-[9px] font-bold py-0.5 px-2 tracking-wider">
+                            MASTER KEYFRAME
+                          </Badge>
+                        </div>
+
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 backdrop-blur-[2px]">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleStartRender(scene.id)}
+                            className="h-9 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md rounded-xl text-xs flex items-center gap-1.5"
+                          >
+                            <PlayIcon className="w-3.5 h-3.5" />
+                            Synthesize Video
+                          </Button>
                         </div>
                       </div>
                     ) : (

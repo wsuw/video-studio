@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import http from "http";
 import https from "https";
 
+// Extend global Node.js http.Server default timeouts to 15 minutes to prevent Next.js dev server socket timeouts
+if (http.Server.prototype) {
+  http.Server.prototype.timeout = 900000; // 15 minutes
+  http.Server.prototype.keepAliveTimeout = 900000;
+  http.Server.prototype.headersTimeout = 900000;
+  console.log("[API Proxy] Extended global Node.js http.Server default timeouts to 15 minutes.");
+}
+
 export const maxDuration = 900; // 15 minutes execution limit
 
 function httpRequest(url: string, body: string, timeoutMs: number): Promise<{ statusCode?: number, body: string }> {
