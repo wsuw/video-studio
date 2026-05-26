@@ -32,7 +32,7 @@ from shared.api import init, GenerationResult
 app = FastAPI(
     title="Wan2GP Unified API Microservice",
     description="整合了高超的音视频生成能力与 MinIO/S3 资产存储的统一微服务。",
-    version="2.0.0",
+    version="2.1.0",
 )
 
 os.makedirs("outputs", exist_ok=True)
@@ -52,7 +52,6 @@ logger.info("Wan2GP session initialized successfully!")
 # ==========================================
 # 内联存储客户端（支持本地静态文件 / MinIO S3 桶）
 # ==========================================
-
 
 class StorageClient:
     def generate_unique_path(self, extension: str) -> str:
@@ -135,7 +134,6 @@ def get_storage_client() -> StorageClient:
 # 辅助函数
 # ==========================================
 
-
 def resolve_audio_path(audio_path: str) -> Optional[str]:
     """按优先级定位参考音频文件所在的位置"""
     if not audio_path:
@@ -156,31 +154,40 @@ def resolve_audio_path(audio_path: str) -> Optional[str]:
 # 数据校验 Schema 结构体
 # ==========================================
 
-
 class GenerateRequest(BaseModel):
+    """通用/兼容模式请求体"""
     prompt: str = Field(..., description="生成媒体的文本提示词")
-    model_type: str = Field(
-        "index_tts2", description="使用的生成模型类型 (e.g. index_tts2, ltx2)"
-    )
+    model_type: str = Field("index_tts2", description="使用的生成模型类型 (e.g. index_tts2, ltx2)")
     resolution: str = Field("832x480", description="画面分辨率")
     duration_seconds: float = Field(25.0, description="最大生成时间限制 (秒)")
-    custom_settings: Optional[Dict[str, Any]] = Field(
-        None, description="自定义额外微调配置项"
-    )
+    custom_settings: Optional[Dict[str, Any]] = Field(None, description="自定义额外微调配置项")
+
+
+class VideoGenerateRequest(BaseModel):
+    """视频生成专属请求体"""
+    prompt: str = Field(..., description="视频提示词")
+    model_type: str = Field("ltx2_22B_distilled", description="视频生成模型")
+    resolution: str = Field("768x512", description="视频分辨率")
+    duration_seconds: float = Field(4.0, description="最大生成时长(秒)")
+    video_length: int = Field(97, description="视频帧数")
+    force_fps: int = Field(24, description="强制视频帧率")
+    custom_settings: Optional[Dict[str, Any]] = Field(None, description="自定义微调配置参数")
+
+
+class ImageGenerateRequest(BaseModel):
+    """图片生成专属请求体"""
+    prompt: str = Field(..., description="图片提示词")
+    model_type: str = Field("flux", description="图片生成模型")
+    resolution: str = Field("1024x1024", description="图片分辨率")
+    custom_settings: Optional[Dict[str, Any]] = Field(None, description="自定义微调配置参数")
 
 
 class TTSRequest(BaseModel):
+    """语音合成/声音克隆请求体"""
     text: str = Field(..., description="要合成的文本脚本")
-    spk_audio_prompt: str = Field(
-        ...,
-        description="音色参考音频文件路径，例如 'speech-samples/en-US_Female_Adult.wav'",
-    )
-    emo_audio_prompt: Optional[str] = Field(
-        None, description="情绪参考音频文件路径 (选填)"
-    )
-    emo_alpha: float = Field(
-        1.0, ge=0.0, le=1.0, description="情绪融合度比例 (0.0 - 1.0)"
-    )
+    spk_audio_prompt: str = Field(..., description="音色参考音频文件路径，例如 'speech-samples/en-US_Female_Adult.wav'")
+    emo_audio_prompt: Optional[str] = Field(None, description="情绪参考音频文件路径 (选填)")
+    emo_alpha: float = Field(1.0, ge=0.0, le=1.0, description="情绪融合度比例 (0.0 - 1.0)")
     emo_vector: Optional[List[float]] = Field(None, description="8维情绪引导向量")
     use_emo_text: bool = Field(False, description="是否启用文本情感推导模式")
     emo_text: Optional[str] = Field(None, description="特定的情绪状态指令描述")
@@ -192,11 +199,102 @@ class TTSRequest(BaseModel):
 # API 路由接口定义
 # ==========================================
 
+@app.post("/generate/video")
+async def generate_video(req: VideoGenerateRequest, fastapi_req: Request):
+    """
+    🎬 专属视频生成接口，支持控制帧率、时长和分辨率，资产自动上传
+    """
+    settings = {
+        "model_type": req.model_type,
+        "prompt": req.prompt,
+        "resolution": req.resolution,
+        "duration_seconds": req.duration_seconds,
+        "video_length": req.video_length,
+        "force_fps": req.force_fps,
+    }
+    if req.custom_settings:
+        settings.update(req.custom_settings)
+
+    try:
+        logger.info(f"Submitting video task: model_type={req.model_type}")
+        job = session.submit_task(settings)
+        result: GenerationResult = job.result()
+        if not result.success:
+            errors = [err.message for err in result.errors]
+            raise HTTPException(status_code=500, detail=f"Video Generation failed: {errors}")
+
+        storage_client = get_storage_client()
+        is_remote = not isinstance(storage_client, LocalStorageClient)
+
+        urls = []
+        for file_path in result.generated_files:
+            if os.path.exists(file_path):
+                url = storage_client.upload_file(file_path, request=fastapi_req)
+                urls.append(url)
+                if is_remote:
+                    try:
+                        os.remove(file_path)
+                    except Exception as ex:
+                        logger.error(f"Failed to delete temporary local file {file_path}: {ex}")
+
+        return {"status": "success", "files": urls}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error during video generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/generate/image")
+async def generate_image(req: ImageGenerateRequest, fastapi_req: Request):
+    """
+    🖼️ 专属图片/关键帧生成接口，无时长参数，纯静态图片资产自动上传
+    """
+    settings = {
+        "model_type": req.model_type,
+        "prompt": req.prompt,
+        "resolution": req.resolution,
+        "video_length": 0,
+        "duration_seconds": 0,
+        "force_fps": 24,
+    }
+    if req.custom_settings:
+        settings.update(req.custom_settings)
+
+    try:
+        logger.info(f"Submitting image task: model_type={req.model_type}")
+        job = session.submit_task(settings)
+        result: GenerationResult = job.result()
+        if not result.success:
+            errors = [err.message for err in result.errors]
+            raise HTTPException(status_code=500, detail=f"Image Generation failed: {errors}")
+
+        storage_client = get_storage_client()
+        is_remote = not isinstance(storage_client, LocalStorageClient)
+
+        urls = []
+        for file_path in result.generated_files:
+            if os.path.exists(file_path):
+                url = storage_client.upload_file(file_path, request=fastapi_req)
+                urls.append(url)
+                if is_remote:
+                    try:
+                        os.remove(file_path)
+                    except Exception as ex:
+                        logger.error(f"Failed to delete temporary local file {file_path}: {ex}")
+
+        return {"status": "success", "files": urls}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error during image generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/generate")
 async def generate_media(req: GenerateRequest, fastapi_req: Request):
     """
-    通用音视频任务生成接口，通过设置 model_type 决定调用哪个模型，生成的文件自动上传并返回对外 URL
+    🔄 通用/兼容模式生成接口，适合历史客户端使用，自动根据模型格式上传
     """
     settings = {
         "model_type": req.model_type,
@@ -209,7 +307,7 @@ async def generate_media(req: GenerateRequest, fastapi_req: Request):
         settings.update(req.custom_settings)
 
     try:
-        logger.info(f"Submitting media task to session: model_type={req.model_type}")
+        logger.info(f"Submitting general task: model_type={req.model_type}")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
         if not result.success:
@@ -228,9 +326,7 @@ async def generate_media(req: GenerateRequest, fastapi_req: Request):
                     try:
                         os.remove(file_path)
                     except Exception as ex:
-                        logger.error(
-                            f"Failed to delete temporary local file {file_path}: {ex}"
-                        )
+                        logger.error(f"Failed to delete temporary local file {file_path}: {ex}")
 
         return {"status": "success", "files": urls}
     except HTTPException as he:
@@ -240,14 +336,12 @@ async def generate_media(req: GenerateRequest, fastapi_req: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/synthesize")
-async def synthesize(req: TTSRequest, fastapi_req: Request):
+@app.post("/tts")
+async def tts_synthesize(req: TTSRequest, fastapi_req: Request):
     """
-    IndexTTS2 专属的高级声音克隆与多模态情感语音合成接口
+    🎤 专属高级声音克隆与多模态情感语音合成端点 (TTS)
     """
-    logger.info(
-        f"Received TTS synthesize request: text_len={len(req.text)}, spk='{req.spk_audio_prompt}'"
-    )
+    logger.info(f"Received TTS synthesize request: text_len={len(req.text)}, spk='{req.spk_audio_prompt}'")
 
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
@@ -299,7 +393,7 @@ async def synthesize(req: TTSRequest, fastapi_req: Request):
     }
 
     try:
-        logger.info("Submitting TTS task to high-performance session...")
+        logger.info("Submitting TTS task to session...")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
         if not result.success:
