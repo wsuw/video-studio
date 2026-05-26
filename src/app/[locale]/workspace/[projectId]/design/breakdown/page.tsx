@@ -519,11 +519,11 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                     {/* Vertical Form Fields */}
                     <div className="flex-1 flex flex-col gap-5 overflow-y-auto pr-1">
                       {/* Master Portrait Section */}
-                      <div className="space-y-2 shrink-0">
-                        <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
-                          Master Portrait (主视觉人设档案)
+                      <div className="space-y-2 shrink-0 flex flex-col">
+                        <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block text-left">
+                          Master Portrait
                         </label>
-                        <div className="w-40 h-40 relative group rounded-xl overflow-hidden border border-border/60 bg-muted/20 shadow-inner flex items-center justify-center">
+                        <div className="w-full aspect-square relative group rounded-xl overflow-hidden border border-border/60 bg-muted/20 shadow-inner flex items-center justify-center">
                           {isGeneratingPortrait ? (
                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
                               <Loader2 className="w-5 h-5 text-indigo-500 animate-spin mb-1.5" />
@@ -634,7 +634,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                           <div className="space-y-4 shrink-0">
                             <div className="flex items-center justify-between border-b border-border/40 pb-2">
                               <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground block">
-                                Voice Casting (配音角色声线)
+                                Voice Casting
                               </label>
                               {activeEntity.voice_reference && (
                                 <Button
@@ -664,7 +664,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                     <div className="space-y-1.5 flex-1 min-w-0">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-xs font-bold text-foreground truncate">
-                                          {currentVoice ? currentVoice.name : "Custom Voice (自定义声线)"}
+                                          {currentVoice ? currentVoice.name : "Custom Voice"}
                                         </h4>
                                         {currentVoice && (
                                           <Badge
@@ -748,13 +748,13 @@ After generating the visual profile, please ALSO call the generate_entity_portra
 
                       {/* Visual Identity Profile Textarea */}
                       <div className="space-y-2 flex flex-col flex-1 min-h-[200px]">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground">
-                            Visual Identity Profile (Casting Visual Styling)
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground truncate">
+                            Visual Description
                           </label>
-                          <span className="text-xs font-medium text-muted-foreground/85">
-                            Aligns with global: {customStylePrompt || "cinematic"}
-                          </span>
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal shrink-0 border-border bg-muted/20 text-muted-foreground">
+                            Style: {customStylePrompt || "cinematic"}
+                          </Badge>
                         </div>
                         <Textarea
                           value={activeEntity.description}

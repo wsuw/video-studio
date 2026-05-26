@@ -29,7 +29,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         prompt,
-        model_type: "flux",
+        model_type: "z_image",
         resolution: `${width}x${height}`,
         custom_settings: {
           guidance_scale,
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
     const data = await response.json();
     console.log(`[API Proxy] Flux server generation success:`, data);
-    
+
     // The backend returns the complete URL directly in data.url or data.files[0]
     let url = data.url || (data.files && data.files[0]);
 

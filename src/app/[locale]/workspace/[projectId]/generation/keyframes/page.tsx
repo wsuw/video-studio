@@ -225,10 +225,35 @@ export default function QueuePage() {
         }
       })
       .catch((err) => console.warn("[Queue] Load design state error:", err));
-  }, [projectId]);
+  }, [projectId, agent]);
+
+  // Sync loadedDesign to Agent state when agent becomes available
+  useEffect(() => {
+    if (agent && loadedDesign) {
+      const agentScenes = agent.state?.design?.scenes;
+      const loadedScenes = loadedDesign?.scenes;
+      
+      const needsSync = !agentScenes || 
+        agentScenes.length !== (loadedScenes?.length || 0) ||
+        loadedScenes?.some((s: any, idx: number) => s.master_url !== agentScenes[idx]?.master_url || s.status !== agentScenes[idx]?.status);
+
+      if (needsSync) {
+        agent.setState({
+          ...agent.state,
+          design: {
+            ...agent.state?.design,
+            ...loadedDesign,
+            scenes: loadedScenes
+          }
+        });
+      }
+    }
+  }, [agent, loadedDesign]);
 
   // Pull states from Agent or fallback
-  const design = agent?.state?.design || loadedDesign || {};
+  const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0) 
+    ? agent.state.design 
+    : (loadedDesign || {});
   const [scenes, setScenes] = React.useState<Scene[]>(design?.scenes || []);
   // Sync scenes when design changes
   React.useEffect(() => {
@@ -240,7 +265,6 @@ export default function QueuePage() {
   const globalStylePrompt = design.style_prompt || "";
 
   const handleUpdateSceneStatus = async (sceneId: string, status: "pending" | "locked" | "rendered", masterUrl?: string) => {
-    if (!agent) return;
     const updatedScenes = scenes.map((s: any) => {
       if (s.id === sceneId) {
         return {
@@ -257,10 +281,14 @@ export default function QueuePage() {
       scenes: updatedScenes
     };
 
-    agent.setState({
-      ...agent.state,
-      design: updatedDesign
-    });
+    if (agent) {
+      agent.setState({
+        ...agent.state,
+        design: updatedDesign
+      });
+    }
+
+    setLoadedDesign(updatedDesign);
 
     try {
       await updateThreadState(projectId, {
@@ -637,8 +665,8 @@ export default function QueuePage() {
 
       {/* Main Central Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Side: Active Render List (65% width) */}
-        <div className="w-[65%] flex flex-col p-6 overflow-y-auto border-r border-border/40 space-y-6">
+        {/* Left Side: Active Render List (flex-1) */}
+        <div className="flex-1 flex flex-col p-6 overflow-y-auto border-r border-border/40 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -692,12 +720,7 @@ export default function QueuePage() {
                     </div>
 
                     <div className="shrink-0">
-                      {isLocked ? (
-                        <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
-                          <CheckCircle2Icon className="w-3 h-3" />
-                          Master Confirmed (Locked)
-                        </Badge>
-                      ) : isRendered ? (
+                      {isRendered ? (
                         <div className="flex items-center gap-2">
                           <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 gap-1 text-[9px] font-bold py-0.5 px-2">
                             <CheckCircle2Icon className="w-3 h-3" />
@@ -706,11 +729,26 @@ export default function QueuePage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleReRoll(scene.id)}
+                            onClick={() => {
+                              if (renderMode === 'real_single') {
+                                handleStartRender(scene.id);
+                              } else {
+                                handleReRoll(scene.id);
+                              }
+                            }}
                             className="h-7 px-2 text-[10px] gap-1 hover:border-amber-500/50 hover:text-amber-500 transition-colors"
                           >
-                            <DicesIcon className="w-3.5 h-3.5" />
-                            Re-Roll Gacha
+                            {renderMode === 'real_single' ? (
+                              <>
+                                <RefreshCwIcon className="w-3.5 h-3.5 mr-1" />
+                                Regenerate
+                              </>
+                            ) : (
+                              <>
+                                <DicesIcon className="w-3.5 h-3.5 mr-1" />
+                                Re-Roll Gacha
+                              </>
+                            )}
                           </Button>
                         </div>
                       ) : isRendering ? (
@@ -788,52 +826,6 @@ export default function QueuePage() {
                               height={450}
                               className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
                             />
-                          {scene.status === "locked" ? (
-                            <>
-                              {/* Locked Badge (Glassmorphic) */}
-                              <div className="absolute top-3 right-3 bg-emerald-950/80 backdrop-blur-md border border-emerald-500/30 px-2.5 py-1 rounded-lg text-emerald-400 text-[10px] font-bold tracking-wider flex items-center gap-1.5 shadow-md">
-                                <span className="relative flex h-1.5 w-1.5">
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
-                                </span>
-                                LOCKED MASTER
-                              </div>
-
-                              {/* Unlock action on hover */}
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleUpdateSceneStatus(scene.id, "rendered")}
-                                  className="border-amber-500/50 hover:bg-amber-500 hover:text-black text-amber-500 text-xs font-bold gap-1 shadow-lg bg-background/20 backdrop-blur-xs"
-                                >
-                                  <Undo2Icon className="w-3.5 h-3.5" />
-                                  Unlock & Edit
-                                </Button>
-                              </div>
-                            </>
-                          ) : (
-                            /* Quality Control overlay */
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-3">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => handleUpdateSceneStatus(scene.id, "locked", masterUrl)}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-xs font-bold gap-1"
-                              >
-                                <CheckCircle2Icon className="w-3.5 h-3.5" />
-                                Lock Frame
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleUpdateSceneStatus(scene.id, "pending", masterUrl)}
-                                className="text-xs font-bold gap-1"
-                              >
-                                <Undo2Icon className="w-3.5 h-3.5" />
-                                Send to Redesign
-                              </Button>
-                            </div>
-                          )}
                         </div>
                       ) : isGachaSelecting ? (
                         /* Gacha 2x2 Selection Grid */
@@ -896,8 +888,8 @@ export default function QueuePage() {
           </div>
         </div>
 
-        {/* Right Side: Global Art Spec & Denoising Settings (35% width) */}
-        <div className="w-[35%] flex flex-col bg-muted/10 overflow-y-auto p-6 space-y-6">
+        {/* Right Side: Global Art Spec & Denoising Settings (350px width) */}
+        <div className="w-[350px] shrink-0 flex flex-col bg-muted/10 overflow-y-auto p-6 space-y-6">
           <div className="flex items-center gap-2.5 pb-2 border-b border-border/40">
             <LayersIcon className="w-4 h-4 text-muted-foreground" />
             <h2 className="text-xs font-bold tracking-[0.15em] uppercase text-muted-foreground">
