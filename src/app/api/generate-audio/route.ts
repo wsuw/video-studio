@@ -187,7 +187,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "text and spk_audio_prompt are required" }, { status: 400 });
     }
 
-    const ttsServerUrl = process.env.INDEX_TTS_API_URL || "http://127.0.0.1:8126/tts";
+    const ttsServerUrl = process.env.INDEX_TTS_API_URL || "http://127.0.0.1:8126/generate/audio";
     const ttsServerBase = new URL(ttsServerUrl).origin;
 
     const outputsDir = path.join(process.cwd(), "public", "audio", "outputs");

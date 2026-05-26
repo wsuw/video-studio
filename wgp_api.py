@@ -204,7 +204,7 @@ class ImageGenerateRequest(BaseModel):
     custom_settings: Optional[Dict[str, Any]] = Field(None, description="自定义微调配置参数")
 
 
-class TTSRequest(BaseModel):
+class AudioGenerateRequest(BaseModel):
     """语音合成/声音克隆请求体"""
     text: str = Field(..., description="要合成的文本脚本")
     spk_audio_prompt: str = Field(..., description="音色参考音频文件路径，例如 'speech-samples/en-US_Female_Adult.wav'")
@@ -215,6 +215,8 @@ class TTSRequest(BaseModel):
     emo_text: Optional[str] = Field(None, description="特定的情绪状态指令描述")
     use_random: bool = Field(False, description="推理生成中是否混入随机噪音采样")
     interval_silence: int = Field(200, description="断句间的静音时间间隔 (ms)")
+
+TTSRequest = AudioGenerateRequest
 
 
 # ==========================================
@@ -358,9 +360,10 @@ async def generate_media(req: GenerateRequest, fastapi_req: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/generate/audio")
 @app.post("/tts")
 @app.post("/synthesize")
-async def tts_synthesize(req: TTSRequest, fastapi_req: Request):
+async def generate_audio(req: AudioGenerateRequest, fastapi_req: Request):
     """
     🎤 专属高级声音克隆与多模态情感语音合成端点 (TTS)
     """
