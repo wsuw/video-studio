@@ -1,6 +1,7 @@
 import os
 import time
 import uuid
+import gc
 import torch
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
@@ -24,7 +25,6 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 # Global model reference
 pipe: Optional[LTX2Pipeline] = None
-upscale_pipe: Optional[LTX2LatentUpsamplePipeline] = None
 
 device = "cuda"
 model_path = "rootonchair/LTX-2-19b-distilled"
@@ -49,54 +49,30 @@ class GenerationRequest(BaseModel):
 
 @app.on_event("startup")
 def load_models():
-    global pipe, upscale_pipe
+    global pipe
     print("Loading LTX2 pipeline into memory…")
     start = time.time()
 
     # 1. Load the main LTX2 pipeline with bfloat16
     pipe = LTX2Pipeline.from_pretrained(model_path, torch_dtype=torch.bfloat16)
 
-    # 2. Enable FP8 Layerwise Casting for the main Transformer to compress weights from 38GB to 19GB
-    if hasattr(pipe, "transformer") and hasattr(
-        pipe.transformer, "enable_layerwise_casting"
-    ):
-        print("Enabling FP8 Layerwise Casting for LTX2 Transformer...")
-        pipe.transformer.enable_layerwise_casting(
-            storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
-        )
+    # 2. Enable sequential CPU offload as per official way to minimize VRAM usage
+    pipe.enable_sequential_cpu_offload(device=device)
 
-    # 3. Load the Latent Upsampler Model
-    latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
-        model_path, subfolder="latent_upsampler", torch_dtype=torch.bfloat16
-    )
-
-    # 4. Enable FP8 Layerwise Casting for the Latent Upsampler to save extra VRAM
-    if hasattr(latent_upsampler, "enable_layerwise_casting"):
-        print("Enabling FP8 Layerwise Casting for Latent Upsampler...")
-        latent_upsampler.enable_layerwise_casting(
-            storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
-        )
-
-    upscale_pipe = LTX2LatentUpsamplePipeline(
-        vae=pipe.vae, latent_upsampler=latent_upsampler
-    )
-
-    # 5. Enable VAE Tiling to prevent VAE OOM during decoding
+    # 3. Enable VAE Tiling to prevent OOM
     pipe.vae.enable_tiling()
 
-    # 6. Enable component-level CPU offload instead of slow layer-by-layer sequential offload.
-    # This keeps the active model component in GPU memory during computation (utilizing the 24GB VRAM),
-    # while automatically offloading idle components (like Text Encoder / VAE) to CPU.
-    pipe.enable_model_cpu_offload(device=device)
-    upscale_pipe.enable_model_cpu_offload(device=device)
-
-    print(f"Models loaded in {time.time() - start:.2f}s")
+    print(f"Main LTX2 pipeline loaded in {time.time() - start:.2f}s")
 
 
 @app.post("/generate")
 async def generate(request: GenerationRequest, fastapi_req: Request):
-    if pipe is None or upscale_pipe is None:
+    if pipe is None:
         raise HTTPException(status_code=503, detail="Model not loaded yet")
+
+    latent_upsampler = None
+    upsample_pipe = None
+
     try:
         # Stage 1 – latent video & audio
         video_latent, audio_latent = pipe(
@@ -114,12 +90,34 @@ async def generate(request: GenerationRequest, fastapi_req: Request):
             return_dict=False,
         )
 
+        # 🚀 官网推荐方式：动态按需加载 Latent Upsampler，避免与主管道常驻在同一个显存空间中
+        print("Loading Latent Upsampler model dynamically...")
+        latent_upsampler = LTX2LatentUpsamplerModel.from_pretrained(
+            model_path,
+            subfolder="latent_upsampler",
+            torch_dtype=torch.bfloat16,
+        )
+        upsample_pipe = LTX2LatentUpsamplePipeline(
+            vae=pipe.vae, latent_upsampler=latent_upsampler
+        )
+        upsample_pipe.enable_model_cpu_offload(device=device)
+
         # Stage 1 upsample latent video
-        upscaled_video_latent = upscale_pipe(
+        print("Running Latent Upsampler...")
+        upscaled_video_latent = upsample_pipe(
             latents=video_latent,
             output_type="latent",
             return_dict=False,
         )[0]
+
+        # 🚀 立即从显存和内存卸载/销毁 Upsampler 管道，释放显存后再进行 Stage 2 终稿去噪精炼
+        print("Unloading Latent Upsampler model from memory...")
+        del upsample_pipe
+        del latent_upsampler
+        upsample_pipe = None
+        latent_upsampler = None
+        gc.collect()
+        torch.cuda.empty_cache()
 
         # Stage 2 – final video & audio refinement
         video, audio = pipe(
@@ -156,7 +154,14 @@ async def generate(request: GenerationRequest, fastapi_req: Request):
             os.remove(local_path)
 
         return {"status": "success", "url": url, "output_path": local_path}
+
     except Exception as e:
+        # 异常情况下也确保垃圾回收，释放显存
+        if upsample_pipe is not None or latent_upsampler is not None:
+            del upsample_pipe
+            del latent_upsampler
+        gc.collect()
+        torch.cuda.empty_cache()
         raise HTTPException(status_code=500, detail=str(e))
 
 
