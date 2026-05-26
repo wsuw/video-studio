@@ -71,7 +71,9 @@ class LocalStorageClient(StorageClient):
         return os.path.join("outputs", f"{uuid.uuid4()}{extension}")
 
     def upload_file(self, local_path: str, request=None) -> str:
-        filename = os.path.basename(local_path)
+        orig_filename = os.path.basename(local_path)
+        name_part, ext_part = os.path.splitext(orig_filename)
+        filename = f"{name_part}_{uuid.uuid4().hex[:12]}{ext_part}"
         dest_path = os.path.join("outputs", filename)
         if os.path.abspath(local_path) != os.path.abspath(dest_path):
             os.makedirs("outputs", exist_ok=True)
@@ -108,7 +110,9 @@ class S3StorageClient(StorageClient):
         return os.path.join("outputs", f"{uuid.uuid4()}{extension}")
 
     def upload_file(self, local_path: str, request=None) -> str:
-        filename = os.path.basename(local_path)
+        orig_filename = os.path.basename(local_path)
+        name_part, ext_part = os.path.splitext(orig_filename)
+        filename = f"{name_part}_{uuid.uuid4().hex[:12]}{ext_part}"
         content_type, _ = mimetypes.guess_type(local_path)
         if not content_type:
             content_type = "application/octet-stream"

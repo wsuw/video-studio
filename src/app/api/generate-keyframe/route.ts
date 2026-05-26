@@ -18,9 +18,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // Call the local Python Flux.2 Klein server on port 8124
-    const fluxServerUrl = process.env.FLUX_SERVER_URL || "http://localhost:8124/generate";
-    console.log(`[API Proxy] Sending request to Flux.2 Klein Server... (URL: ${fluxServerUrl})`);
+    // Call the local Python unified Wan2GP server
+    const wan2gpApiUrl = process.env.WAN2GP_API_URL || "http://localhost:8126";
+    const fluxServerUrl = `${wan2gpApiUrl.replace(/\/$/, "")}/generate/image`;
+    console.log(`[API Proxy] Sending request to Wan2GP Image Server... (URL: ${fluxServerUrl})`);
     const response = await fetch(fluxServerUrl, {
       method: "POST",
       headers: {
@@ -28,11 +29,13 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         prompt,
-        height,
-        width,
-        guidance_scale,
-        num_inference_steps,
-        seed,
+        model_type: "flux",
+        resolution: `${width}x${height}`,
+        custom_settings: {
+          guidance_scale,
+          num_inference_steps,
+          seed,
+        }
       }),
     });
 
@@ -48,8 +51,8 @@ export async function POST(req: Request) {
     const data = await response.json();
     console.log(`[API Proxy] Flux server generation success:`, data);
     
-    // The backend returns the complete URL directly in data.url
-    let url = data.url;
+    // The backend returns the complete URL directly in data.url or data.files[0]
+    let url = data.url || (data.files && data.files[0]);
 
     // Rewrite any relative or local hostnames to use the correct public domain
     if (url) {

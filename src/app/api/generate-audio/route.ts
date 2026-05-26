@@ -187,7 +187,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "text and spk_audio_prompt are required" }, { status: 400 });
     }
 
-    const ttsServerUrl = process.env.INDEX_TTS_API_URL || "http://127.0.0.1:8126/generate/audio";
+    const wan2gpApiUrl = process.env.WAN2GP_API_URL || "http://127.0.0.1:8126";
+    const ttsServerUrl = process.env.INDEX_TTS_API_URL || `${wan2gpApiUrl.replace(/\/$/, "")}/generate/audio`;
     const ttsServerBase = new URL(ttsServerUrl).origin;
 
     const outputsDir = path.join(process.cwd(), "public", "audio", "outputs");
@@ -205,12 +206,18 @@ export async function POST(req: Request) {
 
     if (turns.length <= 1) {
       // ── 单人路径 ──────────────────────────────────────────
-      const { resolved, temp } = await resolveSpeakerPath(spk_audio_prompt);
+      const singleTurn = turns[0];
+      const speaker = singleTurn?.speaker || "NARRATOR";
+      const voiceRef =
+        character_voices[speaker] ??
+        (speaker === "NARRATOR" ? "examples/voice_04.wav" : spk_audio_prompt);
+
+      const { resolved, temp } = await resolveSpeakerPath(voiceRef);
       tempFiles.push(temp);
 
-      const singleTurn = turns[0];
       const finalEmoVector = singleTurn?.emo_vector ?? emo_vector;
       const finalEmoAlpha = singleTurn?.emo_alpha ?? emo_alpha;
+      const finalEmoText = singleTurn?.emotion_text || (use_emo_text ? (singleTurn?.text ?? text) : emo_text);
 
       const result = await callTts(ttsServerUrl, {
         ...baseTtsPayload,
@@ -218,7 +225,7 @@ export async function POST(req: Request) {
         spk_audio_prompt: resolved,
         emo_vector: finalEmoVector,
         emo_alpha: finalEmoAlpha,
-        emo_text,
+        emo_text: finalEmoText,
         interval_silence,
       });
 

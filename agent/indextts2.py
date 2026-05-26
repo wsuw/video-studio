@@ -98,10 +98,14 @@ def generate_tts_audio(
                                 f"Emotion reference audio file not found: {emo_audio_prompt}"
                             )
 
-        # 3. Call the IndexTTS2 api.py service (port 8000)
-        index_tts_url = os.getenv(
-            "INDEX_TTS_API_URL", "http://127.0.0.1:8000/synthesize"
-        )
+        # 3. Call the IndexTTS2 api.py service
+        wan2gp_api_url = os.getenv("WAN2GP_API_URL")
+        if wan2gp_api_url:
+            index_tts_url = f"{wan2gp_api_url.rstrip('/')}/generate/audio"
+        else:
+            index_tts_url = os.getenv(
+                "INDEX_TTS_API_URL", "http://127.0.0.1:8126/generate/audio"
+            )
 
         payload = {
             "text": text,
@@ -131,11 +135,31 @@ def generate_tts_audio(
         storage_client = get_storage_client()
         local_output_path = storage_client.generate_unique_path("wav")
 
-        with open(local_output_path, "wb") as f:
-            f.write(response.content)
+        # Check if the response contains JSON with a pre-uploaded S3 or hosted URL
+        is_json = False
+        res_json = None
+        try:
+            if "application/json" in response.headers.get("content-type", "").lower():
+                res_json = response.json()
+                is_json = True
+        except:
+            pass
 
-        # 5. Direct upload to MinIO/S3 and get URL
-        web_url = storage_client.upload_file(local_output_path, request=request)
+        if is_json and res_json and "url" in res_json:
+            web_url = res_json["url"]
+            if web_url.startswith("/"):
+                from urllib.parse import urlparse
+                parsed = urlparse(index_tts_url)
+                web_url = f"{parsed.scheme}://{parsed.netloc}{web_url}"
+            print(f"IndexTTS2 server returned JSON response with URL: {web_url}. Downloading to local cache...")
+            download_file(web_url, local_output_path)
+            # Re-upload to ensure it goes to client's configured storage client/bucket if needed
+            web_url = storage_client.upload_file(local_output_path, request=request)
+        else:
+            with open(local_output_path, "wb") as f:
+                f.write(response.content)
+            # 5. Direct upload to MinIO/S3 and get URL
+            web_url = storage_client.upload_file(local_output_path, request=request)
 
         # 6. Cleanup temporary local WAV file if S3 is active
         if isinstance(storage_client, S3StorageClient):

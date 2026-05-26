@@ -27,7 +27,8 @@ import {
   PlayIcon,
   PauseIcon,
   Volume2Icon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  Loader2
 } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
@@ -37,7 +38,7 @@ import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { getThreadState } from "@/lib/langgraph"
+import { getThreadState, updateThreadState } from "@/lib/langgraph"
 import { v4 as uuidv4 } from "uuid"
 import { PRESET_VOICES } from "@/lib/preset-voices"
 import { VoiceSelectorDialog, Voice } from "@/components/voices/voice-selector-dialog"
@@ -92,6 +93,7 @@ export default function BreakdownPage() {
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
   const [allVoices, setAllVoices] = useState<any[]>([]);
+  const [isGeneratingPortrait, setIsGeneratingPortrait] = React.useState<boolean>(false);
   const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
 
   React.useEffect(() => {
@@ -209,14 +211,70 @@ After generating the visual profile, please ALSO call the generate_entity_portra
     agent.runAgent();
   };
 
-  const handleAutoPortrait = (entity: Entity) => {
-    if (!agent) return;
-    agent.addMessage({
-      role: "user",
-      id: uuidv4(),
-      content: `Please generate a canonical visual reference image (Master Portrait) using the generate_entity_portrait tool for the entity "${entity.name}" (ID: ${entity.id}) with the style prompt: "${entity.description}"`,
-    });
-    agent.runAgent();
+  const handleAutoPortrait = async (entity: Entity) => {
+    if (!entity.description) {
+      alert("Please enter a description for the asset first.");
+      return;
+    }
+    
+    setIsGeneratingPortrait(true);
+    try {
+      const response = await fetch("/api/generate-keyframe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: `${entity.description}. Master portrait visual reference, high resolution.`,
+          width: 1024,
+          height: 1024,
+          guidance_scale: 1.0,
+          num_inference_steps: 8,
+          seed: Math.floor(Math.random() * 1000000),
+          sceneId: "breakdown"
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Status ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.status === "success" && data.url) {
+        const updatedEntities = entities.map(e => {
+          if (e.id === entity.id) {
+            return { ...e, visual_reference: data.url };
+          }
+          return e;
+        });
+
+        const updatedDesign = {
+          ...design,
+          entities: updatedEntities
+        };
+
+        if (agent) {
+          agent.setState({
+            ...agent.state,
+            design: updatedDesign
+          });
+        }
+        
+        setLoadedDesign(updatedDesign);
+
+        await updateThreadState(projectId, {
+          design: updatedDesign
+        });
+      } else {
+        throw new Error(data.error || "Generation returned unsuccessful status");
+      }
+    } catch (err: any) {
+      console.error("[Breakdown] Auto portrait generation failed:", err);
+      alert(`Image generation failed: ${err.message || err}`);
+    } finally {
+      setIsGeneratingPortrait(false);
+    }
   };
 
   return (
@@ -466,7 +524,12 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                           Master Portrait (主视觉人设档案)
                         </label>
                         <div className="w-40 h-40 relative group rounded-xl overflow-hidden border border-border/60 bg-muted/20 shadow-inner flex items-center justify-center">
-                          {activeEntity.visual_reference ? (
+                          {isGeneratingPortrait ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
+                              <Loader2 className="w-5 h-5 text-indigo-500 animate-spin mb-1.5" />
+                              <p className="text-[10px] text-muted-foreground leading-snug">Generating...</p>
+                            </div>
+                          ) : activeEntity.visual_reference ? (
                             <>
                               <img
                                 src={activeEntity.visual_reference}
@@ -478,6 +541,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                   size="sm"
                                   variant="secondary"
                                   onClick={() => handleAutoPortrait(activeEntity)}
+                                  disabled={isGeneratingPortrait}
                                   className="text-xs font-bold h-6 px-2 w-full"
                                 >
                                   <Wand2Icon className="w-2.5 h-2.5 mr-1" />
@@ -505,6 +569,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                               <Button
                                 size="sm"
                                 onClick={() => handleAutoPortrait(activeEntity)}
+                                disabled={isGeneratingPortrait}
                                 className="text-xs font-bold h-5 px-1.5 mt-2 bg-indigo-600 hover:bg-indigo-700 text-white"
                               >
                                 Auto-Draw

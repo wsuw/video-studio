@@ -110,13 +110,30 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
     absolute_output_path = os.path.join(outputs_dir, filename)
     web_url = f"/images/outputs/{filename}"
 
-    flux_server_url = os.getenv("FLUX_SERVER_URL", "http://localhost:8124/generate")
-    print(f"[Image Factory] 🎨 Contacting local Flux.2 Klein server at {flux_server_url} for prompt: '{prompt[:50]}'...")
+    wan2gp_api_url = os.getenv("WAN2GP_API_URL")
+    if wan2gp_api_url:
+        flux_server_url = f"{wan2gp_api_url.rstrip('/')}/generate/image"
+    else:
+        flux_server_url = os.getenv("FLUX_SERVER_URL", "http://localhost:8126/generate/image")
+
+    print(f"[Image Factory] 🎨 Contacting image server at {flux_server_url} for prompt: '{prompt[:50]}'...")
+
+    is_unified = "/generate/image" in flux_server_url
 
     try:
-        response = requests.post(
-            flux_server_url,
-            json={
+        if is_unified:
+            payload = {
+                "prompt": prompt,
+                "model_type": "flux",
+                "resolution": "1024x1024",
+                "custom_settings": {
+                    "guidance_scale": 1.0,
+                    "num_inference_steps": 4,
+                    "seed": 0
+                }
+            }
+        else:
+            payload = {
                 "prompt": prompt,
                 "height": 1024,
                 "width": 1024,
@@ -124,16 +141,27 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
                 "num_inference_steps": 4,
                 "seed": 0,
                 "output_path": absolute_output_path
-            },
+            }
+
+        response = requests.post(
+            flux_server_url,
+            json=payload,
             timeout=120
         )
         if response.status_code == 200:
             res_json = response.json()
-            generated_url = res_json.get("url")
+            generated_url = res_json.get("url") or (res_json.get("files") and res_json.get("files")[0])
+            
+            # If the URL is relative, prepend the host of the server
+            if generated_url and generated_url.startswith("/"):
+                from urllib.parse import urlparse
+                parsed = urlparse(flux_server_url)
+                generated_url = f"{parsed.scheme}://{parsed.netloc}{generated_url}"
+                
             if generated_url:
-                print(f"[Image Factory] ✅ Successfully generated portrait using local Flux server: {generated_url}")
+                print(f"[Image Factory] ✅ Successfully generated portrait using local server: {generated_url}")
                 return generated_url
-            print(f"[Image Factory] ✅ Successfully generated portrait using local Flux server, but 'url' not in response. Using legacy web_url: {web_url}")
+            print(f"[Image Factory] ✅ Successfully generated portrait using local server, but 'url'/'files' not in response. Using legacy web_url: {web_url}")
             return web_url
         else:
             print(f"[Image Factory] ⚠️ Flux server returned status {response.status_code}: {response.text}")

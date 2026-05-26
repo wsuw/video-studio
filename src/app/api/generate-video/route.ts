@@ -76,26 +76,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // Call the local Python LTX-2 server on port 8125
-    const ltxServerUrl = process.env.LTX_SERVER_URL || "http://localhost:8125/generate";
-    console.log(`[API Proxy] Sending request to LTX-2 Server... (URL: ${ltxServerUrl})`);
+    // Call the local Python unified Wan2GP server
+    const wan2gpApiUrl = process.env.WAN2GP_API_URL || "http://localhost:8126";
+    const ltxServerUrl = process.env.LTX_SERVER_URL || `${wan2gpApiUrl.replace(/\/$/, "")}/generate/video`;
+    console.log(`[API Proxy] Sending request to Video Server... (URL: ${ltxServerUrl})`);
 
-    const requestPayload = JSON.stringify({
-      prompt,
-      negative_prompt,
-      width,
-      height,
-      num_frames,
-      frame_rate,
-      num_inference_steps_stage1: num_inference_steps,
-      guidance_scale_stage1: guidance_scale,
-      seed,
-    });
+    const isUnified = ltxServerUrl.includes("/generate/video");
+    let requestPayload: string;
+
+    if (isUnified) {
+      requestPayload = JSON.stringify({
+        prompt,
+        model_type: "ltx2_22B_distilled",
+        resolution: `${width}x${height}`,
+        duration_seconds: num_frames / frame_rate,
+        video_length: num_frames,
+        force_fps: frame_rate,
+        custom_settings: {
+          negative_prompt,
+          num_inference_steps_stage1: num_inference_steps,
+          guidance_scale_stage1: guidance_scale,
+          seed,
+        }
+      });
+    } else {
+      requestPayload = JSON.stringify({
+        prompt,
+        negative_prompt,
+        width,
+        height,
+        num_frames,
+        frame_rate,
+        num_inference_steps_stage1: num_inference_steps,
+        guidance_scale_stage1: guidance_scale,
+        seed,
+      });
+    }
 
     const result = await httpRequest(ltxServerUrl, requestPayload, 900000); // 15 minutes timeout
 
     if (result.statusCode !== 200) {
-      console.error(`[API Proxy] LTX-2 server returned status ${result.statusCode}: ${result.body}`);
+      console.error(`[API Proxy] Video server returned status ${result.statusCode}: ${result.body}`);
       return NextResponse.json(
         { error: `Python model server error: ${result.body}` },
         { status: result.statusCode || 500 }
@@ -103,10 +124,10 @@ export async function POST(req: Request) {
     }
 
     const data = JSON.parse(result.body);
-    console.log(`[API Proxy] LTX-2 server generation success:`, data);
+    console.log(`[API Proxy] Video server generation success:`, data);
     
-    // The backend returns the complete URL directly in data.url
-    let url = data.url;
+    // The backend returns the complete URL directly in data.url or data.files[0]
+    let url = data.url || (data.files && data.files[0]);
 
     // Rewrite any relative or local hostnames to use the correct public domain
     if (url) {
