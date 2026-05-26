@@ -8,6 +8,7 @@
     "dev:ui": "next dev --turbopack --hostname 0.0.0.0",
     "dev:agent": "./scripts/run-agent.sh || scripts\\run-agent.bat",
     "dev:wan2gp": "D:\\AntigravityProject\\Wan2GP\\.venv\\Scripts\\python.exe wgp_api.py",
+    "dev:wan2gp-ui": "D:\\AntigravityProject\\Wan2GP\\.venv\\Scripts\\python.exe wgp.py",
     "build": "next build",
     "start": "next start",
     "install:agent": "./scripts/setup-agent.sh || scripts\\setup-agent.bat",
