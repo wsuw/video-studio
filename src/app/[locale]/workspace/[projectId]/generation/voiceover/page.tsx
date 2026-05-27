@@ -227,6 +227,36 @@ const DialogueTextarea = React.memo(({ value, onChange, onBlur, placeholder, cla
 });
 DialogueTextarea.displayName = "DialogueTextarea";
 
+const getSpeakerDisplayName = (speakerKey: string | undefined, characters: any[]) => {
+  if (!speakerKey) return "Narrator (旁白)";
+  const keyUpper = speakerKey.toUpperCase();
+  if (keyUpper === "NARRATOR" || keyUpper === "SYSTEM") {
+    return "Narrator (旁白)";
+  }
+  // Try to match by Entity ID first
+  const charById = characters.find(c => c.id.toLowerCase() === speakerKey.toLowerCase());
+  if (charById) return charById.name;
+  // Fallback to match by name
+  const charByName = characters.find(c => c.name.toUpperCase() === keyUpper);
+  if (charByName) return charByName.name;
+  return speakerKey; // raw speaker name fallback
+};
+
+const getSpeakerSelectValue = (speakerKey: string | undefined, characters: any[]) => {
+  if (!speakerKey) return "NARRATOR";
+  const keyUpper = speakerKey.toUpperCase();
+  if (keyUpper === "NARRATOR" || keyUpper === "SYSTEM") {
+    return "NARRATOR";
+  }
+  // Try to match by Entity ID first
+  const charById = characters.find(c => c.id.toLowerCase() === speakerKey.toLowerCase());
+  if (charById) return charById.id;
+  // Fallback to match by name
+  const charByName = characters.find(c => c.name.toUpperCase() === keyUpper);
+  if (charByName) return charByName.id;
+  return speakerKey; // fallback
+};
+
 export default function VoiceoverStudio() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
   const router = useRouter();
@@ -401,7 +431,7 @@ export default function VoiceoverStudio() {
     const currentTurns = activeScene.dialogue_turns || [];
     const updatedTurns = currentTurns.map((t, idx) => {
       if (idx === turnIdx) {
-        return { ...t, speaker: newSpeaker.toUpperCase() };
+        return { ...t, speaker: newSpeaker };
       }
       return t;
     });
@@ -472,19 +502,18 @@ export default function VoiceoverStudio() {
   // 1. Initial parse/reconciliation when active scene changes
   useEffect(() => {
     if (activeScene) {
-      const val = activeScene.dialogue || "";
-      const existing = activeScene.dialogue_turns || [];
-      const reconciled = reconcileDialogueTurns(val, existing, characters.map(c => c.name));
+      let turns = activeScene.dialogue_turns || [];
 
-      // Update scene dialogue_turns if they changed or were uninitialized
-      if (!activeScene.dialogue_turns || activeScene.dialogue_turns.length !== reconciled.length) {
-        handleUpdateSceneField(activeScene.id, { dialogue_turns: reconciled });
+      // Fallback: If we don't have dialogue_turns, but we DO have a legacy dialogue string, parse it.
+      if (turns.length === 0 && activeScene.dialogue) {
+        turns = reconcileDialogueTurns(activeScene.dialogue, [], characters.map(c => c.name));
+        handleUpdateSceneField(activeScene.id, { dialogue_turns: turns });
       }
 
-      if (reconciled.length > 0) {
-        if (selectedTurnIndex === null || selectedTurnIndex >= reconciled.length) {
+      if (turns.length > 0) {
+        if (selectedTurnIndex === null || selectedTurnIndex >= turns.length) {
           setSelectedTurnIndex(0);
-          const firstTurn = reconciled[0];
+          const firstTurn = turns[0];
           setUseEmoText(!!firstTurn.use_emotion_text || !!firstTurn.emotion_text);
           loadEmotionTextStates(firstTurn.emotion_text || "");
         }
@@ -707,7 +736,10 @@ export default function VoiceoverStudio() {
     characters.forEach((c) => {
       if (c.voice_reference) {
         const charVoiceObj = PRESET_VOICES.find(v => v.id === c.voice_reference) || allVoices.find(v => v.id === c.voice_reference);
-        characterVoices[c.name.toUpperCase()] = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : c.voice_reference;
+        const voicePath = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : c.voice_reference;
+        characterVoices[c.name.toUpperCase()] = voicePath;
+        characterVoices[c.id.toUpperCase()] = voicePath;
+        characterVoices[c.id.toLowerCase()] = voicePath;
       }
     });
 
@@ -838,11 +870,14 @@ export default function VoiceoverStudio() {
     const characterVoices: Record<string, string> = {};
     characterVoices["NARRATOR"] = narratorPath;
     characterVoices["SYSTEM"] = narratorPath;
-    
+
     characters.forEach((c) => {
       if (c.voice_reference) {
         const charVoiceObj = PRESET_VOICES.find(v => v.id === c.voice_reference) || allVoices.find(v => v.id === c.voice_reference);
-        characterVoices[c.name.toUpperCase()] = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : c.voice_reference;
+        const voicePath = charVoiceObj ? (charVoiceObj.path || charVoiceObj.sampleUrl) : c.voice_reference;
+        characterVoices[c.name.toUpperCase()] = voicePath;
+        characterVoices[c.id.toUpperCase()] = voicePath;
+        characterVoices[c.id.toLowerCase()] = voicePath;
       }
     });
 
@@ -964,8 +999,8 @@ export default function VoiceoverStudio() {
   };
 
   const renderVoiceCastCard = (currentSpeaker: string) => {
-    const isNarrator = currentSpeaker === "NARRATOR" || currentSpeaker === "SYSTEM";
-    const char = characters.find(c => c.name.toUpperCase() === currentSpeaker.toUpperCase());
+    const isNarrator = currentSpeaker.toUpperCase() === "NARRATOR" || currentSpeaker.toUpperCase() === "SYSTEM";
+    const char = characters.find(c => c.id.toLowerCase() === currentSpeaker.toLowerCase() || c.name.toUpperCase() === currentSpeaker.toUpperCase());
 
     let currentVoiceRef = "";
     let displayName = currentSpeaker;
@@ -1298,14 +1333,16 @@ export default function VoiceoverStudio() {
                             #{scene.id.toUpperCase()}
                           </span>
                           {(() => {
-                            const turns = parseDialogueText(scene.dialogue || "", characters.map(c => c.name));
+                            const turns = scene.dialogue_turns && scene.dialogue_turns.length > 0
+                              ? scene.dialogue_turns
+                              : parseDialogueText(scene.dialogue || "", characters.map(c => c.name));
                             if (turns.length > 0) {
                               const uniqueSpeakers = Array.from(new Set(turns.map(t => t.speaker)));
                               return (
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   {uniqueSpeakers.map((spk, idx) => {
-                                    const char = characters.find(c => c.name.toUpperCase() === spk);
-                                    const isNarrator = spk === "NARRATOR" || spk === "SYSTEM";
+                                    const isNarrator = spk.toUpperCase() === "NARRATOR" || spk.toUpperCase() === "SYSTEM";
+                                    const char = characters.find(c => c.id.toLowerCase() === spk.toLowerCase() || c.name.toUpperCase() === spk.toUpperCase());
                                     return (
                                       <Badge
                                         key={idx}
@@ -1317,7 +1354,7 @@ export default function VoiceoverStudio() {
                                             : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
                                         )}
                                       >
-                                        {char ? char.name : spk}
+                                        {char ? char.name : (isNarrator ? "Narrator" : spk)}
                                       </Badge>
                                     );
                                   })}
@@ -1383,7 +1420,9 @@ export default function VoiceoverStudio() {
                       {/* Dialogue script card preview */}
                       <div className="space-y-2.5 pt-1">
                         {(() => {
-                          const turns = parseDialogueText(scene.dialogue || "", characters.map(c => c.name));
+                          const turns = scene.dialogue_turns && scene.dialogue_turns.length > 0
+                            ? scene.dialogue_turns
+                            : parseDialogueText(scene.dialogue || "", characters.map(c => c.name));
                           if (turns.length === 0) {
                             return (
                               <div className="text-xs text-muted-foreground/45 italic bg-muted/5 p-2.5 rounded-lg border border-dashed border-border/40 text-center select-none">
@@ -1394,8 +1433,8 @@ export default function VoiceoverStudio() {
                           return (
                             <div className="space-y-2">
                               {turns.map((turn, tIdx) => {
-                                const isNarrator = turn.speaker === "NARRATOR" || turn.speaker === "SYSTEM";
-                                const char = characters.find(c => c.name.toUpperCase() === turn.speaker);
+                                const isNarrator = turn.speaker.toUpperCase() === "NARRATOR" || turn.speaker.toUpperCase() === "SYSTEM";
+                                const char = characters.find(c => c.id.toLowerCase() === turn.speaker.toLowerCase() || c.name.toUpperCase() === turn.speaker.toUpperCase());
                                 const isTurnSelected = isSelected && selectedTurnIndex === tIdx;
                                 
                                 return (
@@ -1424,7 +1463,7 @@ export default function VoiceoverStudio() {
                                         isNarrator ? "bg-neutral-500/10 text-neutral-400 border-neutral-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"
                                       )}
                                     >
-                                      {char ? char.name : turn.speaker}
+                                      {char ? char.name : (isNarrator ? "Narrator" : turn.speaker)}
                                     </Badge>
                                     <div className="flex-1 text-foreground/90 font-medium leading-relaxed font-sans pr-1 break-words">
                                       {turn.text}
@@ -1498,13 +1537,13 @@ export default function VoiceoverStudio() {
                             👤 Speaking Character (说话角色)
                           </label>
                           <select
-                            value={activeScene.dialogue_turns[selectedTurnIndex].speaker || "NARRATOR"}
+                            value={getSpeakerSelectValue(activeScene.dialogue_turns[selectedTurnIndex].speaker, characters)}
                             onChange={(e) => handleUpdateTurnSpeaker(selectedTurnIndex, e.target.value)}
                             className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus-visible:outline-none focus:border-indigo-500/40 shadow-sm"
                           >
                             <option value="NARRATOR">Narrator (旁白)</option>
                             {characters.map((char) => (
-                              <option key={char.id} value={char.name.toUpperCase()}>
+                              <option key={char.id} value={char.id}>
                                 {char.name}
                               </option>
                             ))}

@@ -111,6 +111,13 @@ class Scene(BaseModel):
         default=[],
         description="Chronological list of dialogue turns for multiple speakers in this scene",
     )
+    audio_url: Optional[str] = Field(
+        None,
+        description="Public URL or path to the synthesized stitched voiceover audio for this entire scene",
+    )
+    audio_duration: Optional[float] = Field(
+        None, description="Duration of synthesized stitched voiceover in seconds for this scene"
+    )
 
 
 def merge_dict(a: dict, b: dict) -> dict:
