@@ -50,6 +50,36 @@ class LayoutElement(BaseModel):
     )
 
 
+class DialogueTurn(BaseModel):
+    speaker: str = Field(
+        description="Entity ID of the speaking character (e.g., e1, e2) or 'narrator'"
+    )
+    text: str = Field(description="The spoken dialogue or narration text for this turn")
+    emotion_preset: Optional[str] = Field(
+        None, description="Optional preset name for this turn's emotion"
+    )
+    emotion_alpha: Optional[float] = Field(
+        None, description="Optional emotion blend factor/alpha"
+    )
+    emotion_vector: Optional[list[float]] = Field(
+        None, description="Optional 8-dimensional emotion vector"
+    )
+    emotion_text: Optional[str] = Field(
+        None,
+        description="Optional free-form text emotion description (e.g., happy: 0.8)",
+    )
+    use_emotion_text: Optional[bool] = Field(
+        False, description="Whether to use text-based emotion guide"
+    )
+    audio_url: Optional[str] = Field(
+        None,
+        description="Public URL or path to the synthesized voiceover audio for this turn",
+    )
+    audio_duration: Optional[float] = Field(
+        None, description="Duration of synthesized voiceover in seconds for this turn"
+    )
+
+
 class Scene(BaseModel):
     id: str = Field(description="Unique scene ID (e.g., s1, s2)")
     description: str = Field(
@@ -58,10 +88,6 @@ class Scene(BaseModel):
     entities: list[str] = Field(
         default=[],
         description="List of Entity IDs (e.g. e1, e2) appearing in this scene",
-    )
-    layout_bbox: list[float] = Field(
-        default=[],
-        description="Legacy normalized composition bounding box [x, y, w, h] (0.0 to 1.0)",
     )
     layout: list[LayoutElement] = Field(
         default=[],
@@ -81,17 +107,9 @@ class Scene(BaseModel):
         default="static",
         description="Camera motion/movement (e.g., static, pan, tilt, zoom-in, zoom-out)",
     )
-    dialogue: Optional[str] = Field(
-        None, description="Dialogue or narration script for this scene"
-    )
-    voice_actor_id: Optional[str] = Field(
-        None, description="Entity ID of the speaking character, or 'narrator'"
-    )
-    audio_url: Optional[str] = Field(
-        None, description="Public URL or path to the synthesized voiceover audio"
-    )
-    audio_duration: Optional[float] = Field(
-        None, description="Duration of synthesized voiceover in seconds"
+    dialogue_turns: list[DialogueTurn] = Field(
+        default=[],
+        description="Chronological list of dialogue turns for multiple speakers in this scene",
     )
 
 
