@@ -215,7 +215,7 @@ export async function POST(req: Request) {
 
       const finalEmoVector = singleTurn?.emo_vector ?? emo_vector;
       const finalEmoAlpha = singleTurn?.emo_alpha ?? emo_alpha;
-      const finalEmoText = singleTurn?.emotion_text || (use_emo_text ? (singleTurn?.text ?? text) : emo_text);
+      const finalEmoText = singleTurn?.emotion_text || emo_text || (use_emo_text ? (singleTurn?.text ?? text) : null);
 
       const result = await callTts(ttsServerUrl, {
         ...baseTtsPayload,
@@ -244,7 +244,7 @@ export async function POST(req: Request) {
         const turnText = turn.text;
         const turnEmoVector = turn.emo_vector ?? emo_vector;
         const turnEmoAlpha = turn.emo_alpha ?? emo_alpha;
-        const turnEmoText = turn.emotion_text || (use_emo_text ? turnText : null);
+        const turnEmoText = turn.emotion_text || emo_text || (use_emo_text ? turnText : null);
 
         const voiceRef = character_voices[speaker] ?? spk_audio_prompt;
 

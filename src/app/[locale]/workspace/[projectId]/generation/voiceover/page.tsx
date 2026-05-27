@@ -1557,28 +1557,7 @@ export default function VoiceoverStudio() {
                       </div>
                     </div>
 
-                    {/* Emotion Strength Slider (Alpha) */}
-                    <div className="space-y-2.5 p-4 bg-background/50 border border-border/60 rounded-xl">
-                      <div className="flex justify-between items-center text-sm font-bold text-muted-foreground">
-                        <span className="tracking-wider">Emotion Blend Strength (Alpha)</span>
-                        <span className="font-mono text-indigo-400">{emoAlpha.toFixed(2)}</span>
-                      </div>
-                      <Slider
-                        min={0.0}
-                        max={1.0}
-                        step={0.05}
-                        value={[emoAlpha]}
-                        onValueChange={(vals) => {
-                          aiRunningRef.current = false;
-                          setEmoAlpha(vals[0]);
-                          handleUpdateActiveTurnEmotion({ emotion_alpha: vals[0] });
-                        }}
-                        className="py-1"
-                      />
-                      <p className="text-xs text-muted-foreground/85 leading-normal">
-                        Controls how intensely the specified emotion vector or text guide influences the synthesized voice.
-                      </p>
-                    </div>
+
 
                     {/* Toggle: Use Text Guide Emotion */}
                     <div className="flex items-center justify-between p-4 bg-background/50 border border-border/60 rounded-xl">

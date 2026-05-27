@@ -702,25 +702,6 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
                           className="h-8 text-xs bg-background"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                            Emotion Strength
-                          </label>
-                          <span className="text-[10px] font-bold text-primary">{emoAlpha.toFixed(1)}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min={0} max={1} step={0.1}
-                          value={emoAlpha}
-                          onChange={(e) => setEmoAlpha(parseFloat(e.target.value))}
-                          className="w-full h-1.5 accent-primary cursor-pointer"
-                        />
-                        <div className="flex justify-between text-[9px] text-muted-foreground">
-                          <span>Subtle</span>
-                          <span>Strong</span>
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>
