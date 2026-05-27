@@ -16,6 +16,7 @@ import { MessageSquareIcon, SaveIcon, ArrowRightIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { usePhaseSync } from "@/hooks/use-phase-sync";
 
 // 使用动态导入，禁用 SSR，防止 "window is not defined" 错误
@@ -33,6 +34,7 @@ export default function Page() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId;
+  const locale = (params.locale as string) || "en";
 
   const [projectName, setProjectName] = React.useState("Project Name");
 
@@ -69,7 +71,9 @@ export default function Page() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/studio">Studio</BreadcrumbLink>
+                <BreadcrumbLink asChild className="text-muted-foreground hover:text-foreground">
+                  <Link href={`/${locale}/studio`}>Studio</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>

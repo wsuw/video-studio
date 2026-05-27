@@ -24,6 +24,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useRouter, useParams } from "next/navigation"
+import Link from "next/link"
 import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
 import { getThreadState } from "@/lib/langgraph"
@@ -77,6 +78,7 @@ export default function StylePage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
+  const locale = (params.locale as string) || "en";
 
   // Sync to design state
   usePhaseSync("design");
@@ -159,7 +161,9 @@ export default function StylePage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/workspace" className="text-muted-foreground hover:text-foreground">Studio</BreadcrumbLink>
+                <BreadcrumbLink asChild className="text-muted-foreground hover:text-foreground">
+                  <Link href={`/${locale}/studio`}>Studio</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>

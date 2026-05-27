@@ -34,6 +34,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useRouter, useParams } from "next/navigation"
+import Link from "next/link"
 import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
@@ -64,6 +65,7 @@ export default function BreakdownPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
+  const locale = (params.locale as string) || "en";
 
   // Sync to breakdown phase
   usePhaseSync("breakdown");
@@ -290,7 +292,9 @@ After generating the visual profile, please ALSO call the generate_entity_portra
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/workspace" className="text-muted-foreground hover:text-foreground">Studio</BreadcrumbLink>
+                <BreadcrumbLink asChild className="text-muted-foreground hover:text-foreground">
+                  <Link href={`/${locale}/studio`}>Studio</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>

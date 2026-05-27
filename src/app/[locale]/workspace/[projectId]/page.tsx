@@ -22,11 +22,13 @@ import { PanelRightIcon, MessageSquareIcon } from "lucide-react"
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 export default function Page() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
   const params = useParams();
   const projectId = params?.projectId;
+  const locale = (params?.locale as string) || "en";
 
   const [projectName, setProjectName] = React.useState("Project Name");
 
@@ -57,8 +59,8 @@ export default function Page() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/studio">
-                  Studio
+                <BreadcrumbLink asChild>
+                  <Link href={`/${locale}/studio`}>Studio</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />

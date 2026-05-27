@@ -16,9 +16,13 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useConfigureSuggestions } from "@copilotkit/react-core/v2"
+import { useParams } from "next/navigation"
+import Link from "next/link"
 
 export default function ReviewPage() {
   const { isChatOpen, setIsChatOpen } = React.useContext(WorkspaceContext);
+  const params = useParams();
+  const locale = (params.locale as string) || "en";
   usePhaseSync("redesign");
 
   useConfigureSuggestions({
@@ -43,7 +47,9 @@ export default function ReviewPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/workspace">Studio</BreadcrumbLink>
+                <BreadcrumbLink asChild>
+                  <Link href={`/${locale}/studio`}>Studio</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="hidden md:block">

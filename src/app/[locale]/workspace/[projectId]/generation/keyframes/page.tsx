@@ -37,6 +37,7 @@ import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout"
 import React, { useState, useEffect } from "react"
 import { usePhaseSync } from "@/hooks/use-phase-sync"
 import { useParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import { useAgent, useConfigureSuggestions } from "@copilotkit/react-core/v2"
 import { cn } from "@/lib/utils"
 import { getThreadState, updateThreadState } from "@/lib/langgraph"
@@ -130,6 +131,7 @@ export default function QueuePage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId as string;
+  const locale = (params.locale as string) || "en";
   const { toast } = useToast();
 
   // Sync to LangGraph thread
@@ -603,7 +605,9 @@ export default function QueuePage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/workspace" className="text-muted-foreground hover:text-foreground">Studio</BreadcrumbLink>
+                <BreadcrumbLink asChild className="text-muted-foreground hover:text-foreground">
+                  <Link href={`/${locale}/studio`}>Studio</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem className="hidden md:block">
