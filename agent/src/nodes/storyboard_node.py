@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 from langchain.tools import tool, ToolRuntime
 from langgraph.runtime import Runtime
@@ -147,33 +147,33 @@ Step 4: Specify a detailed camera/visual description and call `submit_storyboard
 
 <tool_call_example>
 Always format your tool call arguments matching this structure:
-{
+{{
         "scenes": [
-    {
+    {{
             "id": "s1",
       "description": "Int. room - Day. Neo stands in front of the window looking outside.",
       "entities": ["e1"],
       "layout": [
-        {
+        {{
                 "entity_id": "e1",
           "bbox": [0.3, 0.15, 0.4, 0.7]
-        }
+        }}
       ],
       "status": "pending",
       "lens": "50mm",
       "shot_type": "medium",
       "motion": "static",
       "dialogue_turns": [
-        {
+        {{
                 "speaker": "e1",
           "text": "Where are we?",
           "use_emotion_text": true,
           "emotion_text": "calm: 0.8"
-        }
+        }}
       ]
-    }
+    }}
   ]
-}
+}}
 </tool_call_example>
 
 <cinematic_layout_rules>
