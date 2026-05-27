@@ -493,7 +493,7 @@ export default function Page() {
                                   : "bg-white/40 dark:bg-zinc-950/20 border-slate-200 dark:border-zinc-800/60 hover:bg-slate-50/80 dark:hover:bg-zinc-800/30"
                                   }`}
                               >
-                                <div className={`p-2 rounded-lg border ${isSelected ? "bg-primary text-white border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
+                                <div className={`p-2 rounded-lg border ${isSelected ? "bg-primary text-primary-foreground border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
                                   }`}>
                                   <Icon className="size-4" />
                                 </div>
@@ -540,7 +540,7 @@ export default function Page() {
                                   : "bg-white/40 dark:bg-zinc-950/20 border-slate-200 dark:border-zinc-800/60 hover:bg-slate-50/80 dark:hover:bg-zinc-800/30"
                                   }`}
                               >
-                                <div className={`p-2 rounded-lg border ${isSelected ? "bg-primary text-white border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
+                                <div className={`p-2 rounded-lg border ${isSelected ? "bg-primary text-primary-foreground border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
                                   }`}>
                                   <Icon className="size-4" />
                                 </div>
@@ -602,7 +602,7 @@ export default function Page() {
                                   onClick={(e) => handlePlaySample(voice.id, voice.sample, e)}
                                   className={`absolute top-2 right-2 p-1.5 rounded-full border transition-all ${
                                     playingVoice === voice.id
-                                      ? "bg-primary text-white border-primary shadow-md scale-110"
+                                      ? "bg-primary text-primary-foreground border-primary shadow-md scale-110"
                                       : "bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:scale-105"
                                   }`}
                                   title={playingVoice === voice.id ? "暂停试听" : "试听音色"}
@@ -615,7 +615,7 @@ export default function Page() {
                                 </button>
                               )}
 
-                              <div className={`p-2.5 rounded-full border mb-2 ${isSelected ? "bg-primary text-white border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
+                              <div className={`p-2.5 rounded-full border mb-2 ${isSelected ? "bg-primary text-primary-foreground border-primary" : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700"
                                 }`}>
                                 <User className="size-4" />
                               </div>
@@ -642,7 +642,7 @@ export default function Page() {
                     <Button
                       type="submit"
                       size="lg"
-                      className="h-14 px-8 text-base bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg transition-transform hover:-translate-y-0.5 group"
+                      className="h-14 px-8 text-base bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg transition-transform hover:-translate-y-0.5 group"
                     >
                       Create Video Workspace
                       <ArrowRight className="size-4 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -684,7 +684,7 @@ export default function Page() {
                                 {tmpl.name}
                               </span>
                               {isApplied && (
-                                <span className="inline-flex items-center justify-center size-4 bg-primary text-white rounded-full">
+                                <span className="inline-flex items-center justify-center size-4 bg-primary text-primary-foreground rounded-full">
                                   <Check className="size-2.5" />
                                 </span>
                               )}

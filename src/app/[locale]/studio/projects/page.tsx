@@ -258,7 +258,7 @@ export default function ProjectsPage() {
               <Link href="/studio">
                 <Button 
                   size="lg"
-                  className="bg-primary hover:bg-primary/95 text-white shadow-lg transition-transform hover:-translate-y-0.5 group rounded-xl px-5 h-12"
+                  className="bg-primary hover:bg-primary/95 text-primary-foreground shadow-lg transition-transform hover:-translate-y-0.5 group rounded-xl px-5 h-12"
                 >
                   <FolderPlus className="size-4 mr-2" />
                   New Project
@@ -292,7 +292,7 @@ export default function ProjectsPage() {
                         onClick={() => setSelectedRatio(r)}
                         className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${
                           selectedRatio === r
-                            ? "bg-primary text-white shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-sm"
                             : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                         }`}
                       >
@@ -309,7 +309,7 @@ export default function ProjectsPage() {
                         onClick={() => setSelectedStyle(s)}
                         className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all capitalize ${
                           selectedStyle === s
-                            ? "bg-primary text-white shadow-sm"
+                            ? "bg-primary text-primary-foreground shadow-sm"
                             : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
                         }`}
                       >
@@ -465,7 +465,7 @@ export default function ProjectsPage() {
                       Clear Filters
                     </Button>
                     <Link href="/studio">
-                      <Button className="bg-primary hover:bg-primary/95 text-white shadow-lg rounded-xl text-sm font-semibold">
+                      <Button className="bg-primary hover:bg-primary/95 text-primary-foreground shadow-lg rounded-xl text-sm font-semibold">
                         Create Video Workspace
                       </Button>
                     </Link>

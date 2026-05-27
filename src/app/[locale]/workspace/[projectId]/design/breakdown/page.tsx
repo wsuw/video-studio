@@ -715,7 +715,7 @@ After generating the visual profile, please ALSO call the generate_entity_portra
                                         className={cn(
                                           "w-8 h-8 rounded-full border transition-all shrink-0 shadow-sm",
                                           isVoicePlaying
-                                            ? "bg-primary text-white border-primary animate-pulse"
+                                            ? "bg-primary text-primary-foreground border-primary animate-pulse"
                                             : "bg-background/80 hover:bg-primary/10 border-border/80 text-muted-foreground hover:text-primary"
                                         )}
                                       >
