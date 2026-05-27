@@ -265,7 +265,7 @@ export default function VoiceoverStudio() {
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [isVoiceDialogOpen, setIsVoiceDialogOpen] = useState(false);
   const [allVoices, setAllVoices] = useState<any[]>([]);
-  const [narratorVoice, setNarratorVoice] = useState<string>("voice_04");
+  const [narratorVoice, setNarratorVoice] = useState<string>("cff02830-c816-45bf-ba0c-ab8bd0210a5e");
   const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
 
   const design = {
@@ -304,7 +304,7 @@ export default function VoiceoverStudio() {
           setScenes(loadedScenes);
           setEntities(loadedEntities);
           setScript(design.script || "");
-          setNarratorVoice(design.narrator_voice || "voice_04");
+          setNarratorVoice(design.narrator_voice || "cff02830-c816-45bf-ba0c-ab8bd0210a5e");
 
           agent.setState({
             ...agent.state,
@@ -644,9 +644,9 @@ export default function VoiceoverStudio() {
     setIsBatchSynthesizing(true);
 
     // Resolve narrator voice ID
-    const narratorVoiceRef = design.narrator_voice || "voice_04";
+    const narratorVoiceRef = design.narrator_voice || "cff02830-c816-45bf-ba0c-ab8bd0210a5e";
     const narratorVoiceObj = PRESET_VOICES.find(v => v.id === narratorVoiceRef) || allVoices.find(v => v.id === narratorVoiceRef);
-    const narratorPath = narratorVoiceObj ? (narratorVoiceObj.path || narratorVoiceObj.sampleUrl) : "examples/voice_04.wav";
+    const narratorPath = narratorVoiceObj ? (narratorVoiceObj.path || narratorVoiceObj.sampleUrl) : "speech-samples/en-US_Female_Adult_Ava_Dragon_HD_Latest.wav";
 
     // Build dynamic speaker voice map
     const characterVoices: Record<string, string> = {};
@@ -768,9 +768,9 @@ export default function VoiceoverStudio() {
     }
 
     // Resolve narrator voice ID
-    const narratorVoiceRef = design.narrator_voice || "voice_04";
+    const narratorVoiceRef = design.narrator_voice || "cff02830-c816-45bf-ba0c-ab8bd0210a5e";
     const narratorVoiceObj = PRESET_VOICES.find(v => v.id === narratorVoiceRef) || allVoices.find(v => v.id === narratorVoiceRef);
-    const narratorPath = narratorVoiceObj ? (narratorVoiceObj.path || narratorVoiceObj.sampleUrl) : "examples/voice_04.wav";
+    const narratorPath = narratorVoiceObj ? (narratorVoiceObj.path || narratorVoiceObj.sampleUrl) : "speech-samples/en-US_Female_Adult_Ava_Dragon_HD_Latest.wav";
 
     // Resolve speaker audio reference path
     let speakerRefPath = narratorPath;
@@ -914,7 +914,7 @@ export default function VoiceoverStudio() {
     let currentVoiceRef = "";
     let displayName = currentSpeaker;
     if (isNarrator) {
-      currentVoiceRef = design.narrator_voice || "voice_04";
+      currentVoiceRef = design.narrator_voice || "cff02830-c816-45bf-ba0c-ab8bd0210a5e";
       displayName = "Narrator (旁白)";
     } else if (char) {
       currentVoiceRef = char.voice_reference || "";

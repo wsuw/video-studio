@@ -208,9 +208,7 @@ export async function POST(req: Request) {
       // ── 单人路径 ──────────────────────────────────────────
       const singleTurn = turns[0];
       const speaker = singleTurn?.speaker || "NARRATOR";
-      const voiceRef =
-        character_voices[speaker] ??
-        (speaker === "NARRATOR" ? "examples/voice_04.wav" : spk_audio_prompt);
+      const voiceRef = character_voices[speaker] ?? spk_audio_prompt;
 
       const { resolved, temp } = await resolveSpeakerPath(voiceRef);
       tempFiles.push(temp);
@@ -248,9 +246,7 @@ export async function POST(req: Request) {
         const turnEmoAlpha = turn.emo_alpha ?? emo_alpha;
         const turnEmoText = turn.emotion_text || (use_emo_text ? turnText : null);
 
-        const voiceRef =
-          character_voices[speaker] ??
-          (speaker === "NARRATOR" ? "examples/voice_04.wav" : spk_audio_prompt);
+        const voiceRef = character_voices[speaker] ?? spk_audio_prompt;
 
         const { resolved, temp } = await resolveSpeakerPath(voiceRef);
         tempFiles.push(temp);
