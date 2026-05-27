@@ -35,6 +35,7 @@ import {
   SaveIcon,
   PlusIcon,
   Trash2Icon,
+  ChevronDownIcon,
 } from "lucide-react";
 import { WorkspaceContext } from "@/app/[locale]/workspace/[projectId]/layout";
 import React, { useState, useEffect, useRef } from "react";
@@ -256,6 +257,9 @@ export default function VoiceoverStudio() {
   const [emoAlpha, setEmoAlpha] = useState<number>(0.6);
   const [useEmoText, setUseEmoText] = useState<boolean>(false);
   const [emoText, setEmoText] = useState<string>("");
+  const [emoTextMode, setEmoTextMode] = useState<"preset" | "custom">("preset");
+  const [selectedPresetEmo, setSelectedPresetEmo] = useState<string>("calm");
+  const [emoIntensity, setEmoIntensity] = useState<number>(0.8);
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [activeAudioUrl, setActiveAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -794,6 +798,10 @@ export default function VoiceoverStudio() {
       }
     });
 
+    const resolvedEmoText = useEmoText
+      ? (emoTextMode === "preset" ? `${selectedPresetEmo}: ${emoIntensity}` : emoText)
+      : null;
+
     const clientTurns = activeScene.dialogue_turns
       ? activeScene.dialogue_turns.map((t, idx) => {
           if (selectedTurnIndex !== null && idx === selectedTurnIndex) {
@@ -802,7 +810,7 @@ export default function VoiceoverStudio() {
               text: localDialogueRef.current,
               emo_alpha: emoAlpha,
               emo_vector: emoPreset === "custom" || emoPreset ? emoVector : null,
-              emotion_text: useEmoText ? emoText : t.emotion_text,
+              emotion_text: useEmoText ? resolvedEmoText : t.emotion_text,
             };
           }
           return {
@@ -829,7 +837,7 @@ export default function VoiceoverStudio() {
           emo_alpha: emoAlpha,
           emo_vector: emoPreset === "custom" || emoPreset ? emoVector : null,
           use_emo_text: useEmoText,
-          emo_text: useEmoText ? emoText || dialogueText : null,
+          emo_text: useEmoText ? resolvedEmoText || dialogueText : null,
           sceneId: activeScene.id,
           character_voices: characterVoices,
           turns: clientTurns,
@@ -1580,19 +1588,108 @@ export default function VoiceoverStudio() {
 
                     {/* Text guide input */}
                     {useEmoText && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-muted-foreground">
-                          Specific Emotion Style Guide
-                        </label>
-                        <Input
-                          value={emoText}
-                          onChange={(e) => {
-                            aiRunningRef.current = false;
-                            setEmoText(e.target.value);
-                          }}
-                          placeholder="e.g. Whispering softly with a warm smile, trembling in despair..."
-                          className="bg-background text-sm h-10 focus-visible:ring-indigo-500/20 shadow-sm"
-                        />
+                      <div className="space-y-4 pt-2 pl-3 border-l-2 border-indigo-500/30">
+                        {/* Segmented Tabs */}
+                        <div className="flex rounded-lg p-0.5 bg-background/80 border border-border/80 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              aiRunningRef.current = false;
+                              setEmoTextMode("preset");
+                            }}
+                            className={cn(
+                              "flex-1 py-1.5 rounded-md transition-all font-semibold",
+                              emoTextMode === "preset"
+                                ? "bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20 shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            Preset & Intensity
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              aiRunningRef.current = false;
+                              setEmoTextMode("custom");
+                            }}
+                            className={cn(
+                              "flex-1 py-1.5 rounded-md transition-all font-semibold",
+                              emoTextMode === "custom"
+                                ? "bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20 shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            Custom Text
+                          </button>
+                        </div>
+
+                        {emoTextMode === "preset" ? (
+                          <div className="space-y-4">
+                            {/* Preset Dropdown */}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-muted-foreground block">
+                                Select Emotion Preset
+                              </label>
+                              <div className="relative">
+                                <select
+                                  value={selectedPresetEmo}
+                                  onChange={(e) => {
+                                    aiRunningRef.current = false;
+                                    setSelectedPresetEmo(e.target.value);
+                                  }}
+                                  className="h-10 w-full pl-3 pr-8 bg-background border border-border/60 rounded-xl text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500/20 cursor-pointer appearance-none text-foreground"
+                                >
+                                  <option value="calm">Calm</option>
+                                  <option value="happy">Happy</option>
+                                  <option value="angry">Angry</option>
+                                  <option value="sad">Sad</option>
+                                  <option value="afraid">Afraid</option>
+                                  <option value="disgusted">Disgusted</option>
+                                  <option value="melancholic">Melancholic</option>
+                                  <option value="surprised">Surprised</option>
+                                </select>
+                                <ChevronDownIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                              </div>
+                            </div>
+
+                            {/* Intensity range slider */}
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between items-center text-xs font-bold text-muted-foreground">
+                                <span>Intensity Strength</span>
+                                <span className="text-indigo-400 font-mono font-bold text-sm">{emoIntensity.toFixed(1)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 py-1">
+                                <input
+                                  type="range"
+                                  min="0.0"
+                                  max="1.2"
+                                  step="0.1"
+                                  value={emoIntensity}
+                                  onChange={(e) => {
+                                    aiRunningRef.current = false;
+                                    setEmoIntensity(parseFloat(e.target.value));
+                                  }}
+                                  className="flex-1 h-1.5 rounded-lg bg-muted appearance-none cursor-pointer accent-indigo-500 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground block">
+                              Emotion Description
+                            </label>
+                            <Input
+                              value={emoText}
+                              onChange={(e) => {
+                                aiRunningRef.current = false;
+                                setEmoText(e.target.value);
+                              }}
+                              placeholder="e.g. calm 0.5, angry 1.0, or whispering softly..."
+                              className="bg-background text-sm h-10 focus-visible:ring-indigo-500/20 shadow-sm rounded-xl"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 

@@ -55,6 +55,9 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
   const [useEmoText, setUseEmoText] = useState(false);
   const [emoText, setEmoText] = useState("");
   const [emoAlpha, setEmoAlpha] = useState(0.8);
+  const [emoMode, setEmoMode] = useState<"preset" | "custom">("preset");
+  const [selectedPresetEmo, setSelectedPresetEmo] = useState<string>("calm");
+  const [emoIntensity, setEmoIntensity] = useState<number>(0.8);
 
   // Sync playingId to ref for event handlers
   useEffect(() => {
@@ -145,8 +148,12 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
       interval_silence: 200,
       sceneId: "preview",
     };
-    if (useEmoText && emoText.trim()) {
-      body.emo_text = emoText;
+    if (useEmoText) {
+      if (emoMode === "preset") {
+        body.emo_text = `${selectedPresetEmo}: ${emoIntensity}`;
+      } else if (emoText.trim()) {
+        body.emo_text = emoText;
+      }
     }
 
     try {
@@ -690,18 +697,91 @@ export function VoiceViewer({ initialVoices }: VoiceViewerProps) {
                   </div>
 
                   {useEmoText && (
-                    <div className="space-y-3 pt-1 pl-1 border-l-2 border-primary/20">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                          Emotion Description
-                        </label>
-                        <Input
-                          value={emoText}
-                          onChange={(e) => setEmoText(e.target.value)}
-                          placeholder="e.g. Excited and full of energy!"
-                          className="h-8 text-xs bg-background"
-                        />
+                    <div className="space-y-3.5 pt-2 pl-2 border-l-2 border-primary/30">
+                      {/* Segmented Control / Tabs */}
+                      <div className="flex rounded-lg p-0.5 bg-muted border text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setEmoMode("preset")}
+                          className={`flex-1 py-1 rounded-md transition-all font-medium ${
+                            emoMode === "preset"
+                              ? "bg-background text-foreground shadow-sm font-semibold border-border"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Preset & Intensity
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEmoMode("custom")}
+                          className={`flex-1 py-1 rounded-md transition-all font-medium ${
+                            emoMode === "custom"
+                              ? "bg-background text-foreground shadow-sm font-semibold border-border"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          Custom Text
+                        </button>
                       </div>
+
+                      {emoMode === "preset" ? (
+                        <div className="space-y-3">
+                          {/* Emotion dropdown */}
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                              Select Emotion
+                            </label>
+                            <div className="relative">
+                              <select
+                                value={selectedPresetEmo}
+                                onChange={(e) => setSelectedPresetEmo(e.target.value)}
+                                className="h-8 w-full pl-2.5 pr-8 bg-background border rounded-lg text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer appearance-none"
+                              >
+                                <option value="calm">Calm</option>
+                                <option value="happy">Happy</option>
+                                <option value="angry">Angry</option>
+                                <option value="sad">Sad</option>
+                                <option value="afraid">Afraid</option>
+                                <option value="disgusted">Disgusted</option>
+                                <option value="melancholic">Melancholic</option>
+                                <option value="surprised">Surprised</option>
+                              </select>
+                              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                            </div>
+                          </div>
+
+                          {/* Intensity slider */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                              <span>Intensity Strength</span>
+                              <span className="text-primary font-mono font-bold text-xs">{emoIntensity.toFixed(1)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range"
+                                min="0.0"
+                                max="1.2"
+                                step="0.1"
+                                value={emoIntensity}
+                                onChange={(e) => setEmoIntensity(parseFloat(e.target.value))}
+                                className="flex-1 h-1.5 rounded-lg bg-secondary appearance-none cursor-pointer accent-primary focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                            Emotion Description
+                          </label>
+                          <Input
+                            value={emoText}
+                            onChange={(e) => setEmoText(e.target.value)}
+                            placeholder="e.g. calm 0.5, angry 1.0, or whispering softly..."
+                            className="h-8 text-xs bg-background focus-visible:ring-primary/20 rounded-lg"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
