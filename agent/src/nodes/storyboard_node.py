@@ -30,10 +30,13 @@ class LLMDialogueTurn(BaseModel):
         description="Spoken dialogue or voiceover narration text for this turn"
     )
     emotion_text: Optional[str] = Field(
-        None, description="Optional emotion text guide (e.g., calm: 0.8, happy: 1.0)"
-    )
-    use_emotion_text: bool = Field(
-        True, description="Whether to use text-based emotion guide"
+        None,
+        description=(
+            "Optional emotion configuration for this turn. Can be a standard preset name "
+            "(e.g., 'calm', 'happy', 'sad', 'angry', 'scared') or an inline dictionary group of emotion strengths, "
+            "for example: \"{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, "
+            "'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}\" or a free-form emotion text prompt."
+        ),
     )
 
 
@@ -141,8 +144,10 @@ Step 4: Specify a detailed camera/visual description and call `submit_storyboard
 - DIALOGUE TURN SCHEMA: Each item in `dialogue_turns` must be structured as:
   - `speaker`: Entity ID of the character (e.g. "e1") or "narrator" for voiceover. Never write character names; always use their unique Entity ID!
   - `text`: The exact spoken words.
-  - `use_emotion_text`: Set to true.
-  - `emotion_text`: Optional. Add dynamic emotion description or strength (e.g., "calm: 0.8", "happy: 0.9", "angry: 1.0").
+  - `emotion_text`: Optional. Specify an emotion configuration. This can be:
+    1. A standard preset: "calm", "happy", "sad", "angry", or "scared"
+    2. A custom text emotion prompt (e.g. "calm: 0.8")
+    3. An inline dictionary group of detailed emotion strengths (e.g. "{'happy': 0.8, 'calm': 0.2, 'surprised': 0.1}")
 </critical_dialogue_extraction_rules>
 
 <tool_call_example>
@@ -167,8 +172,7 @@ Always format your tool call arguments matching this structure:
         {{
                 "speaker": "e1",
           "text": "Where are we?",
-          "use_emotion_text": true,
-          "emotion_text": "calm: 0.8"
+          "emotion_text": "{'calm': 0.8, 'surprised': 0.1}"
         }}
       ]
     }}

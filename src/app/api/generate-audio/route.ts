@@ -162,6 +162,93 @@ function cleanupFiles(files: (string | null)[]) {
   }
 }
 
+// ── 情绪配置解析工具函数 ───────────────────────────────────
+
+function parseEmotionText(emotionText: string | undefined | null, defaultAlpha: number = 0.6): {
+  emo_vector: number[] | null;
+  emo_alpha: number;
+  use_emo_text: boolean;
+  emo_text: string | null;
+} {
+  if (!emotionText) {
+    return { emo_vector: null, emo_alpha: defaultAlpha, use_emo_text: false, emo_text: null };
+  }
+
+  const trimmed = emotionText.trim();
+  const lower = trimmed.toLowerCase();
+
+  // 1. 匹配标准单情绪及强度格式，例如：happy: 0.8 或 calm: 0.6 或 happy
+  const labels = [
+    "happy",
+    "angry",
+    "sad",
+    "afraid",
+    "disgusted",
+    "melancholic",
+    "surprised",
+    "calm",
+  ];
+  
+  // 支持 scared -> afraid 映射以确保兼容性
+  const cleanLower = lower === "scared" ? "afraid" : lower;
+
+  const match = cleanLower.match(/^([a-z]+)(?:\s*:\s*([0-9.]+))?$/);
+  if (match) {
+    const emotionName = match[1];
+    const strength = match[2] ? parseFloat(match[2]) : 0.8;
+    
+    const index = labels.indexOf(emotionName);
+    if (index !== -1) {
+      const vector = [0, 0, 0, 0, 0, 0, 0, 0];
+      vector[index] = 1.0; // 该维度情绪置为满值，依靠 alpha 控制整体混合强度
+      return {
+        emo_vector: vector,
+        emo_alpha: strength,
+        use_emo_text: false,
+        emo_text: trimmed,
+      };
+    }
+  }
+
+  // 2. 匹配 JSON / Python 字典格式的一组情绪强度混合，例如：{'happy': 0.2, 'calm': 0.05}
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      // 标准化为 JSON 双引号格式
+      const jsonStr = trimmed.replace(/'/g, '"');
+      const dict = JSON.parse(jsonStr);
+
+      const labels = [
+        "happy",
+        "angry",
+        "sad",
+        "afraid",
+        "disgusted",
+        "melancholic",
+        "surprised",
+        "calm",
+      ];
+
+      const vector = labels.map(label => {
+        return typeof dict[label] === "number" ? dict[label] : 0.0;
+      });
+
+      const parsedAlpha = typeof dict["alpha"] === "number" ? dict["alpha"] : defaultAlpha;
+
+      return {
+        emo_vector: vector,
+        emo_alpha: parsedAlpha,
+        use_emo_text: false,
+        emo_text: trimmed,
+      };
+    } catch (e) {
+      console.warn("[Audio API] Failed to parse dictionary-like emotion_text:", trimmed, e);
+    }
+  }
+
+  // 3. 回退到传统的文本情绪描述（例如 "calm: 0.8" 或自由文本描述）
+  return { emo_vector: null, emo_alpha: defaultAlpha, use_emo_text: true, emo_text: trimmed };
+}
+
 // ── POST Handler ───────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -213,9 +300,12 @@ export async function POST(req: Request) {
       const { resolved, temp } = await resolveSpeakerPath(voiceRef);
       tempFiles.push(temp);
 
-      const finalEmoVector = singleTurn?.emo_vector ?? emo_vector;
-      const finalEmoAlpha = singleTurn?.emo_alpha ?? emo_alpha;
-      const finalEmoText = singleTurn?.emotion_text || emo_text || (use_emo_text ? (singleTurn?.text ?? text) : null);
+      // 解析单句的 emotion_text 属性
+      const parsedEmo = parseEmotionText(singleTurn?.emotion_text || emo_text, emo_alpha);
+      const finalEmoVector = parsedEmo.emo_vector ?? emo_vector;
+      const finalEmoAlpha = parsedEmo.emo_alpha;
+      const finalEmoText = parsedEmo.emo_text || (use_emo_text ? (singleTurn?.text ?? text) : null);
+      const finalUseEmoText = parsedEmo.use_emo_text || use_emo_text;
 
       const result = await callTts(ttsServerUrl, {
         ...baseTtsPayload,
@@ -224,6 +314,7 @@ export async function POST(req: Request) {
         emo_vector: finalEmoVector,
         emo_alpha: finalEmoAlpha,
         emo_text: finalEmoText,
+        use_emo_text: finalUseEmoText,
         interval_silence,
       });
 
@@ -242,9 +333,13 @@ export async function POST(req: Request) {
       for (const turn of turns) {
         const speaker = turn.speaker;
         const turnText = turn.text;
-        const turnEmoVector = turn.emo_vector ?? emo_vector;
-        const turnEmoAlpha = turn.emo_alpha ?? emo_alpha;
-        const turnEmoText = turn.emotion_text || emo_text || (use_emo_text ? turnText : null);
+
+        // 解析当前 Turn 的 emotion_text
+        const parsedEmo = parseEmotionText(turn.emotion_text || emo_text, emo_alpha);
+        const turnEmoVector = parsedEmo.emo_vector ?? emo_vector;
+        const turnEmoAlpha = parsedEmo.emo_alpha;
+        const turnEmoText = parsedEmo.emo_text || (use_emo_text ? turnText : null);
+        const turnUseEmoText = parsedEmo.use_emo_text || use_emo_text;
 
         const voiceRef = character_voices[speaker] ?? spk_audio_prompt;
 
@@ -260,6 +355,7 @@ export async function POST(req: Request) {
           emo_vector: turnEmoVector,
           emo_alpha: turnEmoAlpha,
           emo_text: turnEmoText,
+          use_emo_text: turnUseEmoText,
           interval_silence: 0,
         });
 

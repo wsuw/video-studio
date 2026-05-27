@@ -55,21 +55,14 @@ class DialogueTurn(BaseModel):
         description="Entity ID of the speaking character (e.g., e1, e2) or 'narrator'"
     )
     text: str = Field(description="The spoken dialogue or narration text for this turn")
-    emotion_preset: Optional[str] = Field(
-        None, description="Optional preset name for this turn's emotion"
-    )
-    emotion_alpha: Optional[float] = Field(
-        None, description="Optional emotion blend factor/alpha"
-    )
-    emotion_vector: Optional[list[float]] = Field(
-        None, description="Optional 8-dimensional emotion vector"
-    )
     emotion_text: Optional[str] = Field(
         None,
-        description="Optional free-form text emotion description (e.g., happy: 0.8)",
-    )
-    use_emotion_text: Optional[bool] = Field(
-        False, description="Whether to use text-based emotion guide"
+        description=(
+            "Optional emotion configuration for this turn. Can be a standard preset name "
+            "(e.g., 'calm', 'happy', 'sad', 'angry', 'scared') or an inline dictionary group of emotion strengths, "
+            "for example: \"{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, "
+            "'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}\" or a free-form emotion text prompt."
+        ),
     )
     audio_url: Optional[str] = Field(
         None,

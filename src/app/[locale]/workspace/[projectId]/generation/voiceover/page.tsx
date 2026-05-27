@@ -110,9 +110,9 @@ const formatTurnToString = (t: DialogueTurn) => {
 
 function parseDialogueText(text: string, characterNames: string[]): DialogueTurn[] {
   if (!text) return [];
-  
+
   const speakers = new Set(["NARRATOR", "SYSTEM", ...characterNames.map(n => n.toUpperCase())]);
-  
+
   // Auto-detect "NAME: text" or "NAME (modifier): text"
   for (const m of text.matchAll(/(?:^|\s|\n)([A-Z0-9_\-\u4e00-\u9fa5]{2,})(?:\s*\([^)]*\))?\s*[:：]/g)) {
     speakers.add(m[1].toUpperCase());
@@ -120,7 +120,7 @@ function parseDialogueText(text: string, characterNames: string[]): DialogueTurn
 
   const sorted = [...speakers].sort((a, b) => b.length - a.length);
   const escaped = sorted.map(s => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"));
-  
+
   // Regex to match: Speaker name, optional whitespace, optional parentheses, optional whitespace, colon
   const re = new RegExp(`(?:^|\\s|\\n)(${escaped.join("|")})\\s*(?:\\(([^)]*)\\))?\\s*[:：]\\s*`, "gi");
 
@@ -133,7 +133,7 @@ function parseDialogueText(text: string, characterNames: string[]): DialogueTurn
   while ((match = re.exec(text)) !== null) {
     const matchIndex = match.index;
     const matchLength = match[0].length;
-    
+
     // The dialogue text is between the end of the last match and the start of the current match
     const textBetween = text.slice(lastIndex, matchIndex).trim();
     if (textBetween || (turns.length === 0 && lastIndex === 0 && textBetween)) {
@@ -179,7 +179,7 @@ function reconcileDialogueTurns(
   for (let i = 0; i < parsed.length; i++) {
     const p = parsed[i];
     const existing = existingTurns?.[i];
-    
+
     if (existing && existing.speaker === p.speaker) {
       reconciled.push({
         ...existing,
@@ -449,9 +449,7 @@ export default function VoiceoverStudio() {
     const newTurn: DialogueTurn = {
       speaker: "NARRATOR",
       text: "New dialogue line...",
-      emotion_preset: "calm",
-      emotion_alpha: 0.6,
-      emotion_vector: [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9],
+      emotion_text: '{"calm": 0.6}',
     };
     const updatedTurns = [...currentTurns, newTurn];
     const newDialogueStr = updatedTurns.map(formatTurnToString).join("\n\n");
@@ -551,26 +549,92 @@ export default function VoiceoverStudio() {
       return;
     }
 
-    const match = rawText.match(/^(calm|happy|angry|sad|afraid|disgusted|melancholic|surprised):\s*([0-9.]+)/i);
-    if (match) {
-      setEmoMode("preset");
-      setSelectedPresetEmo(match[1].toLowerCase());
-      setEmoIntensity(parseFloat(match[2]));
-      setEmoText("");
-    } else {
+    const trimmed = rawText.trim();
+
+    // 1. 如果是 JSON/Python 字典格式
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        const jsonStr = trimmed.replace(/'/g, '"');
+        const dict = JSON.parse(jsonStr);
+
+        const labels = [
+          "happy",
+          "angry",
+          "sad",
+          "afraid",
+          "disgusted",
+          "melancholic",
+          "surprised",
+          "calm",
+        ];
+
+        // 统计所有非 0 情绪维度
+        const nonZeroEmotions: { key: string; val: number }[] = [];
+        for (const key of Object.keys(dict)) {
+          const lowerKey = key.toLowerCase();
+          const cleanKey = lowerKey === "scared" ? "afraid" : lowerKey;
+          if (labels.includes(cleanKey) && typeof dict[key] === "number" && dict[key] > 0) {
+            nonZeroEmotions.push({ key: cleanKey, val: dict[key] });
+          }
+        }
+
+        // 如果刚好有且仅有一个情绪非零，说明前端可以渲染为“预设 + 强度”模式
+        if (nonZeroEmotions.length === 1) {
+          setEmoMode("preset");
+          setSelectedPresetEmo(nonZeroEmotions[0].key);
+          setEmoIntensity(nonZeroEmotions[0].val);
+          setEmoText("");
+          return;
+        }
+      } catch (e) {
+        console.warn("[Voiceover UI] Failed to parse emotion_text as JSON:", trimmed, e);
+      }
+
+      // 如果是非单一情绪的多情绪字典，显示为自定义文本模式
       setEmoMode("custom");
       setEmoText(rawText);
       setSelectedPresetEmo("calm");
       setEmoIntensity(0.8);
+      return;
     }
+
+    // 2. 如果是旧的 happy: 0.8 格式（做向下兼容）
+    const match = trimmed.match(/^([a-z]+)(?:\s*:\s*([0-9.]+))?$/i);
+    if (match) {
+      const labels = [
+        "happy",
+        "angry",
+        "sad",
+        "afraid",
+        "disgusted",
+        "melancholic",
+        "surprised",
+        "calm",
+      ];
+      const emotionName = match[1].toLowerCase();
+      const cleanName = emotionName === "scared" ? "afraid" : emotionName;
+      if (labels.includes(cleanName)) {
+        setEmoMode("preset");
+        setSelectedPresetEmo(cleanName);
+        setEmoIntensity(match[2] ? parseFloat(match[2]) : 0.8);
+        setEmoText("");
+        return;
+      }
+    }
+
+    // 3. 否则，完全显示为自定义文本模式
+    setEmoMode("custom");
+    setEmoText(rawText);
+    setSelectedPresetEmo("calm");
+    setEmoIntensity(0.8);
   };
 
   const handleToggleUseEmoText = (val: boolean) => {
     aiRunningRef.current = false;
     setUseEmoText(val);
-    
+
     const resolvedText = val
-      ? (emoMode === "preset" ? `${selectedPresetEmo}: ${emoIntensity}` : emoText)
+      ? (emoMode === "preset" ? `{"${selectedPresetEmo}": ${emoIntensity}}` : emoText)
       : undefined;
 
     handleUpdateActiveTurnEmotion({
@@ -582,10 +646,10 @@ export default function VoiceoverStudio() {
   const handleUpdateEmoMode = (mode: "preset" | "custom") => {
     aiRunningRef.current = false;
     setEmoMode(mode);
-    
+
     if (useEmoText) {
       const resolvedText = mode === "preset"
-        ? `${selectedPresetEmo}: ${emoIntensity}`
+        ? `{"${selectedPresetEmo}": ${emoIntensity}}`
         : emoText;
       handleUpdateActiveTurnEmotion({
         emotion_text: resolvedText || undefined,
@@ -596,10 +660,10 @@ export default function VoiceoverStudio() {
   const handleUpdateSelectedPresetEmo = (emo: string) => {
     aiRunningRef.current = false;
     setSelectedPresetEmo(emo);
-    
+
     if (useEmoText && emoMode === "preset") {
       handleUpdateActiveTurnEmotion({
-        emotion_text: `${emo}: ${emoIntensity}`,
+        emotion_text: `{"${emo}": ${emoIntensity}}`,
       });
     }
   };
@@ -607,10 +671,10 @@ export default function VoiceoverStudio() {
   const handleUpdateEmoIntensity = (intensity: number) => {
     aiRunningRef.current = false;
     setEmoIntensity(intensity);
-    
+
     if (useEmoText && emoMode === "preset") {
       handleUpdateActiveTurnEmotion({
-        emotion_text: `${selectedPresetEmo}: ${intensity}`,
+        emotion_text: `{"${selectedPresetEmo}": ${intensity}}`,
       });
     }
   };
@@ -618,7 +682,7 @@ export default function VoiceoverStudio() {
   const handleUpdateEmoText = (text: string) => {
     aiRunningRef.current = false;
     setEmoText(text);
-    
+
     if (useEmoText && emoMode === "custom") {
       handleUpdateActiveTurnEmotion({
         emotion_text: text || undefined,
@@ -656,7 +720,7 @@ export default function VoiceoverStudio() {
     setIsSaving(true);
     try {
       console.log("[Voiceover] Manually persisting dialogue and voice settings...");
-      
+
       let finalDialogue = "";
       if (selectedTurnIndex !== null && activeScene?.dialogue_turns) {
         const updatedTurns = activeScene.dialogue_turns.map((t, idx) => {
@@ -887,23 +951,23 @@ export default function VoiceoverStudio() {
 
     const clientTurns = activeScene.dialogue_turns
       ? activeScene.dialogue_turns.map((t, idx) => {
-          if (selectedTurnIndex !== null && idx === selectedTurnIndex) {
-            return {
-              speaker: t.speaker,
-              text: localDialogueRef.current,
-              emo_alpha: emoAlpha,
-              emo_vector: null,
-              emotion_text: useEmoText ? resolvedEmoText : t.emotion_text,
-            };
-          }
+        if (selectedTurnIndex !== null && idx === selectedTurnIndex) {
           return {
             speaker: t.speaker,
-            text: t.text,
-            emo_alpha: t.emotion_alpha,
+            text: localDialogueRef.current,
+            emo_alpha: emoAlpha,
             emo_vector: null,
-            emotion_text: t.emotion_text,
+            emotion_text: useEmoText ? resolvedEmoText : t.emotion_text,
           };
-        })
+        }
+        return {
+          speaker: t.speaker,
+          text: t.text,
+          emo_alpha: t.emotion_alpha,
+          emo_vector: null,
+          emotion_text: t.emotion_text,
+        };
+      })
       : [];
 
     setIsSynthesizing(true);
@@ -1018,7 +1082,7 @@ export default function VoiceoverStudio() {
       );
     }
 
-    const currentVoice = allVoices.find(v => v.id === currentVoiceRef || v.sampleUrl === currentVoiceRef) 
+    const currentVoice = allVoices.find(v => v.id === currentVoiceRef || v.sampleUrl === currentVoiceRef)
       || PRESET_VOICES.find(v => v.id === currentVoiceRef || v.path === currentVoiceRef);
     const isCustomVoice = currentVoiceRef && !currentVoice;
     const isVoicePlaying = currentVoice && playingVoiceId === currentVoice.id;
@@ -1027,7 +1091,7 @@ export default function VoiceoverStudio() {
       if (!currentVoice) return;
       const path = currentVoice.sampleUrl || currentVoice.path;
       const id = currentVoice.id;
-      
+
       let finalUrl = "";
       if (path.startsWith("examples/") || path.startsWith("presets/")) {
         finalUrl = `/api/preview-voice?path=${encodeURIComponent(path)}`;
@@ -1111,7 +1175,7 @@ export default function VoiceoverStudio() {
           onClick={() => setIsVoiceDialogOpen(true)}
           className={cn(
             "p-3 cursor-pointer transition-all border text-left relative group select-none shadow-sm hover:bg-muted/10",
-            currentVoiceRef 
+            currentVoiceRef
               ? "border-primary/40 bg-primary/[0.01]"
               : "border-dashed border-border/80 hover:border-primary/30"
           )}
@@ -1361,7 +1425,7 @@ export default function VoiceoverStudio() {
                                 </div>
                               );
                             }
-                            
+
                             // Fallback to default speakingChar
                             return (
                               <Badge
@@ -1436,7 +1500,7 @@ export default function VoiceoverStudio() {
                                 const isNarrator = turn.speaker.toUpperCase() === "NARRATOR" || turn.speaker.toUpperCase() === "SYSTEM";
                                 const char = characters.find(c => c.id.toLowerCase() === turn.speaker.toLowerCase() || c.name.toUpperCase() === turn.speaker.toUpperCase());
                                 const isTurnSelected = isSelected && selectedTurnIndex === tIdx;
-                                
+
                                 return (
                                   <div
                                     key={tIdx}
@@ -1509,7 +1573,7 @@ export default function VoiceoverStudio() {
                   {/* Top Scene Overview & Info Banner */}
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold font-mono text-indigo-400">
-                      {selectedTurnIndex !== null 
+                      {selectedTurnIndex !== null
                         ? `TURN #${selectedTurnIndex + 1} (${activeScene.dialogue_turns?.[selectedTurnIndex]?.speaker || "NARRATOR"})`
                         : `SCENE DUBBING #${activeScene.id.toUpperCase()}`}
                     </span>
@@ -1617,15 +1681,13 @@ export default function VoiceoverStudio() {
                       </label>
                       <button
                         onClick={() => handleToggleUseEmoText(!useEmoText)}
-                        className={`relative w-9 h-5 rounded-full transition-all duration-200 border cursor-pointer ${
-                          useEmoText
+                        className={`relative w-9 h-5 rounded-full transition-all duration-200 border cursor-pointer ${useEmoText
                             ? "bg-primary border-primary"
                             : "bg-muted border-border"
-                        }`}
+                          }`}
                       >
-                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                          useEmoText ? "translate-x-4" : "translate-x-0"
-                        }`} />
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${useEmoText ? "translate-x-4" : "translate-x-0"
+                          }`} />
                       </button>
                     </div>
 
@@ -1637,22 +1699,20 @@ export default function VoiceoverStudio() {
                           <button
                             type="button"
                             onClick={() => handleUpdateEmoMode("preset")}
-                            className={`flex-1 py-1 rounded-md transition-all font-medium cursor-pointer ${
-                              emoMode === "preset"
+                            className={`flex-1 py-1 rounded-md transition-all font-medium cursor-pointer ${emoMode === "preset"
                                 ? "bg-background text-foreground shadow-sm font-semibold border-border"
                                 : "text-muted-foreground hover:text-foreground"
-                            }`}
+                              }`}
                           >
                             Preset & Intensity
                           </button>
                           <button
                             type="button"
                             onClick={() => handleUpdateEmoMode("custom")}
-                            className={`flex-1 py-1 rounded-md transition-all font-medium cursor-pointer ${
-                              emoMode === "custom"
+                            className={`flex-1 py-1 rounded-md transition-all font-medium cursor-pointer ${emoMode === "custom"
                                 ? "bg-background text-foreground shadow-sm font-semibold border-border"
                                 : "text-muted-foreground hover:text-foreground"
-                            }`}
+                              }`}
                           >
                             Custom Text
                           </button>
