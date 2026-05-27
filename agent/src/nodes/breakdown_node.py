@@ -7,10 +7,81 @@ from langchain.agents import create_agent
 from copilotkit import CopilotKitMiddleware
 from langchain.agents.middleware import before_model, after_model
 from langchain_core.messages import SystemMessage
-from src.models import get_model, generate_image
+from src.models import get_model
 from typing import Any
 import os
 import json
+import requests
+
+
+def generate_image(prompt: str, entity_type: str = "character") -> str:
+    """
+    Generate an image using the unified wgp_api.py service (/generate/image endpoint).
+    """
+    # 优先获取 WAN2GP_API_URL，默认 localhost:8126
+    api_base = os.getenv("WAN2GP_API_URL", "http://localhost:8126").rstrip("/")
+    url = f"{api_base}/generate/image"
+
+    payload = {
+        "prompt": prompt,
+        "model_type": "z_image",
+        "resolution": "1024x1024",
+        "custom_settings": {"guidance_scale": 1.0, "num_inference_steps": 8, "seed": 0},
+    }
+
+    print(f"[Breakdown WGP Image] 🎨 Requesting wgp_api image generation at {url}...")
+    try:
+        response = requests.post(url, json=payload, timeout=120)
+        if response.status_code == 200:
+            res_json = response.json()
+            # wgp_api 返回结构：{"status": "success", "files": [url]}
+            files = res_json.get("files", [])
+            if files:
+                generated_url = files[0]
+                # 如果是相对路径，拼上 API 的 host
+                if generated_url.startswith("/"):
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(url)
+                    generated_url = f"{parsed.scheme}://{parsed.netloc}{generated_url}"
+                print(
+                    f"[Breakdown WGP Image] ✅ Successfully generated image via wgp_api: {generated_url}"
+                )
+                return generated_url
+            else:
+                print(f"[Breakdown WGP Image] ⚠️ wgp_api response files list is empty.")
+        else:
+            print(
+                f"[Breakdown WGP Image] ⚠️ wgp_api returned status {response.status_code}: {response.text}"
+            )
+    except Exception as e:
+        print(f"[Breakdown WGP Image] ❌ Failed to generate image via wgp_api: {e}")
+
+    # If it fails, fallback to curated illustrations
+    print("[Breakdown WGP Image] ℹ️ Falling back to curated concept illustration.")
+    FALLBACK_PORTRAITS = {
+        "character": [
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400&h=400",
+        ],
+        "prop": [
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=400&h=400",
+        ],
+        "location": [
+            "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&q=80&w=400&h=400",
+            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=400&h=400",
+        ],
+    }
+    import hashlib
+
+    val = sum(ord(c) for c in prompt)
+    options = FALLBACK_PORTRAITS.get(entity_type, FALLBACK_PORTRAITS["character"])
+    return options[val % len(options)]
 
 
 # ==========================================
@@ -186,8 +257,9 @@ def sync_breakdown_interceptor(
 
                     def process_entity_visual(e_dict):
                         ref = e_dict.get("visual_reference")
-                        # Generate if ref is missing, empty, or a simple placeholder
-                        if not ref or not ref.startswith("http"):
+                        api_base = os.getenv("WAN2GP_API_URL", "http://localhost:8126").rstrip("/")
+                        # Generate if ref is missing, empty, is a fallback, or does not start with our wgp_api base URL
+                        if not ref or not ref.startswith(api_base) or "unsplash.com" in ref:
                             name = e_dict.get("name", "Asset")
                             desc = e_dict.get("description", "")
                             e_type = e_dict.get("type", "character")

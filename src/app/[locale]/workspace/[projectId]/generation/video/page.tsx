@@ -199,8 +199,8 @@ export default function VideoExecutionPage() {
     if (agent && loadedDesign) {
       const agentScenes = agent.state?.design?.scenes;
       const loadedScenes = loadedDesign?.scenes;
-      
-      const needsSync = !agentScenes || 
+
+      const needsSync = !agentScenes ||
         agentScenes.length !== (loadedScenes?.length || 0) ||
         loadedScenes?.some((s: any, idx: number) => s.video_url !== agentScenes[idx]?.video_url || s.status !== agentScenes[idx]?.status);
 
@@ -218,8 +218,8 @@ export default function VideoExecutionPage() {
   }, [agent, loadedDesign]);
 
   // Pull states from Agent or fallback
-  const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0) 
-    ? agent.state.design 
+  const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0)
+    ? agent.state.design
     : (loadedDesign || {});
   const scenes: Scene[] = design.scenes || [];
   const globalArtStyle = design.art_style || "cyberpunk";
@@ -663,7 +663,7 @@ export default function VideoExecutionPage() {
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                        
+
                         <div className="absolute top-3 left-3">
                           <Badge className="bg-primary/20 text-primary border-primary/30 backdrop-blur-md text-[9px] font-bold py-0.5 px-2 tracking-wider">
                             MASTER KEYFRAME

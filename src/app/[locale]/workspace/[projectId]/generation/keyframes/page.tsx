@@ -147,7 +147,6 @@ export default function QueuePage() {
 
   const { agent } = useAgent({ agentId: "default" });
 
-  // Helper to dynamically auto-heal local hostnames or relative paths to public domain
   const getCleanUrl = (url: string) => {
     if (!url) return url;
     try {
@@ -223,8 +222,8 @@ export default function QueuePage() {
     if (agent && loadedDesign) {
       const agentScenes = agent.state?.design?.scenes;
       const loadedScenes = loadedDesign?.scenes;
-      
-      const needsSync = !agentScenes || 
+
+      const needsSync = !agentScenes ||
         agentScenes.length !== (loadedScenes?.length || 0) ||
         loadedScenes?.some((s: any, idx: number) => s.master_url !== agentScenes[idx]?.master_url || s.status !== agentScenes[idx]?.status);
 
@@ -242,8 +241,8 @@ export default function QueuePage() {
   }, [agent, loadedDesign]);
 
   // Pull states from Agent or fallback
-  const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0) 
-    ? agent.state.design 
+  const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0)
+    ? agent.state.design
     : (loadedDesign || {});
   const [scenes, setScenes] = React.useState<Scene[]>(design?.scenes || []);
   // Sync scenes when design changes
@@ -534,7 +533,7 @@ export default function QueuePage() {
 
       } catch (error: any) {
         console.error("[Render] Gacha render error:", error);
-        
+
         // Even if the overall process failed, if some variants succeeded, show them!
         if (generatedUrls.length > 0) {
           setRealGachaVariants(prev => ({
@@ -566,12 +565,12 @@ export default function QueuePage() {
 
   // Lock selected variant as the master frame
   const handleSelectMaster = (sceneId: string, url: string) => {
-        // After real single render, persist master URL similarly
-        setMasterOutputs(prev => ({ ...prev, [sceneId]: url }));
-        setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, master_url: url, status: 'rendered' } : s));
-        const stored = JSON.parse(localStorage.getItem('keyframeMasterOutputs') || '{}');
-        stored[sceneId] = url;
-        localStorage.setItem('keyframeMasterOutputs', JSON.stringify(stored));
+    // After real single render, persist master URL similarly
+    setMasterOutputs(prev => ({ ...prev, [sceneId]: url }));
+    setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, master_url: url, status: 'rendered' } : s));
+    const stored = JSON.parse(localStorage.getItem('keyframeMasterOutputs') || '{}');
+    stored[sceneId] = url;
+    localStorage.setItem('keyframeMasterOutputs', JSON.stringify(stored));
     setGachaMode(prev => ({ ...prev, [sceneId]: false }));
     handleUpdateSceneStatus(sceneId, "rendered", url);
   };
@@ -810,13 +809,13 @@ export default function QueuePage() {
                       {isRendered ? (
                         <div className="relative w-full h-full group/img">
                           <img
-                              src={getCleanUrl(masterUrl)}
-                              alt={`Master Scene ${scene.id}`}
-                              referrerPolicy="no-referrer"
-                              width={800}
-                              height={450}
-                              className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
-                            />
+                            src={getCleanUrl(masterUrl)}
+                            alt={`Master Scene ${scene.id}`}
+                            referrerPolicy="no-referrer"
+                            width={800}
+                            height={450}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
+                          />
                         </div>
                       ) : isGachaSelecting ? (
                         /* Gacha 2x2 Selection Grid */
@@ -934,7 +933,7 @@ export default function QueuePage() {
                   <button
                     onClick={() => setRenderMode('mock')}
                     className={cn(
-                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
                       renderMode === 'mock'
                         ? "bg-background text-foreground shadow-sm border border-border/40"
                         : "text-muted-foreground hover:text-foreground"
@@ -945,7 +944,7 @@ export default function QueuePage() {
                   <button
                     onClick={() => setRenderMode('real_single')}
                     className={cn(
-                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
                       renderMode === 'real_single'
                         ? "bg-background text-primary shadow-sm border border-primary/20"
                         : "text-muted-foreground hover:text-foreground"
@@ -956,7 +955,7 @@ export default function QueuePage() {
                   <button
                     onClick={() => setRenderMode('real_gacha')}
                     className={cn(
-                       "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
+                      "text-[9px] font-bold py-1.5 px-2 rounded-md transition-all",
                       renderMode === 'real_gacha'
                         ? "bg-background text-amber-500 shadow-sm border border-amber-500/20"
                         : "text-muted-foreground hover:text-foreground"
