@@ -150,20 +150,11 @@ export default function QueuePage() {
   // Helper to dynamically auto-heal local hostnames or relative paths to public domain
   const getCleanUrl = (url: string) => {
     if (!url) return url;
-    if (url.startsWith("/")) {
-      return `https://t2i.aianime.space${url}`;
-    }
     try {
-      const urlObj = new URL(url);
-      if (
-        urlObj.hostname === "localhost" ||
-        urlObj.hostname === "127.0.0.1" ||
-        urlObj.hostname === "0.0.0.0"
-      ) {
-        return `https://t2i.aianime.space${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
-      }
-    } catch (e) {}
-    return url;
+      return encodeURI(decodeURI(url));
+    } catch (e) {
+      return url;
+    }
   };
 
   // Helper to dynamically calculate 720p resolution boundaries based on project's aspect ratio

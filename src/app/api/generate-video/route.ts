@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     if (isUnified) {
       requestPayload = JSON.stringify({
         prompt,
-        model_type: "ltx2_22B_distilled",
+        model_type: "ltx2_22B_distilled_1_1",
         resolution: `${width}x${height}`,
         duration_seconds: num_frames / frame_rate,
         video_length: num_frames,
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
 
     const data = JSON.parse(result.body);
     console.log(`[API Proxy] Video server generation success:`, data);
-    
+
     // The backend returns the complete URL directly in data.url or data.files[0]
     let url = data.url || (data.files && data.files[0]);
 

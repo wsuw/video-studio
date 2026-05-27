@@ -105,41 +105,22 @@ export default function VideoExecutionPage() {
 
   const { agent } = useAgent({ agentId: "default" });
 
-  // Helpers to dynamically auto-heal local hostnames or relative paths to public domain
   const getCleanImageUrl = (url: string | undefined) => {
     if (!url) return url;
-    if (url.startsWith("/")) {
-      return `https://t2i.aianime.space${url}`;
-    }
     try {
-      const urlObj = new URL(url);
-      if (
-        urlObj.hostname === "localhost" ||
-        urlObj.hostname === "127.0.0.1" ||
-        urlObj.hostname === "0.0.0.0"
-      ) {
-        return `https://t2i.aianime.space${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
-      }
-    } catch (e) {}
-    return url;
+      return encodeURI(decodeURI(url));
+    } catch (e) {
+      return url;
+    }
   };
 
   const getCleanVideoUrl = (url: string | undefined) => {
     if (!url) return url;
-    if (url.startsWith("/")) {
-      return `https://i2v.aianime.space${url}`;
-    }
     try {
-      const urlObj = new URL(url);
-      if (
-        urlObj.hostname === "localhost" ||
-        urlObj.hostname === "127.0.0.1" ||
-        urlObj.hostname === "0.0.0.0"
-      ) {
-        return `https://i2v.aianime.space${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
-      }
-    } catch (e) {}
-    return url;
+      return encodeURI(decodeURI(url));
+    } catch (e) {
+      return url;
+    }
   };
 
   // States
