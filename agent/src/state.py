@@ -58,10 +58,11 @@ class DialogueTurn(BaseModel):
     emotion_text: Optional[str] = Field(
         None,
         description=(
-            "Optional emotion configuration for this turn. Can be a standard preset name "
-            "(e.g., 'calm', 'happy', 'sad', 'angry', 'scared') or an inline dictionary group of emotion strengths, "
-            "for example: \"{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, "
-            "'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}\" or a free-form emotion text prompt."
+            "Optional emotion configuration for this turn. You MUST format this as a JSON-like inline dictionary "
+            "of emotion strengths representing the precise blend of the 8 emotions: "
+            "happy, angry, sad, afraid, disgusted, melancholic, surprised, calm. "
+            "Example: \"{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, "
+            "'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}\" or \"{'calm': 0.8}\"."
         ),
     )
     audio_url: Optional[str] = Field(

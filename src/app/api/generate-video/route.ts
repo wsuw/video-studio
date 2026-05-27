@@ -78,42 +78,25 @@ export async function POST(req: Request) {
 
     // Call the local Python unified Wan2GP server
     const wan2gpApiUrl = process.env.WAN2GP_API_URL || "http://localhost:8126";
-    const ltxServerUrl = process.env.LTX_SERVER_URL || `${wan2gpApiUrl.replace(/\/$/, "")}/generate/video`;
-    console.log(`[API Proxy] Sending request to Video Server... (URL: ${ltxServerUrl})`);
+    const videoServerUrl = `${wan2gpApiUrl.replace(/\/$/, "")}/generate/video`;
+    console.log(`[API Proxy] Sending request to Video Server... (URL: ${videoServerUrl})`);
 
-    const isUnified = ltxServerUrl.includes("/generate/video");
-    let requestPayload: string;
-
-    if (isUnified) {
-      requestPayload = JSON.stringify({
-        prompt,
-        model_type: "ltx2_22B_distilled_1_1",
-        resolution: `${width}x${height}`,
-        duration_seconds: num_frames / frame_rate,
-        video_length: num_frames,
-        force_fps: frame_rate,
-        custom_settings: {
-          negative_prompt,
-          num_inference_steps_stage1: num_inference_steps,
-          guidance_scale_stage1: guidance_scale,
-          seed,
-        }
-      });
-    } else {
-      requestPayload = JSON.stringify({
-        prompt,
+    const requestPayload = JSON.stringify({
+      prompt,
+      model_type: "ltx2_22B_distilled_1_1",
+      resolution: `${width}x${height}`,
+      duration_seconds: num_frames / frame_rate,
+      video_length: num_frames,
+      force_fps: frame_rate,
+      custom_settings: {
         negative_prompt,
-        width,
-        height,
-        num_frames,
-        frame_rate,
         num_inference_steps_stage1: num_inference_steps,
         guidance_scale_stage1: guidance_scale,
         seed,
-      });
-    }
+      }
+    });
 
-    const result = await httpRequest(ltxServerUrl, requestPayload, 900000); // 15 minutes timeout
+    const result = await httpRequest(videoServerUrl, requestPayload, 900000); // 15 minutes timeout
 
     if (result.statusCode !== 200) {
       console.error(`[API Proxy] Video server returned status ${result.statusCode}: ${result.body}`);
@@ -133,7 +116,7 @@ export async function POST(req: Request) {
     if (url) {
       try {
         if (url.startsWith("/")) {
-          const origin = new URL(ltxServerUrl).origin;
+          const origin = new URL(videoServerUrl).origin;
           url = `${origin}${url}`;
         } else {
           const urlObj = new URL(url);
@@ -142,7 +125,7 @@ export async function POST(req: Request) {
             urlObj.hostname === "127.0.0.1" ||
             urlObj.hostname === "0.0.0.0"
           ) {
-            const serverOrigin = new URL(ltxServerUrl).origin;
+            const serverOrigin = new URL(videoServerUrl).origin;
             url = `${serverOrigin}${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
           }
         }

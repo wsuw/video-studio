@@ -59,14 +59,12 @@ def inject_dynamic_prompt(state: AgentState, runtime: Runtime) -> dict[str, Any]
     scenes_lines = ""
     for s in scenes:
         s_dict = (
-            s
-            if isinstance(s, dict)
-            else (s.dict() if hasattr(s, "dict") else dict(s))
+            s if isinstance(s, dict) else (s.dict() if hasattr(s, "dict") else dict(s))
         )
         sid = s_dict.get("id")
         desc = s_dict.get("description", "")
         turns = s_dict.get("dialogue_turns", []) or []
-        
+
         turns_desc = ""
         for t in turns:
             t_dict = (
@@ -74,10 +72,10 @@ def inject_dynamic_prompt(state: AgentState, runtime: Runtime) -> dict[str, Any]
                 if isinstance(t, dict)
                 else (t.dict() if hasattr(t, "dict") else dict(t))
             )
-            turns_desc += f"    * Speaker {t_dict.get('speaker')}: \"{t_dict.get('text')}\" (Emotion: {t_dict.get('emotion_text')})\n"
+            turns_desc += f'    * Speaker {t_dict.get("speaker")}: "{t_dict.get("text")}" (Emotion: {t_dict.get("emotion_text")})\n'
         if not turns_desc:
             turns_desc = "    * (No dialogue turns assigned yet)\n"
-            
+
         scenes_lines += f"- Scene {sid}: {desc}\n{turns_desc}"
 
     content = f"""<role>
@@ -103,18 +101,11 @@ Step 3: Call `submit_voiceover` with the full updated scenes containing the poli
 </workflow>
 
 <critical_emotion_guidance_rules>
-We only use a single `emotion_text` field to specify emotion configurations for dialogue turns. The大模型 (LLM) should populate `emotion_text` with one of the following:
-1. A standard preset name:
-   - "calm" (Calm / Professional)
-   - "happy" (Cheerful / Excited)
-   - "sad" (Melancholic / Sad)
-   - "angry" (Angry / Agitated)
-   - "scared" (Afraid / Panicked)
-2. A custom text emotion prompt (e.g. "calm: 0.8", "happy: 0.9", "angry: 1.0")
-3. An inline dictionary group of detailed emotion strengths, which is highly recommended for complex blending:
-   - e.g., "{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, 'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}"
+We only use a single `emotion_text` field to specify emotion configurations for dialogue turns. The大模型 (LLM) MUST format `emotion_text` as a JSON-like inline dictionary group of detailed emotion strengths.
+  - The dictionary keys MUST ONLY be chosen from the following 8 standard emotions: 'happy', 'angry', 'sad', 'afraid', 'disgusted', 'melancholic', 'surprised', 'calm'.
+  - You are STRICTLY PROHIBITED from using any other keys (such as 'determined', 'excited', 'fear', 'whisper', etc.). If you want to convey other tones, you must map them to combinations of the 8 standard emotions (e.g. 'determined' can be mapped to a blend of 'calm' and 'angry', for example: "{{'calm': 0.7, 'angry': 0.2}}").
+  - Example: "{{'calm': 0.6}}" or "{{'happy': 0.8, 'surprised': 0.2}}" or "{{'angry': 0.7, 'afraid': 0.3}}"
 
-Narrators and calm segments should use "calm" or a calm dictionary mixture.
 Using this dictionary format allows blending multiple emotions precisely in a single field.
 </critical_emotion_guidance_rules>
 
@@ -199,7 +190,7 @@ def sync_voiceover_interceptor(
                         sid = s.get("id")
                         if sid and sid in existing_scenes_dict:
                             merged = existing_scenes_dict[sid].copy()
-                            
+
                             # Preserve all visual, camera, and state-level properties from storyboard
                             # and simply update/polish dialogue_turns
                             merged["dialogue_turns"] = s.get("dialogue_turns", []) or []
@@ -222,6 +213,7 @@ def sync_voiceover_interceptor(
                         f"[Voiceover Interceptor] ❌ Error in sync_voiceover_interceptor: {e}"
                     )
                     import traceback
+
                     traceback.print_exc()
     return None
 

@@ -188,7 +188,7 @@ function parseEmotionText(emotionText: string | undefined | null, defaultAlpha: 
     "surprised",
     "calm",
   ];
-  
+
   // 支持 scared -> afraid 映射以确保兼容性
   const cleanLower = lower === "scared" ? "afraid" : lower;
 
@@ -196,7 +196,7 @@ function parseEmotionText(emotionText: string | undefined | null, defaultAlpha: 
   if (match) {
     const emotionName = match[1];
     const strength = match[2] ? parseFloat(match[2]) : 0.8;
-    
+
     const index = labels.indexOf(emotionName);
     if (index !== -1) {
       const vector = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -228,8 +228,34 @@ function parseEmotionText(emotionText: string | undefined | null, defaultAlpha: 
         "calm",
       ];
 
+      // 建立近义词/同义词情绪映射表，确保未知情绪能够优雅转换
+      const emotionMapping: Record<string, string> = {
+        scared: "afraid",
+        fear: "afraid",
+        panicked: "afraid",
+        excited: "happy",
+        joy: "happy",
+        determined: "calm", // determined 对应坚定，映射到 calm
+        frustrated: "angry",
+        grief: "sad",
+        depressed: "sad",
+        bored: "calm",
+        tired: "calm",
+      };
+
+      // 进行清洗和聚合
+      const cleanDict: Record<string, number> = {};
+      for (const key of Object.keys(dict)) {
+        const val = dict[key];
+        if (typeof val === "number") {
+          const lowerKey = key.toLowerCase().trim();
+          const mappedKey = emotionMapping[lowerKey] || lowerKey;
+          cleanDict[mappedKey] = (cleanDict[mappedKey] || 0) + val;
+        }
+      }
+
       const vector = labels.map(label => {
-        return typeof dict[label] === "number" ? dict[label] : 0.0;
+        return typeof cleanDict[label] === "number" ? cleanDict[label] : 0.0;
       });
 
       const parsedAlpha = typeof dict["alpha"] === "number" ? dict["alpha"] : defaultAlpha;
@@ -275,7 +301,7 @@ export async function POST(req: Request) {
     }
 
     const wan2gpApiUrl = process.env.WAN2GP_API_URL || "http://127.0.0.1:8126";
-    const ttsServerUrl = process.env.INDEX_TTS_API_URL || `${wan2gpApiUrl.replace(/\/$/, "")}/generate/audio`;
+    const ttsServerUrl = `${wan2gpApiUrl.replace(/\/$/, "")}/generate/audio`;
     const ttsServerBase = new URL(ttsServerUrl).origin;
 
     const outputsDir = path.join(process.cwd(), "public", "audio", "outputs");

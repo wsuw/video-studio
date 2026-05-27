@@ -28,7 +28,7 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         api_base = os.getenv("DEEPSEEK_API_BASE")
         print(
-            f"[LLM Factory] 🤖 Loading ChatDeepSeek model='{model_name}' (api_base='{api_base}')"
+            f"[LLM Factory] [INFO] Loading ChatDeepSeek model='{model_name}' (api_base='{api_base}')"
         )
         return ChatDeepSeek(
             model=model_name,
@@ -39,7 +39,7 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
     elif provider == "openrouter":
         model_name = os.getenv("OPENROUTER_LLM_MODEL")
         api_key = os.getenv("OPENROUTER_API_KEY")
-        print(f"[LLM Factory] 🤖 Loading ChatOpenRouter model='{model_name}'")
+        print(f"[LLM Factory] [INFO] Loading ChatOpenRouter model='{model_name}'")
 
         return ChatOpenRouter(
             model=model_name,
@@ -56,7 +56,7 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
         ollama_base_url = os.getenv("OLLAMA_BASE_URL")
 
         print(
-            f"[LLM Factory] 🤖 Loading ChatOllama model='{model_name}' (base_url='{ollama_base_url}', parallel_tool_calls={parallel_tool_calls})"
+            f"[LLM Factory] [INFO] Loading ChatOllama model='{model_name}' (base_url='{ollama_base_url}', parallel_tool_calls={parallel_tool_calls})"
         )
         
         kwargs = {
@@ -116,7 +116,7 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
     else:
         flux_server_url = os.getenv("FLUX_SERVER_URL", "http://localhost:8126/generate/image")
 
-    print(f"[Image Factory] 🎨 Contacting image server at {flux_server_url} for prompt: '{prompt[:50]}'...")
+    print(f"[Image Factory] [INFO] Contacting image server at {flux_server_url} for prompt: '{prompt[:50]}'...")
 
     is_unified = "/generate/image" in flux_server_url
 
@@ -159,17 +159,17 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
                 generated_url = f"{parsed.scheme}://{parsed.netloc}{generated_url}"
                 
             if generated_url:
-                print(f"[Image Factory] ✅ Successfully generated portrait using local server: {generated_url}")
+                print(f"[Image Factory] [SUCCESS] Successfully generated portrait using local server: {generated_url}")
                 return generated_url
-            print(f"[Image Factory] ✅ Successfully generated portrait using local server, but 'url'/'files' not in response. Using legacy web_url: {web_url}")
+            print(f"[Image Factory] [SUCCESS] Successfully generated portrait using local server, but 'url'/'files' not in response. Using legacy web_url: {web_url}")
             return web_url
         else:
-            print(f"[Image Factory] ⚠️ Flux server returned status {response.status_code}: {response.text}")
+            print(f"[Image Factory] [WARNING] Flux server returned status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"[Image Factory] ⚠️ Failed to connect to local Flux server: {e}")
+        print(f"[Image Factory] [WARNING] Failed to connect to local Flux server: {e}")
 
     # Fallback to curated illustrations
-    print("[Image Factory] ℹ️ Falling back to curated concept illustration.")
+    print("[Image Factory] [INFO] Falling back to curated concept illustration.")
     val = sum(ord(c) for c in prompt)
     options = FALLBACK_PORTRAITS.get(entity_type, FALLBACK_PORTRAITS["character"])
     return options[val % len(options)]
@@ -189,12 +189,12 @@ def generate_video_via_openrouter(prompt: str) -> str:
 
     if not api_key:
         print(
-            "[OpenRouter API] ⚠️ OPENROUTER_API_KEY is not configured in .env. Using fallback cinematic video sequence."
+            "[OpenRouter API] [WARNING] OPENROUTER_API_KEY is not configured in .env. Using fallback cinematic video sequence."
         )
         return fallback_video
 
     print(
-        f"[OpenRouter API] 🎬 Calling OpenRouter Video model='{model}' via ChatOpenRouter for prompt: '{prompt[:50]}'"
+        f"[OpenRouter API] [INFO] Calling OpenRouter Video model='{model}' via ChatOpenRouter for prompt: '{prompt[:50]}'"
     )
     try:
         llm = ChatOpenRouter(
@@ -205,20 +205,20 @@ def generate_video_via_openrouter(prompt: str) -> str:
         response = llm.invoke([HumanMessage(content=prompt)])
         content = response.content
         print(
-            f"[OpenRouter API] 📥 Received ChatOpenRouter video response content: {content}"
+            f"[OpenRouter API] [INFO] Received ChatOpenRouter video response content: {content}"
         )
 
         # Regex to extract the first HTTP/HTTPS URL from response
         urls = re.findall(r"https?://[^\s\)\]]+", content)
         if urls:
             video_url = urls[0]
-            print(f"[OpenRouter API] ✅ Extracted generated video URL: {video_url}")
+            print(f"[OpenRouter API] [SUCCESS] Extracted generated video URL: {video_url}")
             return video_url
 
         print(
-            f"[OpenRouter API] ❌ No valid video URL found in ChatOpenRouter response."
+            f"[OpenRouter API] [ERROR] No valid video URL found in ChatOpenRouter response."
         )
     except Exception as e:
-        print(f"[OpenRouter API] ❌ Exception occurred while using ChatOpenRouter: {e}")
+        print(f"[OpenRouter API] [ERROR] Exception occurred while using ChatOpenRouter: {e}")
 
     return fallback_video

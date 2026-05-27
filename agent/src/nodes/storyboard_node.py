@@ -32,10 +32,11 @@ class LLMDialogueTurn(BaseModel):
     emotion_text: Optional[str] = Field(
         None,
         description=(
-            "Optional emotion configuration for this turn. Can be a standard preset name "
-            "(e.g., 'calm', 'happy', 'sad', 'angry', 'scared') or an inline dictionary group of emotion strengths, "
-            "for example: \"{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, "
-            "'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}\" or a free-form emotion text prompt."
+            "Optional emotion configuration for this turn. You MUST format this as a JSON-like inline dictionary "
+            "of emotion strengths representing the precise blend of the 8 emotions: "
+            "happy, angry, sad, afraid, disgusted, melancholic, surprised, calm. "
+            "Example: \"{'happy': 0.2, 'angry': 0.0, 'sad': 0.1, 'afraid': 0.0, 'disgusted': 0.0, "
+            "'melancholic': 0.0, 'surprised': 0.1, 'calm': 0.05}\" or \"{'calm': 0.8}\"."
         ),
     )
 
@@ -144,10 +145,10 @@ Step 4: Specify a detailed camera/visual description and call `submit_storyboard
 - DIALOGUE TURN SCHEMA: Each item in `dialogue_turns` must be structured as:
   - `speaker`: Entity ID of the character (e.g. "e1") or "narrator" for voiceover. Never write character names; always use their unique Entity ID!
   - `text`: The exact spoken words.
-  - `emotion_text`: Optional. Specify an emotion configuration. This can be:
-    1. A standard preset: "calm", "happy", "sad", "angry", or "scared"
-    2. A custom text emotion prompt (e.g. "calm: 0.8")
-    3. An inline dictionary group of detailed emotion strengths (e.g. "{'happy': 0.8, 'calm': 0.2, 'surprised': 0.1}")
+  - `emotion_text`: Optional. Specify an emotion configuration. You MUST write this as a JSON-like inline dictionary group of detailed emotion strengths.
+    - The dictionary keys MUST ONLY be chosen from the following 8 standard emotions: 'happy', 'angry', 'sad', 'afraid', 'disgusted', 'melancholic', 'surprised', 'calm'.
+    - You are STRICTLY PROHIBITED from using any other keys (such as 'determined', 'excited', 'fear', 'whisper', etc.). If you want to convey other tones, you must map them to combinations of the 8 standard emotions (e.g. 'determined' can be mapped to a blend of 'calm' and 'angry', for example: "{{'calm': 0.7, 'angry': 0.2}}").
+    - Example: "{{'calm': 0.6}}" or "{{'happy': 0.8, 'surprised': 0.2}}" or "{{'angry': 0.7, 'afraid': 0.3}}"
 </critical_dialogue_extraction_rules>
 
 <tool_call_example>
@@ -172,7 +173,7 @@ Always format your tool call arguments matching this structure:
         {{
                 "speaker": "e1",
           "text": "Where are we?",
-          "emotion_text": "{'calm': 0.8, 'surprised': 0.1}"
+          "emotion_text": "{{'calm': 0.8, 'surprised': 0.1}}"
         }}
       ]
     }}
