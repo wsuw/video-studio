@@ -62,6 +62,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const {
       prompt,
+      model_type = "ltx2_22B_distilled_1_1",
       negative_prompt = "worst quality, inconsistent motion, blurry, jittery, distorted",
       width = 768,
       height = 512,
@@ -70,6 +71,12 @@ export async function POST(req: Request) {
       num_inference_steps = 8,
       guidance_scale = 4.0,
       seed = 0,
+      image_start,
+      image_end,
+      image_prompt_type,
+      audio_guide,
+      audio_prompt_type,
+      custom_settings,
     } = body;
 
     if (!prompt) {
@@ -81,9 +88,9 @@ export async function POST(req: Request) {
     const videoServerUrl = `${wan2gpApiUrl.replace(/\/$/, "")}/generate/video`;
     console.log(`[API Proxy] Sending request to Video Server... (URL: ${videoServerUrl})`);
 
-    const requestPayload = JSON.stringify({
+    const requestPayloadObj: any = {
       prompt,
-      model_type: "ltx2_22B_distilled_1_1",
+      model_type,
       resolution: `${width}x${height}`,
       duration_seconds: num_frames / frame_rate,
       video_length: num_frames,
@@ -93,8 +100,17 @@ export async function POST(req: Request) {
         num_inference_steps_stage1: num_inference_steps,
         guidance_scale_stage1: guidance_scale,
         seed,
+        ...custom_settings,
       }
-    });
+    };
+
+    if (image_start !== undefined) requestPayloadObj.image_start = image_start;
+    if (image_end !== undefined) requestPayloadObj.image_end = image_end;
+    if (image_prompt_type !== undefined) requestPayloadObj.image_prompt_type = image_prompt_type;
+    if (audio_guide !== undefined) requestPayloadObj.audio_guide = audio_guide;
+    if (audio_prompt_type !== undefined) requestPayloadObj.audio_prompt_type = audio_prompt_type;
+
+    const requestPayload = JSON.stringify(requestPayloadObj);
 
     const result = await httpRequest(videoServerUrl, requestPayload, 900000); // 15 minutes timeout
 

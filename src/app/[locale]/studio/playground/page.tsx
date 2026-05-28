@@ -133,23 +133,23 @@ export default function PlaygroundPage() {
     setDownloadingIds(prev => ({ ...prev, [trackingId]: true }));
     
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Network response was not ok");
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = defaultFilename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      const downloadUrl = `/api/download?url=${encodeURIComponent(url)}`;
+      
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = downloadUrl;
+      document.body.appendChild(iframe);
+      
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 5000);
+
       toast.success("Download started!");
     } catch (error) {
-      console.error("Failed to download file directly:", error);
-      // Fallback: open in new tab instead of changing current page
-      window.open(url, "_blank", "noopener,noreferrer");
-      toast.info("Opening link in new tab to view/save.");
+      console.error("Failed to download file:", error);
+      toast.error("Could not download the file.");
     } finally {
       setDownloadingIds(prev => ({ ...prev, [trackingId]: false }));
     }

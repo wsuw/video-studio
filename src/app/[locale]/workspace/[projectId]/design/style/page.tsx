@@ -57,12 +57,11 @@ const PRESET_ART_STYLES = [
   }
 ];
 
-// Aspect Ratio configurations with visual frame ratios
+// Aspect Ratio configurations with visual frame ratios (divisible by 64 for algorithm compatibility)
 const ASPECT_RATIOS = [
-  { id: "2.39:1", label: "2.39:1 Anamorphic", sub: "Cinema Widescreen", ratioClass: "h-6 w-14" },
-  { id: "16:9", label: "16:9 Cinematic", sub: "Standard Landscape", ratioClass: "h-8 w-14" },
-  { id: "9:16", label: "9:16 Vertical", sub: "Mobile / TikTok", ratioClass: "h-12 w-7" },
-  { id: "1:1", label: "1:1 Square", sub: "Social Feed", ratioClass: "h-10 w-10" }
+  { id: "16:9", label: "16:9 Cinematic (1280x768)", sub: "Standard Widescreen Landscape", ratioClass: "h-8 w-14" },
+  { id: "9:16", label: "9:16 Vertical (768x1280)", sub: "Mobile Portrait Stream", ratioClass: "h-12 w-7" },
+  { id: "1:1", label: "1:1 Square (768x768)", sub: "Social Media Feed", ratioClass: "h-10 w-10" }
 ];
 
 // Cinematic color palettes
@@ -125,7 +124,10 @@ export default function StylePage() {
   const design = agent?.state?.design || loadedDesign || {};
   const globalArtStyle = design.art_style || "cyberpunk";
   const customStylePrompt = design.style_prompt || "";
-  const aspect_ratio = design.aspect_ratio || "16:9";
+  let aspect_ratio = design.aspect_ratio || "16:9";
+  if (aspect_ratio === "2.39:1") {
+    aspect_ratio = "16:9";
+  }
   const color_palette = design.color_palette || "bladerunner";
   const negative_prompt = design.negative_prompt || "blurry, low quality, distorted, extra limbs, bad proportions";
 

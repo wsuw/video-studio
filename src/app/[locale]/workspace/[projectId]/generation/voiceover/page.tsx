@@ -228,10 +228,10 @@ const DialogueTextarea = React.memo(({ value, onChange, onBlur, placeholder, cla
 DialogueTextarea.displayName = "DialogueTextarea";
 
 const getSpeakerDisplayName = (speakerKey: string | undefined, characters: any[]) => {
-  if (!speakerKey) return "Narrator (旁白)";
+  if (!speakerKey) return "Narrator";
   const keyUpper = speakerKey.toUpperCase();
   if (keyUpper === "NARRATOR" || keyUpper === "SYSTEM") {
-    return "Narrator (旁白)";
+    return "Narrator";
   }
   // Try to match by Entity ID first
   const charById = characters.find(c => c.id.toLowerCase() === speakerKey.toLowerCase());
@@ -551,7 +551,7 @@ export default function VoiceoverStudio() {
 
     const trimmed = rawText.trim();
 
-    // 1. 如果是 JSON/Python 字典格式
+    // 1. If JSON/Python dict format
     if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
       try {
         const jsonStr = trimmed.replace(/'/g, '"');
@@ -568,7 +568,7 @@ export default function VoiceoverStudio() {
           "calm",
         ];
 
-        // 统计所有非 0 情绪维度
+        // Count all non-zero emotion values
         const nonZeroEmotions: { key: string; val: number }[] = [];
         for (const key of Object.keys(dict)) {
           const lowerKey = key.toLowerCase();
@@ -578,7 +578,7 @@ export default function VoiceoverStudio() {
           }
         }
 
-        // 如果刚好有且仅有一个情绪非零，说明前端可以渲染为“预设 + 强度”模式
+        // If exactly one emotion is non-zero, render as preset + intensity
         if (nonZeroEmotions.length === 1) {
           setEmoMode("preset");
           setSelectedPresetEmo(nonZeroEmotions[0].key);
@@ -590,7 +590,7 @@ export default function VoiceoverStudio() {
         console.warn("[Voiceover UI] Failed to parse emotion_text as JSON:", trimmed, e);
       }
 
-      // 如果是非单一情绪的多情绪字典，显示为自定义文本模式
+      // If multi-emotion, show as custom text
       setEmoMode("custom");
       setEmoText(rawText);
       setSelectedPresetEmo("calm");
@@ -598,7 +598,7 @@ export default function VoiceoverStudio() {
       return;
     }
 
-    // 2. 如果是旧的 happy: 0.8 格式（做向下兼容）
+    // 2. Backward compatibility
     const match = trimmed.match(/^([a-z]+)(?:\s*:\s*([0-9.]+))?$/i);
     if (match) {
       const labels = [
@@ -622,7 +622,7 @@ export default function VoiceoverStudio() {
       }
     }
 
-    // 3. 否则，完全显示为自定义文本模式
+    // 3. Otherwise show as custom text
     setEmoMode("custom");
     setEmoText(rawText);
     setSelectedPresetEmo("calm");
@@ -1070,7 +1070,7 @@ export default function VoiceoverStudio() {
     let displayName = currentSpeaker;
     if (isNarrator) {
       currentVoiceRef = design.narrator_voice || "cff02830-c816-45bf-ba0c-ab8bd0210a5e";
-      displayName = "Narrator (旁白)";
+      displayName = "Narrator";
     } else if (char) {
       currentVoiceRef = char.voice_reference || "";
       displayName = char.name;
@@ -1168,7 +1168,7 @@ export default function VoiceoverStudio() {
       <div className="space-y-2 pt-1 border-t border-border/40">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-400 block">
-            🎙️ {displayName} Voice Cast (配音声线)
+            🎙️ {displayName} Voice Cast
           </label>
         </div>
         <Card
@@ -1476,7 +1476,7 @@ export default function VoiceoverStudio() {
                       {/* Normal Scene Description at the top (First!) */}
                       <div className="text-xs text-muted-foreground bg-muted/10 p-3 rounded-lg border border-border/30 mb-1 leading-relaxed">
                         <span className="font-bold uppercase tracking-wider block text-[10px] text-muted-foreground/75 mb-1">
-                          🎬 Scene Description (场景描述)
+                          🎬 Scene Description
                         </span>
                         {scene.description}
                       </div>
@@ -1598,14 +1598,14 @@ export default function VoiceoverStudio() {
                         {/* Speaker Selector Dropdown */}
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-400 block">
-                            👤 Speaking Character (说话角色)
+                            👤 Speaking Character
                           </label>
                           <select
                             value={getSpeakerSelectValue(activeScene.dialogue_turns[selectedTurnIndex].speaker, characters)}
                             onChange={(e) => handleUpdateTurnSpeaker(selectedTurnIndex, e.target.value)}
                             className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground focus-visible:outline-none focus:border-indigo-500/40 shadow-sm"
                           >
-                            <option value="NARRATOR">Narrator (旁白)</option>
+                            <option value="NARRATOR">Narrator</option>
                             {characters.map((char) => (
                               <option key={char.id} value={char.id}>
                                 {char.name}
@@ -1620,7 +1620,7 @@ export default function VoiceoverStudio() {
                         {/* Edit Selected Turn Text */}
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold tracking-[0.15em] uppercase text-indigo-400 block">
-                            🗣️ Dialogue Line Text (台词内容)
+                            🗣️ Dialogue Line Text
                           </label>
                           <DialogueTextarea
                             value={localDialogue}

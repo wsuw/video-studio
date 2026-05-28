@@ -135,8 +135,8 @@ const data = {
   ],
   distribution: [
     {
-      name: "Timeline",
-      url: "/distribution/timeline",
+      name: "Theater",
+      url: "/distribution/theater",
       icon: (
         <FilmIcon
         />
@@ -199,23 +199,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ]
 
-  const redesignItems = [
-    {
-      name: t("workspace.review", "HITL Review"),
-      url: `/${locale}/workspace/${projectId}/redesign/review`,
-      icon: <EyeIcon />,
-    },
-    {
-      name: t("workspace.correction", "Correction"),
-      url: `/${locale}/workspace/${projectId}/redesign/correction`,
-      icon: <Wand2Icon />,
-    },
-  ]
+
 
   const distributionItems = [
     {
-      name: t("workspace.timeline", "Timeline"),
-      url: `/${locale}/workspace/${projectId}/distribution/timeline`,
+      name: t("workspace.theater", "Theater"),
+      url: `/${locale}/workspace/${projectId}/distribution/theater`,
       icon: <FilmIcon />,
     },
     {
@@ -233,7 +222,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavDesign items={designItems} />
         <NavGeneration generation={generationItems} />
-        <NavRedesign redesign={redesignItems} />
         <NavDistribution distribution={distributionItems} />
       </SidebarContent>
       <SidebarFooter>

@@ -93,6 +93,8 @@ export default function StoryboardPage() {
   const initializedRef = React.useRef<boolean>(false);
   const aiRunningRef = React.useRef<boolean>(false);
 
+  const [aspectRatio, setAspectRatio] = useState<string>("16:9");
+
   // On mount: fetch persisted state directly from LangGraph API
   React.useEffect(() => {
     if (!projectId || !agent || initializedRef.current) return;
@@ -105,6 +107,9 @@ export default function StoryboardPage() {
           setScenes(loadedScenes);
           setEntities(loadedEntities);
           setScript(design.script || "");
+          if (design.aspect_ratio) {
+            setAspectRatio(design.aspect_ratio);
+          }
 
           agent.setState({
             ...agent.state,
@@ -133,6 +138,8 @@ export default function StoryboardPage() {
     }
   }, [agent?.state?.design?.entities]);
 
+  const design = agent?.state?.design || {};
+  const activeAspectRatio = design.aspect_ratio || aspectRatio || "16:9";
   const selectedScene = scenes.find(s => s.id === selectedSceneId) || scenes[0];
 
   // Helper to match entity IDs with full details
@@ -321,7 +328,14 @@ export default function StoryboardPage() {
             {selectedScene ? (
               <div className="absolute inset-0 flex flex-col">
                 {/* Visual Bbox Overlay Container - Fullscreen Visualized Canvas */}
-                <div className="flex-1 relative bg-black/5 dark:bg-black/40 overflow-hidden select-none">
+                <div 
+                  className="flex-1 relative bg-black/5 dark:bg-black/40 overflow-hidden select-none mx-auto rounded-xl border border-border/30 shadow-inner"
+                  style={{
+                    aspectRatio: activeAspectRatio.replace(":", " / "),
+                    maxHeight: "100%",
+                    height: "100%",
+                  }}
+                >
                   {/* Subtle background grid texture */}
                   <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03]"
                     style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
@@ -650,8 +664,13 @@ export default function StoryboardPage() {
                     )} />
 
                     <div className="flex gap-3 items-center">
-                      {/* Left: Beautiful Square Visual Preview Thumbnail */}
-                      <div className="aspect-square w-20 shrink-0 bg-black/5 dark:bg-black/40 rounded-lg relative overflow-hidden border border-border/50 transition-all duration-300 group-hover:bg-black/10 dark:group-hover:bg-black/60">
+                      {/* Left: Beautiful Dynamic Aspect Visual Preview Thumbnail */}
+                      <div 
+                        className="w-20 shrink-0 bg-black/5 dark:bg-black/40 rounded-lg relative overflow-hidden border border-border/50 transition-all duration-300 group-hover:bg-black/10 dark:group-hover:bg-black/60"
+                        style={{
+                          aspectRatio: activeAspectRatio.replace(":", " / ")
+                        }}
+                      >
                         {/* Grid texture inside thumb */}
                         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02]"
                           style={{ backgroundImage: 'radial-gradient(circle, currentColor 0.5px, transparent 0.5px)', backgroundSize: '10px 10px' }}>

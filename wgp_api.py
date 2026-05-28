@@ -157,7 +157,9 @@ def resolve_audio_path(audio_path: str) -> Optional[str]:
                 f"Downloading remote reference audio: {audio_path} -> {temp_path}"
             )
 
-            with urllib.request.urlopen(audio_path, timeout=30) as response:
+            import urllib.parse
+            encoded_audio_path = urllib.parse.quote(audio_path, safe='/:?=&')
+            with urllib.request.urlopen(encoded_audio_path, timeout=30) as response:
                 with open(temp_path, "wb") as f:
                     f.write(response.read())
 
@@ -176,6 +178,46 @@ def resolve_audio_path(audio_path: str) -> Optional[str]:
     for c in candidates:
         if os.path.exists(c):
             logger.info(f"Resolved reference audio path: '{audio_path}' -> '{c}'")
+            return os.path.abspath(c)
+    return None
+
+
+def resolve_image_path(image_path: str) -> Optional[str]:
+    """按优先级定位参考图像文件所在的位置，支持本地相对路径与远程 HTTP(S) URL"""
+    if not image_path:
+        return None
+
+    # 如果是 URL，下载到本地 outputs/temp/ 目录
+    if image_path.startswith("http://") or image_path.startswith("https://"):
+        try:
+            os.makedirs(os.path.join("outputs", "temp"), exist_ok=True)
+            # 提取原文件后缀名以保持图片格式正确
+            ext = os.path.splitext(image_path.split("?")[0])[1] or ".png"
+            temp_filename = f"ref_{uuid.uuid4()}{ext}"
+            temp_path = os.path.join("outputs", "temp", temp_filename)
+            logger.info(
+                f"Downloading remote reference image: {image_path} -> {temp_path}"
+            )
+
+            import urllib.parse
+            encoded_image_path = urllib.parse.quote(image_path, safe='/:?=&')
+            with urllib.request.urlopen(encoded_image_path, timeout=30) as response:
+                with open(temp_path, "wb") as f:
+                    f.write(response.read())
+
+            return os.path.abspath(temp_path)
+        except Exception as e:
+            logger.error(f"Failed to download remote image reference {image_path}: {e}")
+            return None
+
+    candidates = [
+        image_path,
+        os.path.join(_SCRIPT_DIR, image_path),
+        os.path.join(os.getcwd(), image_path),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            logger.info(f"Resolved reference image path: '{image_path}' -> '{c}'")
             return os.path.abspath(c)
     return None
 
@@ -208,6 +250,29 @@ class VideoGenerateRequest(BaseModel):
     duration_seconds: float = Field(4.0, description="最大生成时长(秒)")
     video_length: int = Field(97, description="视频帧数")
     force_fps: int = Field(24, description="强制视频帧率")
+
+    # 新增高级图像及音频引导控制参数（添加清晰的文档注释）
+    image_start: Optional[str] = Field(
+        None, 
+        description="首帧/起始图像的本地相对路径或公开 URL (选填)。设置时需确保 image_prompt_type 包含 'S'。"
+    )
+    image_end: Optional[str] = Field(
+        None, 
+        description="尾帧/结束图像的本地相对路径或公开 URL (选填)。设置时需确保 image_prompt_type 包含 'E'。"
+    )
+    image_prompt_type: Optional[str] = Field(
+        None, 
+        description="图像引导类型选项 (选填)。支持：'S' (仅首帧), 'E' (仅尾帧), 'ES'/'SE' (首尾双帧插值过渡模式)。"
+    )
+    audio_guide: Optional[str] = Field(
+        None, 
+        description="音频引导/音轨背景参考的本地相对路径或公开 URL (选填)。设置时需确保 audio_prompt_type 包含 'A'。"
+    )
+    audio_prompt_type: Optional[str] = Field(
+        None, 
+        description="音频引导类型选项 (选填)。支持：'A' (单路音频引导), 'AB' (双路声源引导)。"
+    )
+
     custom_settings: Optional[Dict[str, Any]] = Field(
         None, description="自定义微调配置参数"
     )
@@ -219,6 +284,9 @@ class ImageGenerateRequest(BaseModel):
     prompt: str = Field(..., description="图片提示词")
     model_type: str = Field("flux", description="图片生成模型")
     resolution: str = Field("1024x1024", description="图片分辨率")
+    image_refs: Optional[List[str]] = Field(
+        None, description="参考图像的本地路径或公开 URL 列表 (选填)。"
+    )
     custom_settings: Optional[Dict[str, Any]] = Field(
         None, description="自定义微调配置参数"
     )
@@ -258,18 +326,56 @@ async def generate_video(req: VideoGenerateRequest, fastapi_req: Request):
     """
     🎬 专属视频生成接口，支持控制帧率、时长和分辨率，资产自动上传
     """
-    settings = {
-        "model_type": req.model_type,
-        "prompt": req.prompt,
-        "resolution": req.resolution,
-        "duration_seconds": req.duration_seconds,
-        "video_length": req.video_length,
-        "force_fps": req.force_fps,
-    }
-    if req.custom_settings:
-        settings.update(req.custom_settings)
-
+    temp_files_to_clean = []
     try:
+        settings = {
+            "model_type": req.model_type,
+            "prompt": req.prompt,
+            "resolution": req.resolution,
+            "duration_seconds": req.duration_seconds,
+            "video_length": req.video_length,
+            "force_fps": req.force_fps,
+        }
+
+        # 1. 动态解析并下载首帧图像 (Start Image)
+        if req.image_start:
+            resolved_start = resolve_image_path(req.image_start)
+            if resolved_start:
+                settings["image_start"] = resolved_start
+                if "outputs/temp" in resolved_start.replace("\\", "/"):
+                    temp_files_to_clean.append(resolved_start)
+            else:
+                raise HTTPException(status_code=400, detail=f"Image start file/URL unresolved: {req.image_start}")
+
+        # 2. 动态解析并下载尾帧图像 (End Image)
+        if req.image_end:
+            resolved_end = resolve_image_path(req.image_end)
+            if resolved_end:
+                settings["image_end"] = resolved_end
+                if "outputs/temp" in resolved_end.replace("\\", "/"):
+                    temp_files_to_clean.append(resolved_end)
+            else:
+                raise HTTPException(status_code=400, detail=f"Image end file/URL unresolved: {req.image_end}")
+
+        if req.image_prompt_type:
+            settings["image_prompt_type"] = req.image_prompt_type
+
+        # 3. 动态解析并下载音频引导 (Audio Guide)
+        if req.audio_guide:
+            resolved_audio = resolve_audio_path(req.audio_guide)
+            if resolved_audio:
+                settings["audio_guide"] = resolved_audio
+                if "outputs/temp" in resolved_audio.replace("\\", "/"):
+                    temp_files_to_clean.append(resolved_audio)
+            else:
+                raise HTTPException(status_code=400, detail=f"Audio guide file/URL unresolved: {req.audio_guide}")
+
+        if req.audio_prompt_type:
+            settings["audio_prompt_type"] = req.audio_prompt_type
+
+        if req.custom_settings:
+            settings.update(req.custom_settings)
+
         logger.info(f"Submitting video task: model_type={req.model_type}")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
@@ -301,6 +407,15 @@ async def generate_video(req: VideoGenerateRequest, fastapi_req: Request):
     except Exception as e:
         logger.error(f"Error during video generation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # 清理临时下载的图像与音频等参考样本，释放磁盘空间
+        for temp_file in temp_files_to_clean:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    logger.info(f"[Cleanup] Deleted temporary media reference file: {temp_file}")
+                except Exception as ex:
+                    logger.error(f"[Cleanup] Failed to delete temporary file {temp_file}: {ex}")
 
 
 @app.post("/generate/image")
@@ -308,19 +423,49 @@ async def generate_image(req: ImageGenerateRequest, fastapi_req: Request):
     """
     🖼️ 专属图片/关键帧生成接口，无时长参数，纯静态图片资产自动上传
     """
-    settings = {
-        "model_type": req.model_type,
-        "prompt": req.prompt,
-        "resolution": req.resolution,
-        "image_mode": 1,
-        "video_length": 0,
-        "duration_seconds": 0,
-        "force_fps": 24,
-    }
-    if req.custom_settings:
-        settings.update(req.custom_settings)
-
+    temp_files_to_clean = []
     try:
+        settings = {
+            "model_type": req.model_type,
+            "prompt": req.prompt,
+            "resolution": req.resolution,
+            "image_mode": 1,
+            "video_length": 0,
+            "duration_seconds": 0,
+            "force_fps": 24,
+        }
+
+        custom_settings = req.custom_settings.copy() if req.custom_settings else {}
+
+        # 合并 top-level image_refs 到 custom_settings 里的 image_refs 中并统一解析
+        raw_refs = []
+        if req.image_refs:
+            raw_refs.extend(req.image_refs)
+        if "image_refs" in custom_settings and isinstance(custom_settings["image_refs"], list):
+            raw_refs.extend(custom_settings["image_refs"])
+
+        # 动态解析并下载参考图列表中的所有 URL，转为本地路径
+        if raw_refs:
+            resolved_refs = []
+            for ref in raw_refs:
+                if isinstance(ref, str):
+                    resolved_ref = resolve_image_path(ref)
+                    if resolved_ref:
+                        resolved_refs.append([resolved_ref, ""])  # 对应 wgp.py 的 list-of-tuples 格式要求
+                        if "outputs/temp" in resolved_ref.replace("\\", "/"):
+                            temp_files_to_clean.append(resolved_ref)
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Image reference unresolved: {ref}")
+                else:
+                    resolved_refs.append(ref)
+            settings["image_refs"] = resolved_refs
+            settings["video_prompt_type"] = "I"
+
+        if req.custom_settings:
+            # 排除掉原本未被转义的 image_refs，保留其他 custom_settings
+            clean_custom = {k: v for k, v in req.custom_settings.items() if k != "image_refs"}
+            settings.update(clean_custom)
+
         logger.info(f"Submitting image task: model_type={req.model_type}")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
@@ -352,6 +497,15 @@ async def generate_image(req: ImageGenerateRequest, fastapi_req: Request):
     except Exception as e:
         logger.error(f"Error during image generation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # 清理临时下载的参考图，释放磁盘空间
+        for temp_file in temp_files_to_clean:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    logger.info(f"[Cleanup] Deleted temporary reference image file: {temp_file}")
+                except Exception as ex:
+                    logger.error(f"[Cleanup] Failed to delete temporary file {temp_file}: {ex}")
 
 
 @app.post("/generate")
@@ -536,6 +690,111 @@ async def generate_audio(req: AudioGenerateRequest, fastapi_req: Request):
                     logger.error(
                         f"Failed to delete temp reference file {temp_file}: {ex}"
                     )
+
+
+class StitchRequest(BaseModel):
+    video_urls: List[str]
+
+
+def get_local_or_downloaded_path(url: str, temp_dir: str) -> str:
+    import urllib.parse
+    parsed = urllib.parse.urlparse(url)
+    path_str = parsed.path
+    if "/outputs/" in path_str:
+        filename = path_str.split("/outputs/")[-1]
+        local_path = os.path.join("outputs", filename)
+        if os.path.exists(local_path):
+            return os.path.abspath(local_path)
+            
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_filename = f"stitch_{uuid.uuid4().hex[:12]}.mp4"
+    dest_path = os.path.join(temp_dir, temp_filename)
+    
+    logger.info(f"Downloading remote video for stitching: {url} -> {dest_path}")
+    encoded_url = urllib.parse.quote(url, safe='/:?=&')
+    with urllib.request.urlopen(encoded_url, timeout=30) as response:
+        with open(dest_path, "wb") as f:
+            f.write(response.read())
+            
+    return os.path.abspath(dest_path)
+
+
+@app.post("/stitch-videos")
+async def stitch_videos(req: StitchRequest, fastapi_req: Request):
+    import subprocess
+    if not req.video_urls:
+        raise HTTPException(status_code=400, detail="No video URLs provided")
+        
+    temp_dir = os.path.join("outputs", "temp", f"stitch_job_{uuid.uuid4().hex[:8]}")
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    resolved_paths = []
+    try:
+        # Resolve all input videos
+        for url in req.video_urls:
+            local_path = get_local_or_downloaded_path(url, temp_dir)
+            resolved_paths.append(local_path)
+            
+        # Create concat.txt file
+        concat_txt_path = os.path.join(temp_dir, "concat.txt")
+        with open(concat_txt_path, "w", encoding="utf-8") as f:
+            for path in resolved_paths:
+                safe_path = path.replace("\\", "/")
+                f.write(f"file '{safe_path}'\n")
+                
+        # Resolve ffmpeg binary path
+        ffmpeg_bin = os.path.join(WAN2GP_DIR, "ffmpeg_bins", "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+        if not os.path.exists(ffmpeg_bin):
+            ffmpeg_bin = shutil.which("ffmpeg.exe") or shutil.which("ffmpeg") or "ffmpeg"
+            
+        output_filename = f"compilation_{uuid.uuid4().hex[:12]}.mp4"
+        output_path = os.path.join("outputs", output_filename)
+        
+        # Run ffmpeg concat command
+        cmd = [
+            ffmpeg_bin,
+            "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_txt_path,
+            "-c", "copy",
+            output_path
+        ]
+        
+        logger.info(f"Running ffmpeg stitching: {' '.join(cmd)}")
+        process = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        
+        if process.returncode != 0:
+            logger.error(f"FFmpeg stitching failed: {process.stderr}")
+            raise HTTPException(status_code=500, detail=f"FFmpeg concatenation failed: {process.stderr}")
+            
+        # Upload using storage client
+        storage_client = get_storage_client()
+        url = storage_client.upload_file(output_path, request=fastapi_req)
+        logger.info(f"Stitched video uploaded: {url}")
+        
+        # If remote S3 storage, clean up local stitched file
+        if not isinstance(storage_client, LocalStorageClient) and os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except Exception as e:
+                logger.error(f"Failed to delete temp output: {e}")
+                
+        return {"status": "success", "url": url}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Stitching execution failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up temp folder and downloaded pieces
+        if os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                logger.error(f"Cleanup of temp stitch directory failed: {e}")
+
 
 
 @app.get("/health")

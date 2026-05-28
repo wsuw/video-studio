@@ -12,31 +12,57 @@ export async function POST(req: Request) {
       guidance_scale = 1.0,
       num_inference_steps = 8,
       seed = 0,
+      image_refs,
+      layout,
     } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
+    const requestOrigin = new URL(req.url).origin;
+    const getAbsoluteUrl = (url: string | undefined): string | undefined => {
+      if (!url) return undefined;
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        return url;
+      }
+      return `${requestOrigin}${url}`;
+    };
+
+    const resolvedImageRefs = image_refs && Array.isArray(image_refs)
+      ? image_refs.map((ref: string) => getAbsoluteUrl(ref)).filter(Boolean)
+      : undefined;
+
     // Call the local Python unified Wan2GP server
     const wan2gpApiUrl = process.env.WAN2GP_API_URL || "http://localhost:8126";
     const fluxServerUrl = `${wan2gpApiUrl.replace(/\/$/, "")}/generate/image`;
     console.log(`[API Proxy] Sending request to Wan2GP Image Server... (URL: ${fluxServerUrl})`);
+
+    // Append strong negative qualifiers inside the prompt block to force pure graphic output
+    const cleanPrompt = `${prompt}, photorealistic, cinematography, clean frame, no text, no labeling, no annotations, no arrows, no diagrams, no percentages, no UI elements, no overlay graphics`;
+
+    const requestPayloadObj: any = {
+      prompt: cleanPrompt,
+      model_type: "z_image",
+      resolution: `${width}x${height}`,
+      custom_settings: {
+        guidance_scale,
+        num_inference_steps,
+        seed,
+        layout,
+      }
+    };
+
+    if (resolvedImageRefs !== undefined) {
+      requestPayloadObj.image_refs = resolvedImageRefs;
+    }
+
     const response = await fetch(fluxServerUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        prompt,
-        model_type: "z_image",
-        resolution: `${width}x${height}`,
-        custom_settings: {
-          guidance_scale,
-          num_inference_steps,
-          seed,
-        }
-      }),
+      body: JSON.stringify(requestPayloadObj),
     });
 
     if (!response.ok) {

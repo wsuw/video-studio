@@ -158,16 +158,16 @@ export default function QueuePage() {
     }
   };
 
-  // Helper to dynamically calculate 720p resolution boundaries based on project's aspect ratio
+  // Helper to dynamically calculate divisible-by-64 720p resolution boundaries based on project's aspect ratio
   const getAspectRatioResolution = () => {
     const ratio = design.aspect_ratio || "16:9";
     if (ratio === "9:16") {
-      return { width: 720, height: 1280 };
+      return { width: 768, height: 1280 };
     }
     if (ratio === "1:1") {
-      return { width: 720, height: 720 };
+      return { width: 768, height: 768 };
     }
-    return { width: 1280, height: 720 }; // default 16:9 720p
+    return { width: 1280, height: 768 }; // 1280x768 (divisible by 64 for algorithm compatibility)
   };
 
   // States
@@ -221,7 +221,7 @@ export default function QueuePage() {
 
   // Sync loadedDesign to Agent state when agent becomes available
   useEffect(() => {
-    if (agent && loadedDesign) {
+    if (agent && agent.state && loadedDesign) {
       const agentScenes = agent.state?.design?.scenes;
       const loadedScenes = loadedDesign?.scenes;
 
@@ -240,7 +240,7 @@ export default function QueuePage() {
         });
       }
     }
-  }, [agent, loadedDesign]);
+  }, [agent, agent.state, loadedDesign]);
 
   // Pull states from Agent or fallback
   const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0)
@@ -324,8 +324,42 @@ export default function QueuePage() {
     const scene = scenes.find(s => s.id === sceneId);
     if (!scene) return;
 
-    // Build compound prompt for high-fidelity diffusion synthesis
-    const fullPrompt = `${scene.description}.${stylePrompt ? ` Style: ${stylePrompt}.` : ""} ${globalArtStyle} aesthetic, ${scene.shot_type || "medium"} shot, ${scene.lens || "50mm"} lens, ${scene.motion || "static"} camera.`;
+    // Build compound prompt with element layout composition descriptors for high-fidelity diffusion synthesis
+    const layout = getActiveLayout(scene);
+    let layoutPrompt = "";
+    if (layout && layout.length > 0) {
+      const layoutDescriptions = layout.map(element => {
+        const entity = getEntityDetails(element.entity_id);
+        const name = entity?.name || `subject`;
+        const [x, y, w, h] = element.bbox;
+        
+        // Define spatial layout position in natural language terms to prevent text generation
+        const xPos = x < 0.35 ? "on the left side" : x > 0.6 ? "on the right side" : "in the center";
+        const yPos = y < 0.35 ? "near the top" : y > 0.6 ? "near the bottom" : "vertically centered";
+        
+        let sizeDescription = "normally sized";
+        if (w < 0.2) {
+          sizeDescription = "appearing small and distant";
+        } else if (w < 0.45) {
+          sizeDescription = "appearing medium-sized";
+        } else {
+          sizeDescription = "appearing large and prominent";
+        }
+        
+        return `the ${entity?.type || 'element'} ${name} is ${xPos}, ${yPos}, ${sizeDescription}`;
+      });
+      layoutPrompt = ` In the frame, ${layoutDescriptions.join(", and ")}.`;
+    }
+
+    const fullPrompt = `${scene.description}.${stylePrompt ? ` Style: ${stylePrompt}.` : ""} ${globalArtStyle} aesthetic, ${scene.shot_type || "medium"} shot, ${scene.lens || "50mm"} lens, ${scene.motion || "static"} camera.${layoutPrompt}`;
+
+    // Resolve any visual reference images for entities in this scene
+    const sceneEntityIds = scene.entities || [];
+    const layoutEntityIds = (scene.layout || []).map(l => l.entity_id);
+    const allEntityIds = Array.from(new Set([...sceneEntityIds, ...layoutEntityIds]));
+    const imageRefs = allEntityIds
+      .map(id => entities.find((e: any) => e.id === id)?.visual_reference)
+      .filter(Boolean);
 
     if (renderMode === "mock") {
       // Original mock render
@@ -411,6 +445,8 @@ export default function QueuePage() {
             sceneId: scene.id,
             width,
             height,
+            image_refs: imageRefs,
+            layout: layout,
           }),
         });
 
@@ -501,6 +537,8 @@ export default function QueuePage() {
               sceneId: `${scene.id}_v${i}`,
               width,
               height,
+              image_refs: imageRefs,
+              layout: layout,
             }),
           });
 
@@ -584,12 +622,15 @@ export default function QueuePage() {
   };
 
   // Batch execute all idle scenes
-  const handleRenderAll = () => {
-    scenes.forEach(scene => {
-      if (scene.status !== "rendered" && !renderingStates[scene.id]) {
-        handleStartRender(scene.id);
+  const handleRenderAll = async () => {
+    const pendingScenes = scenes.filter(scene => scene.status !== "rendered" && !renderingStates[scene.id]);
+    for (const scene of pendingScenes) {
+      try {
+        await handleStartRender(scene.id);
+      } catch (err) {
+        console.error(`[Batch Render] Failed to render keyframe for scene ${scene.id}:`, err);
       }
-    });
+    }
   };
 
   return (
@@ -679,11 +720,15 @@ export default function QueuePage() {
               const layout = getActiveLayout(scene);
               const isRendering = !!renderingStates[scene.id];
               const renderState = renderingStates[scene.id];
+              const aspectStyle = {
+                aspectRatio: (design.aspect_ratio || "16:9").replace(":", " / "),
+                maxHeight: design.aspect_ratio === "9:16" ? "640px" : "none"
+              };
 
               const variants = getGachaOptions(scene.id);
               const masterUrl = masterOutputs[scene.id] || scene.master_url || variants[0];
               const isGachaSelecting = !!gachaMode[scene.id];
-              const isRendered = (scene.status === "rendered" || scene.status === "locked") && !isGachaSelecting;
+              const isRendered = (scene.status === "rendered" || scene.status === "locked" || !!scene.master_url || !!masterOutputs[scene.id]) && !isGachaSelecting;
               const isLocked = scene.status === "locked";
 
               return (
@@ -772,7 +817,10 @@ export default function QueuePage() {
                   {/* Body Content - Box layout + Render Reveal */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Visual 1: Structural layout preview */}
-                    <div className="bg-muted/30 border border-border/60 rounded-xl aspect-[16/9] relative overflow-hidden flex items-center justify-center">
+                    <div
+                      className="bg-muted/30 border border-border/60 rounded-xl relative overflow-hidden flex items-center justify-center w-full mx-auto"
+                      style={aspectStyle}
+                    >
                       <div className="absolute inset-0 opacity-[0.03]"
                         style={{ backgroundImage: 'radial-gradient(circle, currentColor 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }}>
                       </div>
@@ -809,7 +857,10 @@ export default function QueuePage() {
                     </div>
 
                     {/* Visual 2: Output Image / Gacha Selection Panel */}
-                    <div className="bg-muted/10 border border-border/60 rounded-xl aspect-[16/9] relative overflow-hidden flex items-center justify-center">
+                    <div
+                      className="bg-muted/10 border border-border/60 rounded-xl relative overflow-hidden flex items-center justify-center w-full mx-auto"
+                      style={aspectStyle}
+                    >
                       {isRendered ? (
                         <div className="relative w-full h-full group/img">
                           <img
@@ -818,7 +869,7 @@ export default function QueuePage() {
                             referrerPolicy="no-referrer"
                             width={800}
                             height={450}
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover/img:scale-105"
+                            className="w-full h-full object-contain bg-zinc-950"
                           />
                         </div>
                       ) : isGachaSelecting ? (
@@ -833,7 +884,7 @@ export default function QueuePage() {
                               <img
                                 src={getCleanUrl(url)}
                                 alt={`Variant ${variantIdx + 1}`}
-                                className="w-full h-full object-cover group-hover/variant:scale-105 transition-transform duration-500"
+                                className="w-full h-full object-contain bg-zinc-950"
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/variant:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center">
                                 <span className="text-[9px] font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 border border-amber-500/20 rounded shadow-md flex items-center gap-1 scale-90 group-hover/variant:scale-100 transition-transform duration-300">
@@ -1034,7 +1085,7 @@ export default function QueuePage() {
               <div className="flex justify-between items-center text-xs pt-2 border-t border-border/40">
                 <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Target Resolution:</span>
                 <span className="font-mono text-[10px] font-semibold text-foreground">
-                  {design.aspect_ratio === "9:16" ? "720p Vertical (720x1280)" : design.aspect_ratio === "1:1" ? "720p Square (720x720)" : "720p HD (1280x720)"}
+                  {design.aspect_ratio === "9:16" ? "720p Vertical (768x1280)" : design.aspect_ratio === "1:1" ? "720p Square (768x768)" : "720p HD (1280x768)"}
                 </span>
               </div>
             </div>

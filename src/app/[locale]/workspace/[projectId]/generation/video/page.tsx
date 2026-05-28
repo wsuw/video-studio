@@ -64,6 +64,17 @@ interface Scene {
   master_url?: string;
 }
 
+const getAbsoluteUrl = (url: string | undefined): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${url}`;
+  }
+  return url;
+};
+
 // Premium stock video placeholders for mock mode
 const MOCK_VIDEOS: Record<string, string[]> = {
   cyberpunk: [
@@ -125,6 +136,17 @@ export default function VideoExecutionPage() {
     }
   };
 
+  const getAspectRatioResolution = () => {
+    const ratio = design.aspect_ratio || "16:9";
+    if (ratio === "9:16") {
+      return { width: 768, height: 1280 };
+    }
+    if (ratio === "1:1") {
+      return { width: 768, height: 768 };
+    }
+    return { width: 1280, height: 768 }; // 1280x768 (divisible by 64 for algorithm compatibility)
+  };
+
   // States
   const [loadedDesign, setLoadedDesign] = useState<any>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
@@ -147,27 +169,29 @@ export default function VideoExecutionPage() {
   const handleDownload = async (url: string, defaultFilename: string, itemId: string) => {
     setDownloadingIds(prev => ({ ...prev, [itemId]: true }));
     try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Network response was not ok");
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = defaultFilename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
+      const downloadUrl = `/api/download?url=${encodeURIComponent(url)}`;
+      
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.src = downloadUrl;
+      document.body.appendChild(iframe);
+      
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 5000);
+
       toast({
         title: "📥 Download started",
         description: "The video file download has started.",
       });
     } catch (error) {
-      console.error("Failed to download file directly:", error);
-      window.open(url, "_blank", "noopener,noreferrer");
+      console.error("Failed to download file:", error);
       toast({
-        title: "ℹ️ Link opened",
-        description: "Opening link in a new tab to download.",
+        title: "❌ Download failed",
+        description: "Could not download the video file.",
+        variant: "destructive"
       });
     } finally {
       setDownloadingIds(prev => ({ ...prev, [itemId]: false }));
@@ -198,7 +222,7 @@ export default function VideoExecutionPage() {
 
   // Sync loadedDesign to Agent state when agent becomes available
   useEffect(() => {
-    if (agent && loadedDesign) {
+    if (agent && agent.state && loadedDesign) {
       const agentScenes = agent.state?.design?.scenes;
       const loadedScenes = loadedDesign?.scenes;
 
@@ -217,7 +241,7 @@ export default function VideoExecutionPage() {
         });
       }
     }
-  }, [agent, loadedDesign]);
+  }, [agent, agent.state, loadedDesign]);
 
   // Pull states from Agent or fallback
   const design = (agent?.state?.design?.scenes && agent.state.design.scenes.length > 0)
@@ -375,6 +399,7 @@ export default function VideoExecutionPage() {
       }, 1000);
 
       try {
+        const { width, height } = getAspectRatioResolution();
         const response = await fetch("/api/generate-video", {
           method: "POST",
           headers: {
@@ -389,6 +414,12 @@ export default function VideoExecutionPage() {
             frame_rate: frameRate,
             seed: baseSeed || Math.floor(Math.random() * 1000000),
             sceneId: scene.id,
+            image_start: getAbsoluteUrl(scene.master_url),
+            image_prompt_type: scene.master_url ? "S" : undefined,
+            audio_guide: getAbsoluteUrl(scene.audio_url),
+            audio_prompt_type: scene.audio_url ? "A" : undefined,
+            width,
+            height,
           }),
         });
 
@@ -433,12 +464,19 @@ export default function VideoExecutionPage() {
     }
   };
 
-  const handleRenderAll = () => {
-    scenes.forEach(scene => {
-      if (scene.status !== "rendered" && !renderingStates[scene.id]) {
-        handleStartRender(scene.id);
-      }
+  const handleRenderAll = async () => {
+    const pendingScenes = scenes.filter(scene => {
+      const videoUrl = videoOutputs[scene.id] || scene.video_url;
+      return !videoUrl && !renderingStates[scene.id];
     });
+
+    for (const scene of pendingScenes) {
+      try {
+        await handleStartRender(scene.id);
+      } catch (err) {
+        console.error(`[Batch Render] Failed to render scene ${scene.id}:`, err);
+      }
+    }
   };
 
   return (
@@ -485,10 +523,10 @@ export default function VideoExecutionPage() {
           <Button
             variant="default"
             size="sm"
-            onClick={() => router.push(`/workspace/${projectId}/redesign/review`)}
+            onClick={() => router.push(`/workspace/${projectId}/distribution/theater`)}
             className="flex items-center gap-2 h-9 px-4 bg-primary hover:bg-primary/90 shadow-sm transition-all group"
           >
-            <span className="text-xs font-semibold">Next: HITL Review</span>
+            <span className="text-xs font-semibold">Next: Theater</span>
             <ArrowRightIcon className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
 
@@ -531,6 +569,10 @@ export default function VideoExecutionPage() {
               const imageUrl = getCleanImageUrl(scene.master_url);
               const isRendered = scene.status === "rendered" && !!videoUrl;
               const isActive = activeSceneId === scene.id;
+              const aspectStyle = {
+                aspectRatio: (design.aspect_ratio || "16:9").replace(":", " / "),
+                maxHeight: design.aspect_ratio === "9:16" ? "640px" : "none"
+              };
 
               return (
                 <div
@@ -614,7 +656,10 @@ export default function VideoExecutionPage() {
                   </div>
 
                   {/* Body Content - Description + Video player */}
-                  <div className="bg-muted/30 border border-border/60 rounded-xl aspect-[16/9] relative overflow-hidden flex items-center justify-center">
+                  <div
+                    className="bg-muted/30 border border-border/60 rounded-xl relative overflow-hidden flex items-center justify-center w-full mx-auto"
+                    style={aspectStyle}
+                  >
                     {isRendered ? (
                       <div className="relative w-full h-full group">
                         <video
@@ -622,7 +667,7 @@ export default function VideoExecutionPage() {
                           controls
                           loop
                           poster={imageUrl}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain bg-zinc-950"
                         />
                         <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300" onClick={(e) => e.stopPropagation()}>
                           <Button
@@ -916,7 +961,7 @@ export default function VideoExecutionPage() {
               <div className="flex justify-between items-center text-xs pt-2 border-t border-border/40">
                 <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Output Resolution:</span>
                 <span className="font-mono text-[10px] font-semibold text-foreground">
-                  Standard HD (768x512)
+                  {design.aspect_ratio === "9:16" ? "720p Vertical (768x1280)" : design.aspect_ratio === "1:1" ? "720p Square (768x768)" : "720p HD (1280x768)"}
                 </span>
               </div>
             </div>
