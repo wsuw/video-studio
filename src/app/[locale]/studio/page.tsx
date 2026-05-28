@@ -47,6 +47,54 @@ const creativeTemplates = [
     tagline: "Ideal for product demos & tech pitches"
   },
   {
+    id: "musicbox",
+    name: "The Black Forest Music Box",
+    icon: "🎵",
+    badgeColor: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+    projectName: "The Black Forest Music Box",
+    prompt: `# 🎬 A 1-Minute Animation Script: The Black Forest Music Box
+
+**Art Style**: Classic European 2D animation (Studio Ghibli style). Rich textures of polished wood, glowing brass, oil lamps, and a cozy cabin interior.
+
+### Characters:
+- **Hans**: An old Black Forest clockmaker. White beard, leather apron, wearing a jeweler's loupe.
+- **Lily**: His 9-year-old granddaughter. Blonde pigtails, curious blue eyes, wearing a gingham pinafore.
+
+---
+
+### [00:00 - 00:15] Act I: The Clunky Toy
+**Scene**: A cozy wooden workshop filled with gears and blueprints. Sunlight streams through the window, illuminating dust motes.
+**Visuals**:
+- **[00:00 - 00:05]** Lily winds up a cheap wooden toy soldier bought from the market. It dances with stiff, clunky, and stuttering movements (visualizing low frame rate), eventually freezing midway.
+- **[00:05 - 00:15]** Hans sits under a warm oil lamp, using fine tweezers to place a tiny, polished brass gear into an exquisite walnut music box.
+**Dialogue**:
+- **Lily** (sighing, poking the toy): "Grandpa Hans, the toy from the market is no fun at all. It moves so jerkily, like a clumsy drunkard."
+- **Hans** (removes his loupe, smiling warmly): "Haha, little Lily, that is because it lacks a master's touch. True craftsmanship makes dead wood fly. Turn that golden crank on the table."
+
+### [00:15 - 00:45] Act II: The Seamless Miracle
+**Scene**: Lily turns the golden crank, and the walnut lid slowly opens.
+**Visuals**:
+- **[00:15 - 00:25]** *[CRITICAL: Seamless & High-Definition Close-up]* The camera dives into a macro shot inside the music box. Miniature silver swans begin to glide. Their movements are incredibly fluid and lifelike, without a single stutter (visualizing 60 FPS). The golden gears mesh perfectly; their edges are razor-sharp and crystal clear, revealing even the micro-engraved signature of the artisan (visualizing 4K resolution).
+- **[00:25 - 00:35]** Cut back to Lily. Golden clockwork reflections dance in her wide blue eyes. Her hand stops in mid-air, completely spellbound.
+- **[00:35 - 00:45]** Hans gently brushes away a stray speck of wood dust with a feather. Fully wound, a tiny mechanical ballerina spins and leaps across the miniature stage with breathless speed and grace.
+**Dialogue**:
+- **Lily** (gasping, hands over her mouth): "Oh my goodness... Grandpa! The little swan is alive! She spins so smoothly, like water flowing! And the lace on her dress... I can see every single thread!"
+- **Hans** (stroking his beard proudly): "That is the magic of precision engineering, my dear. Thirty-eight ruby bearings, and gears polished like mirrors. When it moves, it flows without a single catch. Every detail is perfect."
+
+### [00:45 - 01:00] Act III: Passing the Torch
+**Scene**: Dusk falls outside. Inside, a brick fireplace crackles cozily.
+**Visuals**:
+- **[00:45 - 00:55]** Hans hands a tiny golden wrench over to Lily, patiently guiding her small hand to oil a delicate gear.
+- **[00:55 - 01:00]** The music box continues to play its beautiful melody on the table as the ballerina spins flawlessly. The camera slowly fades out.
+**Dialogue**:
+- **Hans** (gently): "Keep a steady hand and a clear eye, Lily. Only when you chase absolute perfection can you create a miracle this smooth."
+- **Lily** (nodding determinately, gripping the wrench): "I will, Grandpa! One day, I’ll make the smoothest music boxes in all of Europe!"`,
+    style: "cinematic",
+    ratio: "16:9",
+    voice: "friendly",
+    tagline: "Classic Ghibli style 2D animation story"
+  },
+  {
     id: "cyberpunk",
     name: "Neon Cyberpunk Teaser",
     icon: "🔮",
@@ -291,7 +339,9 @@ export default function Page() {
         const newProjectId = threadData.thread_id // This is the server-generated valid UUID!
 
         // B. Second, populate the initial screenplay state
-        const initialScript = `# 🎬 ${finalProjectName}\n\n## Creative Concept\n${finalPrompt}\n\n## Configurations\n- **Aspect Ratio**: ${selectedRatio}\n- **Style Profile**: ${selectedStyle}\n- **Narrative Voice**: ${selectedVoice} Voice\n\n---\n\n*Your AI director agent is ready! Type in the right sidebar chat to instruct the agent to expand this script.*`
+        const initialScript = activeTemplateId === "musicbox"
+          ? finalPrompt
+          : `# 🎬 ${finalProjectName}\n\n## Creative Concept\n${finalPrompt}\n\n## Configurations\n- **Aspect Ratio**: ${selectedRatio}\n- **Style Profile**: ${selectedStyle}\n- **Narrative Voice**: ${selectedVoice} Voice\n\n---\n\n*Your AI director agent is ready! Type in the right sidebar chat to instruct the agent to expand this script.*`
 
         await updateThreadState(newProjectId, {
           design: {

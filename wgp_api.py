@@ -142,6 +142,35 @@ def get_storage_client() -> StorageClient:
 # ==========================================
 
 
+def clean_string_for_gbk(val: Any) -> Any:
+    """递归清洗对象中的所有字符串，替换/过滤无法用 gbk 编码的 unicode 字符，防范 Windows 平台报错"""
+    if isinstance(val, str):
+        replacements = {
+            '\u2011': '-',  # Non-breaking hyphen
+            '\u2013': '-',  # En dash
+            '\u2014': '-',  # Em dash
+            '\u201c': '"',  # Left double quote
+            '\u201d': '"',  # Right double quote
+            '\u2018': "'",  # Left single quote
+            '\u2019': "'",  # Right single quote
+            '\u2026': '...', # Ellipsis
+            '\u2212': '-',  # Minus sign
+            '\u00a0': ' ',  # Non-breaking space
+        }
+        for k, v in replacements.items():
+            val = val.replace(k, v)
+        try:
+            val.encode('gbk')
+        except UnicodeEncodeError:
+            val = val.encode('gbk', errors='replace').decode('gbk')
+        return val
+    elif isinstance(val, dict):
+        return {k: clean_string_for_gbk(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [clean_string_for_gbk(v) for v in val]
+    return val
+
+
 def resolve_audio_path(audio_path: str) -> Optional[str]:
     """按优先级定位参考音频文件所在的位置，支持本地相对路径与远程 HTTP(S) URL"""
     if not audio_path:
@@ -376,6 +405,7 @@ async def generate_video(req: VideoGenerateRequest, fastapi_req: Request):
         if req.custom_settings:
             settings.update(req.custom_settings)
 
+        settings = clean_string_for_gbk(settings)
         logger.info(f"Submitting video task: model_type={req.model_type}")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
@@ -466,6 +496,7 @@ async def generate_image(req: ImageGenerateRequest, fastapi_req: Request):
             clean_custom = {k: v for k, v in req.custom_settings.items() if k != "image_refs"}
             settings.update(clean_custom)
 
+        settings = clean_string_for_gbk(settings)
         logger.info(f"Submitting image task: model_type={req.model_type}")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
@@ -524,6 +555,7 @@ async def generate_media(req: GenerateRequest, fastapi_req: Request):
         settings.update(req.custom_settings)
 
     try:
+        settings = clean_string_for_gbk(settings)
         logger.info(f"Submitting general task: model_type={req.model_type}")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
@@ -619,6 +651,7 @@ async def generate_audio(req: AudioGenerateRequest, fastapi_req: Request):
             },
         }
 
+        settings = clean_string_for_gbk(settings)
         logger.info("Submitting TTS task to session...")
         job = session.submit_task(settings)
         result: GenerationResult = job.result()
