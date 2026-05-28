@@ -3,6 +3,12 @@ import re
 from typing import Any, Optional
 from langchain_openrouter import ChatOpenRouter
 from langchain_core.messages import HumanMessage
+from dotenv import load_dotenv
+
+# Load environment variables from root .env file (2 levels up from agent/src/)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.abspath(os.path.join(current_dir, "..", "..", ".env"))
+load_dotenv(env_path)
 
 
 # ==========================================
@@ -74,29 +80,9 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
 # ==========================================
 def generate_image(prompt: str, entity_type: str = "character") -> str:
     """
-    Generate an image using the local Flux.2 Klein server (running on port 8124).
-    If it is offline or fails, falls back to high-quality curated illustrations.
+    Generate an image using the local Flux server.
+    Raises an exception if it is offline or fails, allowing the client to show errors.
     """
-    # Deterministic beautiful fallback image dataset if generation fails
-    FALLBACK_PORTRAITS = {
-        "character": [
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-        "prop": [
-            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-        "location": [
-            "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-    }
-
     import hashlib
     import time
     import requests
@@ -114,7 +100,7 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
     if wan2gp_api_url:
         flux_server_url = f"{wan2gp_api_url.rstrip('/')}/generate/image"
     else:
-        flux_server_url = os.getenv("FLUX_SERVER_URL", "http://localhost:8126/generate/image")
+        flux_server_url = os.getenv("FLUX_SERVER_URL", "http://127.0.0.1:8126/generate/image")
 
     print(f"[Image Factory] [INFO] Contacting image server at {flux_server_url} for prompt: '{prompt[:50]}'...")
 
@@ -164,15 +150,10 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
             print(f"[Image Factory] [SUCCESS] Successfully generated portrait using local server, but 'url'/'files' not in response. Using legacy web_url: {web_url}")
             return web_url
         else:
-            print(f"[Image Factory] [WARNING] Flux server returned status {response.status_code}: {response.text}")
+            raise RuntimeError(f"Flux server returned status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"[Image Factory] [WARNING] Failed to connect to local Flux server: {e}")
-
-    # Fallback to curated illustrations
-    print("[Image Factory] [INFO] Falling back to curated concept illustration.")
-    val = sum(ord(c) for c in prompt)
-    options = FALLBACK_PORTRAITS.get(entity_type, FALLBACK_PORTRAITS["character"])
-    return options[val % len(options)]
+        print(f"[Image Factory] [ERROR] Failed to generate image via Flux server: {e}")
+        raise e
 
 
 

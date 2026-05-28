@@ -12,14 +12,21 @@ from typing import Any
 import os
 import json
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables from the root .env file (3 levels up from agent/src/nodes/)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.abspath(os.path.join(current_dir, "..", "..", "..", ".env"))
+load_dotenv(env_path)
 
 
 def generate_image(prompt: str, entity_type: str = "character") -> str:
     """
     Generate an image using the unified wgp_api.py service (/generate/image endpoint).
+    Raises an exception if it fails so the frontend can report the error.
     """
-    # 优先获取 WAN2GP_API_URL，默认 localhost:8126
-    api_base = os.getenv("WAN2GP_API_URL", "http://localhost:8126").rstrip("/")
+    # 优先获取 WAN2GP_API_URL，默认 127.0.0.1:8126 (避免 Windows IPv6 localhost 解析延迟或报错)
+    api_base = os.getenv("WAN2GP_API_URL", "http://127.0.0.1:8126").rstrip("/")
     url = f"{api_base}/generate/image"
 
     payload = {
@@ -49,39 +56,12 @@ def generate_image(prompt: str, entity_type: str = "character") -> str:
                 )
                 return generated_url
             else:
-                print(f"[Breakdown WGP Image] ⚠️ wgp_api response files list is empty.")
+                raise RuntimeError("wgp_api response files list is empty.")
         else:
-            print(
-                f"[Breakdown WGP Image] ⚠️ wgp_api returned status {response.status_code}: {response.text}"
-            )
+            raise RuntimeError(f"wgp_api returned status {response.status_code}: {response.text}")
     except Exception as e:
         print(f"[Breakdown WGP Image] ❌ Failed to generate image via wgp_api: {e}")
-
-    # If it fails, fallback to curated illustrations
-    print("[Breakdown WGP Image] ℹ️ Falling back to curated concept illustration.")
-    FALLBACK_PORTRAITS = {
-        "character": [
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-        "prop": [
-            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-        "location": [
-            "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&q=80&w=400&h=400",
-            "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&q=80&w=400&h=400",
-        ],
-    }
-    import hashlib
-
-    val = sum(ord(c) for c in prompt)
-    options = FALLBACK_PORTRAITS.get(entity_type, FALLBACK_PORTRAITS["character"])
-    return options[val % len(options)]
+        raise e
 
 
 # ==========================================
@@ -257,7 +237,7 @@ def sync_breakdown_interceptor(
 
                     def process_entity_visual(e_dict):
                         ref = e_dict.get("visual_reference")
-                        api_base = os.getenv("WAN2GP_API_URL", "http://localhost:8126").rstrip("/")
+                        api_base = os.getenv("WAN2GP_API_URL", "http://127.0.0.1:8126").rstrip("/")
                         # Generate if ref is missing, empty, is a fallback, or does not start with our wgp_api base URL
                         if not ref or not ref.startswith(api_base) or "unsplash.com" in ref:
                             name = e_dict.get("name", "Asset")
@@ -278,6 +258,7 @@ def sync_breakdown_interceptor(
                                 print(
                                     f"[Auto Portrait] ❌ Failed to generate portrait for {name}: {ex}"
                                 )
+                                raise ex
                         return e_dict
 
                     print(
