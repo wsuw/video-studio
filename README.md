@@ -1,206 +1,143 @@
-# CopilotKit <> LangGraph Starter
+# 🎬 VideoAgent: Industrial-Grade AI Video Generation Workspace
 
-This is a starter template for building AI agents using [LangGraph](https://www.langchain.com/langgraph) and [CopilotKit](https://copilotkit.ai). It provides a modern Next.js application with an integrated LangGraph agent to be built on top of.
+VideoAgent is a stateful, collaborative AI video generation workspace that transitions AI video creation from a "black-box lottery" into a predictable, professional production pipeline. Powered by **LangGraph**, **CopilotKit**, and a suite of advanced local/cloud multimodal models, VideoAgent offers a gradual, cost-controlled, and highly editable video creation experience.
 
-https://github.com/user-attachments/assets/47761912-d46a-4fb3-b9bd-cb41ddd02e34
+---
 
-## Prerequisites
+## 🏗️ System Architecture
 
-- Node.js 18+
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
-- Any of the following package managers:
-  - npm (default)
-  - [pnpm](https://pnpm.io/installation)
-  - [yarn](https://classic.yarnpkg.com/lang/en/docs/install/)
-  - [bun](https://bun.sh/)
-- OpenAI API Key (for the LangGraph agent)
+VideoAgent is decoupled into three robust layers: a high-fidelity Web Frontend, a stateful Agent Orchestration Server, and a heavy-duty GPU Inference Microservice.
 
-## Getting Started
+```mermaid
+graph TD
+    Client[Frontend: Next.js 15 / React 19 / Tailwind 4]
+    Runtime[Relay: CopilotKit Runtime / Middleware]
+    Graph[Orchestrator: LangGraph Server :8123]
+    ModelAPI[API Proxies: Next.js Route Handlers]
+    ModelServer[GPU Microservice: wgp_api.py :8126]
+    Wan2GP[Inference: Wan2GP Engine]
+    Storage[Asset Storage: MinIO S3 / Local Static]
 
-1. Install dependencies using your preferred package manager:
+    Client <-->|State Stream| Runtime
+    Runtime <-->|Agent State| Graph
+    Client -->|API Requests| ModelAPI
+    ModelAPI -->|JSON requests| ModelServer
+    ModelServer <-->|Submit Task| Wan2GP
+    ModelServer <-->|Upload/Download| Storage
+```
 
+1.  **Frontend Presentation Layer**: Next.js 15 (App Router) + React 19 + TailwindCSS 4 + shadcn/ui. Binds real-time UI states with the backend Graph State via **CopilotKit v2**.
+2.  **Stateful Agent Orchestration Layer**: LangGraph Server with `PostgresSaver` Checkpoint persistence. Ensures that script outlines, character profiles, camera movements, and timing constraints are versioned and queryable (supports time-travel / Undo-Redo).
+3.  **Local GPU Inference Layer**: An independent FastAPI microservice running on port `8126`. It isolates the heavy CUDA environment from the web server and schedules tasks across **LTX-2 19B**, **Flux.2-klein**, and **IndexTTS2**.
+
+---
+
+## ✨ Key Capabilities & Pipelines
+
+### 1. Screenplay Breakdown & Character Profiling (Design Node)
+*   **Literary Breakdown**: Automatically extracts characters, key props, and scenes from raw screenplay scripts.
+*   **Visual Reference Generation**: Uses **Flux.2-klein** to generate high-quality, style-consistent portraits for extracted character entities.
+
+### 2. Cinematic Storyboarding & Spatial Planning (Storyboard Node)
+*   **Spatial Bounding Boxes**: Uses a `LayoutGPT` parser to convert descriptive shots into structured coordinates `[x, y, w, h]` for each participant, preventing overlapping and centering biases.
+*   **Camera Configuration**: Granularly controls camera focal lengths (e.g. `24mm` wide, `50mm` medium, `85mm` close-up) and movements (`pan`, `tilt`, `zoom-in`, `zoom-out`).
+
+### 3. Voiceover Synthesis & Voice Cloning (Voiceover Node)
+*   **Zero-Shot Cloning**: Synthesizes emotional dialogues and narrator voiceovers using **IndexTTS2** via local voice cloning.
+*   **Standard Emotion Blends**: Formulates emotions as a combined strength of 8 standard keys (`happy`, `angry`, `sad`, `afraid`, `disgusted`, `melancholic`, `surprised`, `calm`).
+
+### 4. Audio-Visual Timing Alignment (Temporal Anchoring)
+*   **Duration Calculation**: The TTS engine physically measures the WAV file length:
+    $$\text{Duration (seconds)} = \frac{\text{WAV Samples}}{\text{Sample Rate}}$$
+*   **Frame Lock**: Next.js video workbench automatically locks the target frame count for the diffusion model:
+    $$\text{Locked Frames} = \text{round}(\text{audio\_duration} \times \text{frameRate})$$
+    This guarantees 100% frame-perfect synchronization between voice track and visual duration.
+
+### 5. Multi-Video Stacking (Theater Room)
+*   **Seamless Playback**: Combines multiple overlapping `<video>` elements with z-index transitions (`opacity-100` vs `opacity-0`) and adjacent preloading to avoid blank frames or buffering delays during scene switching.
+
+### 6. FFmpeg Lossless Stitching (Export compilation)
+*   **Instant Merging**: Uses FFmpeg Concat Demuxer to compile scene clips into a single compilation file without re-encoding:
+    ```bash
+    ffmpeg.exe -y -f concat -safe 0 -i concat.txt -c copy outputs/compilation.mp4
+    ```
+    This completes stitching in milliseconds and avoids any quality degradation.
+
+---
+
+## ⚡ Engineering Optimization Specs (VRAM & Storage)
+
+### GPU Memory Management (24GB VRAM Baseline)
+*   **FP8 Layerwise Weight Casting**: Casts heavy LTX-2 weights to 8-bit float (`torch.float8_e4m3fn`) during initialization to reduce static footprint, upcasting to `bfloat16` dynamically during the forward pass:
+    ```python
+    transformer.enable_layerwise_casting(
+        storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16
+    )
+    ```
+*   **Automatic Model CPU Offload**: Automatically swaps active models (Gemma-3-8B text encoder ➔ LTX-2 19B Transformer ➔ VAE decoder) between GPU VRAM and CPU RAM, keeping active GPU usage under 24GB.
+*   **WDDM Paging Protection**: Windows Display Driver Model (WDDM) page-outs trigger massive PCIe latency drops (去噪速度 from `6.2s/step` to `100s/step`). The backend bans manual `.to("cuda")` operations to ensure Diffusers offload hooks work cleanly.
+*   **VAE Tiling**: Splits the latent space into overlapping patches (`pipe.vae.enable_tiling()`) to avoid out-of-memory errors during high-resolution, long-frame video decoding.
+*   **Stage 1 NumPy Draft Mode**: Introduces an 8-step denoising draft mode (using distilled sigmas) that yields numpy frame arrays directly from the latent decoder in ~110 seconds on RTX 3090, saving hours of unnecessary full-rendering runs.
+
+### Storage & Network Optimization
+*   **S3 & MinIO Integration**: Automatically uploads media artifacts to a local MinIO bucket initialized with public read permissions.
+*   **MIME-Type Inline Playback**: Dynamically resolves extension formats (e.g. `video/mp4`) to avoid forced browser downloads and allow inline HTML5 video streaming.
+*   **Fallback Local Server**: If MinIO is offline, the client seamlessly falls back to local static file serving via FastAPI `StaticFiles`.
+*   **CORS-Bypassing Download Proxy**: Proxies external video files through a Next.js endpoint to avoid cross-origin download issues and bypass browser pop-up blockers using a hidden `<iframe>`.
+
+---
+
+## 🛠️ Quick Start Guide
+
+### 1. Run local Storage & MinIO Services
+Start the local S3 emulator using Docker Compose:
 ```bash
-# Using npm (default)
+docker compose up -d
+```
+*   MinIO S3 Endpoint: `http://localhost:9000`
+*   MinIO Console Admin: `http://localhost:9001` (user/pass: `minioadmin`)
+
+### 2. Configure Environment Variables
+Copy `.env.example` to `.env` in both the root folder and the `/agent` directory, and configure:
+```env
+# Agent Orchestration URL
+LANGGRAPH_DEPLOYMENT_URL=http://localhost:8123
+AGENT_URL=http://localhost:8123
+
+# Unified GPU Server API URL
+WAN2GP_API_URL=http://localhost:8126
+
+# Storage Settings
+STORAGE_BACKEND=s3
+STORAGE_S3_ENDPOINT=http://localhost:9000
+STORAGE_S3_ACCESS_KEY=minioadmin
+STORAGE_S3_SECRET_KEY=minioadmin
+STORAGE_S3_BUCKET=video-studio
+```
+
+### 3. Install Dependencies & Build
+Install Next.js dependencies and synchronise python packages via `uv`:
+```bash
 npm install
-
-# Using pnpm
-pnpm install
-
-# Using yarn
-yarn install
-
-# Using bun
-bun install
 ```
 
-This will also install the Python agent dependencies via `uv sync`.
+### 4. Start Development Servers
+*   **Start LangGraph Dev Server**:
+    ```bash
+    npm run dev:agent
+    ```
+*   **Start Next.js Frontend Server**:
+    ```bash
+    npm run dev
+    ```
+*   **Start Local GPU Microservice**:
+    ```bash
+    npm run dev:wan2gp
+    ```
 
-2. Set up your environment variables:
+---
 
-```bash
-cp .env.example .env
-```
-
-Then edit the `.env` file and add your OpenAI API key:
-
-```bash
-OPENAI_API_KEY=your-openai-api-key-here
-```
-
-3. Start the development server:
-
-```bash
-# Using npm (default)
-npm run dev
-
-# Using pnpm
-pnpm dev
-
-# Using yarn
-yarn dev
-
-# Using bun
-bun run dev
-```
-
-This will start both the UI and agent servers concurrently.
-
-## Available Scripts
-
-The following scripts can also be run using your preferred package manager:
-
-- `dev` - Starts both UI and agent servers in development mode
-- `dev:debug` - Starts development servers with debug logging enabled
-- `dev:ui` - Starts only the Next.js UI server
-- `dev:agent` - Starts only the LangGraph agent server
-- `build` - Builds the Next.js application for production
-- `start` - Starts the production server
-- `install:agent` - Installs Python dependencies for the agent
-
-## Project Structure
-
-```
-├── src/                         # Next.js frontend source
-│   ├── app/
-│   │   ├── page.tsx             # Main page
-│   │   └── api/copilotkit/      # CopilotKit API route
-│   ├── components/
-│   │   ├── example-canvas/      # Todo list UI
-│   │   ├── example-layout/      # Layout: chat + canvas side-by-side
-│   │   └── generative-ui/       # Example generative UI components
-│   └── hooks/
-├── agent/                       # LangGraph Python agent
-│   ├── main.py                  # Agent entry point
-│   └── src/
-│       ├── todos.py             # Todo tools and state schema
-│       └── query.py             # Example data query tool
-├── scripts/                     # Agent setup and run scripts
-│   ├── setup-agent.sh / .bat
-│   └── run-agent.sh / .bat
-├── public/                      # Static assets
-├── next.config.ts
-├── tsconfig.json
-└── package.json
-```
-
-## A2UI — Agent-to-User Interface
-
-This starter includes [A2UI](https://a2ui.org/specification/) support, allowing the agent to generate rich, interactive UI surfaces declaratively. Instead of returning plain text, the agent sends a JSON description of the UI it wants to render, and the frontend turns it into real components.
-
-### How it works
-
-A2UI uses three concepts:
-
-1. **Catalog** — a set of component definitions (schema) paired with React renderers. Registered once in `layout.tsx` via `<CopilotKitProvider a2ui={{ catalog: demonstrationCatalog }}>`.
-2. **Surface** — a rendered UI instance. The agent creates a surface, sets its components, and binds data to it.
-3. **Operations** — the agent returns `a2ui.render(operations=[...])` from a tool, which the middleware streams to the frontend.
-
-### Two patterns
-
-| Pattern            | Description                                                                   | Agent tool       | Frontend                                    |
-| ------------------ | ----------------------------------------------------------------------------- | ---------------- | ------------------------------------------- |
-| **Fixed schema**   | Pre-defined component layout. Only the data changes per invocation.           | `search_flights` | Schema in `a2ui/schemas/flight_schema.json` |
-| **Dynamic schema** | A secondary LLM generates both components and data based on the conversation. | `generate_a2ui`  | Components decided at runtime               |
-
-Both patterns use the same catalog on the frontend — the difference is where the component tree comes from.
-
-### Key files
-
-| Purpose                              | Path                                               |
-| ------------------------------------ | -------------------------------------------------- |
-| Catalog definitions (Zod schemas)    | `src/app/declarative-generative-ui/definitions.ts` |
-| Catalog renderers (React components) | `src/app/declarative-generative-ui/renderers.tsx`  |
-| Catalog registration                 | `src/app/layout.tsx`                               |
-| Fixed-schema agent tool              | `agent/src/a2ui_fixed_schema.py`                   |
-| Dynamic-schema agent tool            | `agent/src/a2ui_dynamic_schema.py`                 |
-| Flight schema JSON                   | `agent/src/a2ui/schemas/flight_schema.json`        |
-| Showcase config                      | `showcase.json`                                    |
-
-### Adding a custom component
-
-1. **Define** the component schema in `definitions.ts`:
-
-   ```typescript
-   MyWidget: {
-     description: "A brief description for the agent.",
-     props: z.object({ title: z.string(), value: z.number() }),
-   },
-   ```
-
-2. **Render** it in `renderers.tsx`:
-
-   ```typescript
-   MyWidget: ({ props }) => (
-     <div>{props.title}: {props.value}</div>
-   ),
-   ```
-
-   Renderers are type-checked against the definitions — TypeScript will error if props don't match.
-
-3. **Use it** from the agent. The component is automatically available to both fixed-schema templates and the dynamic-schema LLM.
-
-### Adding a new fixed-schema tool
-
-1. Create a JSON schema file in `agent/src/a2ui/schemas/` describing the component tree.
-2. Create a Python tool that loads the schema with `a2ui.load_schema()` and returns `a2ui.render(operations=[...])` with your data. See `a2ui_fixed_schema.py` for the pattern.
-
-### Showcase mode
-
-`showcase.json` controls which suggestion pills are visually highlighted. Set `"showcase": "a2ui"` to highlight the A2UI demos, or `"showcase": "default"` for no highlights. This is configured automatically when scaffolding via `npx copilotkit create --framework a2ui`.
-
-### Further reading
-
-- [A2UI Specification](https://a2ui.org/specification/)
-- [CopilotKit A2UI Documentation](https://docs.copilotkit.ai)
-
-## Documentation
-
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/) - Learn more about LangGraph and its features
-- [CopilotKit Documentation](https://docs.copilotkit.ai) - Explore CopilotKit's capabilities
-
-## Contributing
-
-Feel free to submit issues and enhancement requests! This starter is designed to be easily extensible.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Troubleshooting
-
-### Agent Connection Issues
-
-If you see "I'm having trouble connecting to my tools", make sure:
-
-1. The LangGraph agent is running on port 8123
-2. Your OpenAI API key is set correctly
-3. Both servers started successfully
-
-### Python Dependencies
-
-If you encounter Python import errors:
-
-```bash
-npm run install:agent
-```
+## 🛡️ Production & Pipeline Rules
+*   **No Raw Binary in Graph State**: Large files (WAV, MP4, PNG) must never be written to the LangGraph state. Store S3/local URLs instead to prevent database Checkpoint bloat.
+*   **Strict MCP Boundaries**: All physical actions (file mutations, FFmpeg stitches, ComfyUI calls) must communicate via standard Model Context Protocol (MCP) to ensure separation between inference and execution.
+*   **HITL Approvals**: Enforce human-in-the-loop gates after storyboard layouts and voice casting before initiating GPU intensive renders.

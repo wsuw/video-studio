@@ -222,7 +222,7 @@ Invoke-RestMethod -Uri "http://localhost:8125/health" -Method Get
    ```
 
 3. **微服务自适应加载与健壮性**：
-   当 `STORAGE_BACKEND=s3` 且微服务能够正常连接 MinIO 时，视频/图像生成接口（如 LTX-2 和 Flux Klein）返回的 `url` 将自适应切换为 S3 高可用直链。例如：
+   当 `STORAGE_BACKEND=s3` 且微服务能够正常连接 MinIO 时，视频/图像生成接口（如 LTX-2 和 Flux.2-klein）返回的 `url` 将自适应切换为 S3 高可用直链。例如：
    ```json
    {
      "status": "success",

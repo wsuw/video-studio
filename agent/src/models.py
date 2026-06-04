@@ -76,11 +76,11 @@ def get_model(parallel_tool_calls: bool = True) -> Any:
 
 
 # ==========================================
-# 2. Local Flux & OpenRouter Video Generation
+# 2. Local Flux.2-klein & OpenRouter Video Generation
 # ==========================================
 def generate_image(prompt: str, entity_type: str = "character") -> str:
     """
-    Generate an image using the local Flux server.
+    Generate an image using the local Flux.2-klein server.
     Raises an exception if it is offline or fails, allowing the client to show errors.
     """
     import hashlib
